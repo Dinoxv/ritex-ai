@@ -27,8 +27,14 @@ export class MetadataCache {
       return cached;
     }
 
+    // HIP-3 coins (e.g. "xyz:SILVER") need to query the specific DEX
+    const isHip3 = coin.includes(':');
+    const dexName = isHip3 ? coin.split(':')[0] : undefined;
+
     const [meta, book] = await Promise.all([
-      service.publicClient.meta(),
+      isHip3
+        ? service.getMetaAndAssetCtxs(dexName).then(r => r.meta)
+        : service.publicClient.meta(),
       service.publicClient.l2Book({ coin })
     ]);
 

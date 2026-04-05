@@ -25,9 +25,9 @@ export default function QuickCloseButtons() {
       return;
     }
     try {
-      const [positions, allMids, metadata] = await Promise.all([
+      const [positions, midPrice, metadata] = await Promise.all([
         service.getOpenPositions(),
-        service.getAllMids(),
+        service.getMidPrice(symbol),
         service.getMetadataCache(symbol)
       ]);
 
@@ -37,7 +37,7 @@ export default function QuickCloseButtons() {
         return;
       }
 
-      const currentPrice = parseFloat(allMids[symbol] || '0');
+      const currentPrice = parseFloat(midPrice);
       const isLong = parseFloat(position.position.szi) > 0;
       const slippage = 0.005;
       const closePrice = isLong

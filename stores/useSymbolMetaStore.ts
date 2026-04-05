@@ -40,15 +40,15 @@ export const useSymbolMetaStore = create<SymbolMetaStore>((set, get) => ({
     set({ loading: true, error: null });
 
     try {
-      const data = await service.getMeta();
-
-      if (!data.universe || !Array.isArray(data.universe)) {
-        throw new Error('Invalid metadata response');
-      }
+      // Fetch all perp DEX metadata (main + HIP-3 DEXes)
+      const allMetas = await service.getAllPerpMetas();
 
       const metadata: Record<string, SymbolMeta> = {};
-      data.universe.forEach((symbol: SymbolMeta) => {
-        metadata[symbol.name] = symbol;
+      allMetas.forEach((dexMeta: any) => {
+        if (!dexMeta.universe || !Array.isArray(dexMeta.universe)) return;
+        dexMeta.universe.forEach((symbol: SymbolMeta) => {
+          metadata[symbol.name] = symbol;
+        });
       });
 
       set({ metadata, loading: false });

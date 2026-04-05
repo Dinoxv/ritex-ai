@@ -8,18 +8,27 @@ interface MultiChartPageProps {
   }>;
 }
 
+function normalizeSymbol(s: string): string {
+  const decoded = decodeURIComponent(s);
+  if (decoded.includes(':')) {
+    const [dex, coin] = decoded.split(':');
+    return `${dex.toLowerCase()}:${coin.toUpperCase()}`;
+  }
+  return decoded.toUpperCase();
+}
+
 export async function generateMetadata({ params }: MultiChartPageProps): Promise<Metadata> {
   const { symbol } = await params;
-  const upperSymbol = symbol.toUpperCase();
+  const normalized = normalizeSymbol(symbol);
 
   return {
-    title: `${upperSymbol} Multi-Chart | RITEX AI`,
-    description: `${upperSymbol} multi-timeframe analysis with synchronized charts`,
+    title: `${normalized} Multi-Chart | RITEX AI`,
+    description: `${normalized} multi-timeframe analysis with synchronized charts`,
   };
 }
 
 export default async function MultiChartPage({ params }: MultiChartPageProps) {
   const { address, symbol } = await params;
 
-  return <MultiChartView coin={symbol} />;
+  return <MultiChartView coin={normalizeSymbol(symbol)} />;
 }

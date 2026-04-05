@@ -814,6 +814,23 @@ export class HyperliquidService implements IHyperliquidService {
     return await this.publicClient.allMids();
   }
 
+  /**
+   * Get mid price for any coin (including HIP-3).
+   * allMids() doesn't include HIP-3 tokens, so we fallback to metaAndAssetCtxs.
+   */
+  async getMidPrice(coin: string): Promise<string> {
+    if (!coin.includes(':')) {
+      const mids = await this.getAllMids();
+      return mids[coin] || '0';
+    }
+    // HIP-3 coin — get price from DEX-specific asset context
+    const dexName = coin.split(':')[0];
+    const { meta, assetCtxs } = await this.getMetaAndAssetCtxs(dexName);
+    const idx = meta.universe.findIndex(u => u.name === coin);
+    if (idx === -1) return '0';
+    return assetCtxs[idx]?.midPx || assetCtxs[idx]?.markPx || '0';
+  }
+
   async getMetaAndAssetCtxs(dex?: string): Promise<MetaAndAssetCtxs> {
     const params = dex !== undefined ? { dex } : undefined;
     const [meta, assetCtxs] = await this.publicClient.metaAndAssetCtxs(params);

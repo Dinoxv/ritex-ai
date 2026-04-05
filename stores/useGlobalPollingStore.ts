@@ -6,6 +6,7 @@ import { useSymbolVolatilityStore } from './useSymbolVolatilityStore';
 import { useTopSymbolsStore } from './useTopSymbolsStore';
 import { useCandleStore } from './useCandleStore';
 import { useDexStore } from './useDexStore';
+import { useSidebarPricesStore } from './useSidebarPricesStore';
 
 interface GlobalPollingStore {
   service: HyperliquidService | null;
@@ -105,6 +106,11 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
 
           volatilityStore.updateFromGlobalPoll(metaData);
           topSymbolsStore.updateFromGlobalPoll(metaData);
+
+          // Merge HIP-3 DEX prices into sidebar (allMids WS doesn't include them)
+          if (selectedDex) {
+            useSidebarPricesStore.getState().mergeExternalPrices(metaData);
+          }
         }
       }
 

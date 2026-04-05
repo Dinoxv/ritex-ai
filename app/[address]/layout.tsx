@@ -20,8 +20,10 @@ export default function AddressLayout({ children, params }: AddressLayoutProps) 
   }
 
   const pathSegments = pathname.split('/').filter(Boolean);
-  const lastSegment = pathSegments[pathSegments.length - 1];
-  const selectedSymbol = lastSegment?.toUpperCase() || '';
+  const lastSegment = decodeURIComponent(pathSegments[pathSegments.length - 1] || '');
+  const selectedSymbol = lastSegment?.includes(':') 
+    ? `${lastSegment.split(':')[0].toLowerCase()}:${lastSegment.split(':')[1].toUpperCase()}`
+    : lastSegment?.toUpperCase() || '';
 
   console.log('[AddressLayout] pathname:', pathname, 'selectedSymbol:', selectedSymbol);
 

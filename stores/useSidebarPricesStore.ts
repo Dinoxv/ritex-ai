@@ -12,6 +12,7 @@ interface SidebarPricesStore {
   subscribe: () => void;
   unsubscribe: () => void;
   getPrice: (coin: string) => number | null;
+  mergeExternalPrices: (data: { meta: any; assetCtxs: any[] }) => void;
 }
 
 export const useSidebarPricesStore = create<SidebarPricesStore>((set, get) => ({
@@ -49,5 +50,15 @@ export const useSidebarPricesStore = create<SidebarPricesStore>((set, get) => ({
 
   getPrice: (coin: string) => {
     return get().prices[coin] || null;
+  },
+
+  mergeExternalPrices: (data: { meta: any; assetCtxs: any[] }) => {
+    const { meta, assetCtxs } = data;
+    const external: Record<string, number> = {};
+    meta.universe.forEach((u: any, i: number) => {
+      const px = parseFloat(assetCtxs[i]?.midPx || assetCtxs[i]?.markPx || '0');
+      if (px > 0) external[u.name] = px;
+    });
+    set((state) => ({ prices: { ...state.prices, ...external } }));
   },
 }));

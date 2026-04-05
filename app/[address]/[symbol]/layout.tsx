@@ -7,9 +7,18 @@ interface SymbolLayoutProps {
   params: Promise<{ address: string; symbol: string }>;
 }
 
+function normalizeSymbol(s: string): string {
+  const decoded = decodeURIComponent(s);
+  if (decoded.includes(':')) {
+    const [dex, coin] = decoded.split(':');
+    return `${dex.toLowerCase()}:${coin.toUpperCase()}`;
+  }
+  return decoded.toUpperCase();
+}
+
 export default function SymbolLayout({ children, params }: SymbolLayoutProps) {
   const { symbol } = use(params);
-  const upperSymbol = symbol.toUpperCase();
+  const upperSymbol = normalizeSymbol(symbol);
 
   useEffect(() => {
     document.title = `${upperSymbol} - RITEX AI`;

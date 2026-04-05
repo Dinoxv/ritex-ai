@@ -1106,9 +1106,9 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
     }));
 
     try {
-      const [positions, allMids, metadata] = await Promise.all([
+      const [positions, midPrice, metadata] = await Promise.all([
         service.getOpenPositions(),
-        service.getAllMids(),
+        service.getMidPrice(symbol),
         service.getMetadataCache(symbol)
       ]);
 
@@ -1121,7 +1121,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
       const fullSize = Math.abs(parseFloat(position.position.szi));
       const sizeToClose = percentage === 100 ? undefined : ((fullSize * percentage) / 100).toString();
 
-      const currentPrice = parseFloat(allMids[symbol] || '0');
+      const currentPrice = parseFloat(midPrice);
       const isLong = parseFloat(position.position.szi) > 0;
       const slippage = 0.005;
       const closePrice = isLong
@@ -1163,9 +1163,9 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
     const tempId = `temp_${Date.now()}_sl`;
 
     try {
-      const [positions, allMids, metadata] = await Promise.all([
+      const [positions, midPrice, metadata] = await Promise.all([
         service.getOpenPositions(),
-        service.getAllMids(),
+        service.getMidPrice(coin),
         service.getMetadataCache(coin)
       ]);
 
@@ -1177,7 +1177,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
       const szi = parseFloat(assetPosition.position.szi);
       const entryPrice = parseFloat(assetPosition.position.entryPx || '0');
-      const currentPrice = parseFloat(allMids[coin] || '0');
+      const currentPrice = parseFloat(midPrice);
       const side: 'long' | 'short' = szi > 0 ? 'long' : 'short';
       const size = Math.abs(szi);
 
