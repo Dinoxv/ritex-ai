@@ -66,6 +66,61 @@ export interface Translations {
     openSourceOnGithub: string;
     builtBy: string;
     betaWarning: string;
+    // Stats
+    statsLines: string;
+    statsStores: string;
+    statsComponents: string;
+    statsIndicators: string;
+    statsScanners: string;
+    statsThemes: string;
+    // Architecture section
+    architectureTitle: string;
+    architectureDesc: string;
+    archLayerUI: string;
+    archLayerUIDesc: string;
+    archLayerState: string;
+    archLayerStateDesc: string;
+    archLayerService: string;
+    archLayerServiceDesc: string;
+    archLayerTransport: string;
+    archLayerTransportDesc: string;
+    // Tech indicators section
+    techIndicatorsTitle: string;
+    techIndicatorsDesc: string;
+    trendIndicators: string;
+    trendIndicatorsList: string;
+    momentumIndicators: string;
+    momentumIndicatorsList: string;
+    patternDetection: string;
+    patternDetectionList: string;
+    divergenceTitle: string;
+    divergenceDesc: string;
+    // Trading flow section
+    tradingFlowTitle: string;
+    cloudOrdersTitle: string;
+    cloudOrdersDesc: string;
+    marketOrdersTitle: string;
+    marketOrdersDesc: string;
+    tpslTitle: string;
+    tpslDesc: string;
+    optimisticUITitle: string;
+    optimisticUIDesc: string;
+    // Performance section
+    performanceTitle: string;
+    perfRAF: string;
+    perfRAFDesc: string;
+    perfMemo: string;
+    perfMemoDesc: string;
+    perfVirtual: string;
+    perfVirtualDesc: string;
+    perfDebounce: string;
+    perfDebounceDesc: string;
+    perfCache: string;
+    perfCacheDesc: string;
+    perfLazyWS: string;
+    perfLazyWSDesc: string;
+    // Tech stack section
+    techStackTitle: string;
   };
   // Auth
   auth: {
