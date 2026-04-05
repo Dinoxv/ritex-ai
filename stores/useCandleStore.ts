@@ -63,10 +63,6 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
       return;
     }
 
-    const intervalMs = INTERVAL_TO_MS[interval];
-    const actualEndTime = Date.now();
-    const actualStartTime = actualEndTime - (1200 * intervalMs);
-
     set((state) => ({
       loading: { ...state.loading, [key]: true },
       errors: { ...state.errors, [key]: null },
@@ -76,8 +72,8 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
       const data = await service.getCandles({
         coin,
         interval,
-        startTime: actualStartTime,
-        endTime: actualEndTime,
+        startTime,
+        endTime,
       });
 
       const formattedData = data.map((candle) => formatCandle(candle, coin));
@@ -106,7 +102,7 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
     const oldestTime = existing[0].time as number;
     const intervalMs = INTERVAL_TO_MS[interval];
     const batchSize = 500;
-    const endTime = oldestTime * 1000; // convert seconds to ms
+    const endTime = oldestTime; // already in ms
     const startTime = endTime - (batchSize * intervalMs);
 
     set((state) => ({
