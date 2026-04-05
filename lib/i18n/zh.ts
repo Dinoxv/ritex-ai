@@ -58,7 +58,7 @@ export const zh: Translations = {
     readyToTrade: '准备交易？',
     readyToTradeDesc: '零设置开始更聪明的剥头皮交易。连接钱包即可开始。',
     openSourceOnGithub: 'GitHub开源',
-    builtBy: '由 Jo Vinkenroye 开发',
+    builtBy: '由 RITEX AI 开发',
     betaWarning: 'BETA软件：此平台处于测试阶段。交易存在重大财务损失风险。过往表现不代表未来结果。风险自负。',
   },
   auth: {

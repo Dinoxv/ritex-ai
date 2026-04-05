@@ -58,7 +58,7 @@ export const en: Translations = {
     readyToTrade: 'READY TO TRADE?',
     readyToTradeDesc: 'Start scalping smarter with zero setup. Connect your wallet and go.',
     openSourceOnGithub: 'Open Source on GitHub',
-    builtBy: 'Built by Jo Vinkenroye',
+    builtBy: 'Built by RITEX AI',
     betaWarning: 'BETA SOFTWARE: This platform is in beta. Trading carries substantial risk of financial loss. Past performance is not indicative of future results. Use at your own risk.',
   },
   auth: {

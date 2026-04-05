@@ -113,7 +113,7 @@ export default function LandingPage() {
                   BETA
                 </span>
                 <a
-                  href="https://github.com/gaiproai/ritex-ai"
+                  href="https://github.com/Dinoxv/ritex-ai"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="p-2 bg-white/5 hover:bg-white/10 border border-white/10 hover:border-primary/50 rounded-lg transition-all hover:scale-110"
@@ -546,7 +546,7 @@ export default function LandingPage() {
               </div>
               <div className="mt-8 pt-6 border-t border-white/10">
                 <a
-                  href="https://github.com/gaiproai/ritex-ai"
+                  href="https://github.com/Dinoxv/ritex-ai"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="inline-flex items-center gap-2 text-gray-400 hover:text-primary transition-colors font-mono text-xs md:text-sm"

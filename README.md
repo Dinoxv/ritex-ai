@@ -1,85 +1,97 @@
+<div align="center">
+
 # RITEX AI
+
+### Nền Tảng Giao Dịch Chuyên Nghiệp cho Hyperliquid DEX
+
+[![Website](https://img.shields.io/badge/Website-ritexai.com-00C853?style=for-the-badge&logo=google-chrome&logoColor=white)](https://ritexai.com)
+[![GitHub](https://img.shields.io/badge/GitHub-Dinoxv%2Fritex--ai-181717?style=for-the-badge&logo=github&logoColor=white)](https://github.com/Dinoxv/ritex-ai)
 
 ![RITEX AI Hero](public/landing/hero.png)
 
-A professional real-time cryptocurrency trading terminal for Hyperliquid DEX with advanced technical analysis, multi-timeframe charting, and automated signal detection.
+**Giao dịch thông minh hơn. Tốc độ nhanh hơn. Lợi nhuận nhiều hơn.**
 
-## Features
+100% xử lý tại trình duyệt — Khóa riêng không bao giờ rời khỏi máy bạn.
 
-### Trading Terminal
-- Real-time candlestick charts with TradingView lightweight-charts
-- Multi-symbol support with live price tracking
-- Position and order management with visual indicators
-- One-click chart popups for multi-monitor setups
-- Wallet change history tracking with 50/50 split panel view
-- Real-time trade stream with grouping and filtering
-- Support for multiple Hyperliquid addresses
+[Truy cập ngay →](https://ritexai.com) · [Xem Demo](https://ritexai.com)
 
-### Technical Analysis
-- **Indicators**: EMA (5/20/50), MACD, RSI, Stochastic Oscillator
-- **Channels**: Donchian and Keltner channels
-- **Support/Resistance**: Automatic detection with touch counting and distance calculation
-- **Divergence Detection**: Regular and hidden divergences (MACD, RSI, Stochastic)
-- **Pivot Points**: Automatic pivot high/low detection
-- **Price Action**: Multi-variant signal detection across timeframes
+</div>
 
-### Scanner & Signals
-- Real-time signal scanner across all symbols
-- Bullish/bearish signal detection with confidence scoring
-- Multi-timeframe analysis (1m, 5m, 15m, 1h, 4h, 1d)
-- Divergence signal aggregation
-- Mini price charts with signal visualization
-- Inverted mode for shorting strategies
+---
 
-### Multi-Timeframe Analysis
-- Synchronized multi-chart view (1m, 5m, 15m, 1h)
-- Independent timeframe analysis
-- Responsive grid layout
-- Chart-specific settings and indicators
+## Giới thiệu
 
-### Performance Optimizations
-- Virtual scrolling for symbol and scanner lists
-- RAF throttling for chart updates
-- Debounced divergence detection
-- Memoized calculations and components
-- Optimized WebSocket subscriptions
-- Efficient state management with Zustand
+**RITEX AI** là nền tảng giao dịch chuyên nghiệp kết nối trực tiếp đến [Hyperliquid DEX](https://hyperliquid.xyz) — sàn giao dịch phi tập trung hàng đầu. Không máy chủ trung gian, không thu thập dữ liệu. Mọi yêu cầu đi thẳng từ trình duyệt của bạn đến Hyperliquid.
 
-### UI/UX
-- **Themes**: Terminal Green, Synthwave, Amber, Girly Pastels
-- **Inverted Mode**: Flip colors for short-focused trading
-- **Mobile Support**: Responsive design with touch-friendly interface
-- **Tab Navigation**: Scanner, Symbols, All view modes
-- **Keyboard Shortcuts**: Quick navigation and actions
-- **Sound Notifications**: Customizable audio alerts
-- **Price Blink Animations**: Visual feedback for price changes
+### Tại sao chọn RITEX AI?
 
-### WebSocket Streams
-- Live candle updates across all timeframes
-- Real-time trade data with latency tracking
-- Price ticker with 24h statistics
-- Automatic reconnection and error handling
-- Multi-subscription management
+| | Đặc điểm | Mô tả |
+|---|---|---|
+| 🔒 | **Bảo mật tuyệt đối** | Khóa riêng được mã hóa cục bộ, không bao giờ truyền đi |
+| ⚡ | **Tốc độ thời gian thực** | WebSocket trực tiếp, cập nhật biểu đồ và giá tức thì |
+| 📊 | **Phân tích chuyên sâu** | EMA, MACD, RSI, Stochastic, phát hiện phân kỳ tự động |
+| 🔍 | **Quét thị trường** | Tự động quét toàn bộ thị trường tìm tín hiệu giao dịch |
+| 🌐 | **Đa ngôn ngữ** | Hỗ trợ Tiếng Việt, English, 中文 |
 
-## Getting Started
+---
 
-### Prerequisites
+## Tính năng chính
+
+### 📈 Biểu đồ & Phân tích kỹ thuật
+- Biểu đồ nến thời gian thực (TradingView lightweight-charts)
+- Chỉ báo: EMA (5/20/50), MACD, RSI, Stochastic Oscillator
+- Kênh Donchian và Keltner
+- Phát hiện hỗ trợ/kháng cự tự động
+- Phát hiện phân kỳ thường và ẩn (MACD, RSI, Stochastic)
+- Phân tích đa khung thời gian đồng bộ (1m, 5m, 15m, 1h)
+
+### 🔍 Quét tín hiệu thị trường
+- Quét toàn bộ cặp giao dịch tìm tín hiệu
+- Phát hiện Stochastic cực đoan, EMA đồng hướng, đột biến khối lượng
+- Phân kỳ đa khung thời gian với chấm điểm độ tin cậy
+- Chế độ đảo ngược cho chiến lược bán khống
+
+### ⚡ Thực thi lệnh
+- Cloud ladder để trải lệnh DCA chính xác
+- Lệnh thị trường một chạm
+- Cắt lỗ và chốt lời tự động
+- Phím tắt cho mọi hành động giao dịch
+
+### 📊 Theo dõi hiệu suất
+- Thống kê P&L theo ngày và tháng
+- Biểu đồ P&L tích lũy
+- Tỷ lệ thắng, trung bình giao dịch, phí
+- Theo dõi ví của trader khác (Watchlist)
+
+### 🎨 Giao diện
+- 20+ giao diện màu sắc (Terminal Green, Synthwave, Amber, Cyberpunk, Matrix...)
+- Hỗ trợ đa màn hình — bật biểu đồ ra cửa sổ riêng
+- Thiết kế responsive cho mobile
+- Thông báo âm thanh tùy chỉnh
+
+---
+
+## Bắt đầu
+
+### Yêu cầu
 - Node.js 18+
-- Hyperliquid wallet address (read-only mode supported)
+- Địa chỉ ví Hyperliquid (hỗ trợ chế độ chỉ đọc)
 
-### Installation
+### Cài đặt
 
 ```bash
+git clone https://github.com/Dinoxv/ritex-ai.git
+cd ritex-ai
 npm install
 ```
 
-### Development
+### Phát triển
 
 ```bash
 npm run dev
 ```
 
-Application runs at [http://localhost:3001](http://localhost:3001)
+Truy cập tại [http://localhost:3001](http://localhost:3001)
 
 ### Production
 
@@ -88,120 +100,69 @@ npm run build
 npm start
 ```
 
-## Project Structure
+### Deploy với PM2
+
+```bash
+pm2 start ecosystem.config.js
+```
+
+---
+
+## Công nghệ
+
+| Thành phần | Công nghệ |
+|---|---|
+| Framework | Next.js 16 + React 19 |
+| Ngôn ngữ | TypeScript 5 |
+| Giao diện | TailwindCSS 4 |
+| Biểu đồ | TradingView lightweight-charts 4.2 |
+| State | Zustand 5 (20+ store) |
+| API | @nktkas/hyperliquid SDK |
+| Font | BinancePlex (local) |
+| i18n | Tiếng Việt, English, 中文 |
+
+---
+
+## Phím tắt
+
+| Phím | Hành động |
+|---|---|
+| `Ctrl/Cmd + K` | Tìm kiếm nhanh cặp giao dịch |
+| `Ctrl/Cmd + M` | Bật/tắt đa khung thời gian |
+| `Ctrl/Cmd + I` | Bật/tắt chế độ đảo ngược |
+| `Ctrl/Cmd + ,` | Mở cài đặt |
+
+---
+
+## Cấu trúc dự án
 
 ```
 ritex-ai/
-├── app/
-│   ├── [address]/
-│   │   ├── [symbol]/          # Single symbol view
-│   │   ├── multi-chart/       # Multi-timeframe view
-│   │   ├── chart-popup/       # Popup windows
-│   │   ├── watchlist/         # Watchlist page
-│   │   └── trades/            # Trade history
-│   ├── layout.tsx
-│   └── page.tsx
-├── components/
-│   ├── layout/
-│   │   ├── Sidepanel.tsx      # Symbol list & scanner
-│   │   └── TerminalHeader.tsx # Header with controls
-│   ├── scanner/               # Scanner components
-│   ├── sidepanel/             # Symbol list components
-│   ├── orders/                # Order management
-│   ├── symbol/                # Symbol view
-│   ├── ScalpingChart.tsx      # Main chart component
-│   └── MultiTimeframeChart.tsx
-├── stores/
-│   ├── useSettingsStore.ts
-│   ├── useScannerStore.ts
-│   ├── usePositionStore.ts
-│   ├── useOrderStore.ts
-│   └── ...                    # 20+ Zustand stores
+├── app/                    # Next.js App Router
+│   ├── [address]/          # Các trang giao dịch
+│   ├── layout.tsx          # Layout chính + SEO
+│   └── page.tsx            # Trang chủ
+├── components/             # React components
+├── stores/                 # Zustand stores (20+)
 ├── lib/
-│   ├── indicators.ts          # Technical analysis
-│   ├── websocket/             # WebSocket managers
-│   ├── services/              # API services
-│   ├── performance-utils.ts   # Optimization utilities
-│   └── ...
-├── hooks/                     # React hooks
-├── models/                    # TypeScript interfaces
-└── types/                     # Type definitions
+│   ├── indicators.ts       # Phân tích kỹ thuật
+│   ├── i18n/               # Đa ngôn ngữ (en/vi/zh)
+│   ├── services/           # API services
+│   └── websocket/          # WebSocket managers
+├── hooks/                  # React hooks
+└── types/                  # TypeScript types
 ```
 
-## Technology Stack
+---
 
-- **Framework**: Next.js 16 with React 19
-- **Language**: TypeScript 5
-- **Styling**: TailwindCSS 4
-- **Charts**: TradingView lightweight-charts 4.2
-- **State**: Zustand 5
-- **API**: @nktkas/hyperliquid SDK
-- **WebSocket**: Native WebSocket with ws library
-- **Virtualization**: @tanstack/react-virtual
-- **Notifications**: react-hot-toast, sonner
-- **Analytics**: Vercel Analytics
+## Tác giả
 
-## Key Concepts
+Phát triển bởi **RITEX AI** — [ritexai.com](https://ritexai.com)
 
-### Inverted Mode
-Flips bullish/bearish colors and signals for traders focused on shorting. When enabled:
-- Green becomes red and vice versa
-- Support becomes resistance
-- Bullish signals show as bearish
-- All logic remains the same, only visual representation inverts
+## Giấy phép
 
-### Signal Detection
-The scanner analyzes multiple factors:
-- Stochastic crossovers (oversold/overbought)
-- EMA alignment and crossovers
-- MACD histogram and signal line crosses
-- RSI extremes and divergences
-- Volume spikes
-- Channel breakouts/bounces
-- Support/resistance proximity
+Chỉ sử dụng cá nhân.
 
-### Performance Architecture
-- Virtual scrolling renders only visible items (~5-10 vs 100+ DOM nodes)
-- RAF throttling limits chart redraws to ~60fps
-- Debounced divergence detection (1000ms) prevents constant recalculation
-- Memoized components prevent unnecessary re-renders
-- Optimized WebSocket subscription pooling
+## Tuyên bố miễn trừ
 
-## Routes
-
-- `/[address]/[symbol]` - Single symbol trading view
-- `/[address]/multi-chart/[symbol]` - Multi-timeframe view
-- `/[address]/watchlist` - Watchlist management
-- `/[address]/trades` - Trade history
-- `/[address]/chart-popup/[symbol]` - Popup chart window
-
-## Settings
-
-Access via settings panel (⚙️):
-- **Chart**: Theme, inverted mode, indicators, channels
-- **Scanner**: Signal filters, timeframes, divergence settings
-- **Trading**: Position size, leverage, order types
-- **UI**: Animations, sounds, mobile view preferences
-
-## Keyboard Shortcuts
-
-- `Ctrl/Cmd + K` - Quick symbol search
-- `Ctrl/Cmd + M` - Toggle multi-chart view
-- `Ctrl/Cmd + I` - Toggle inverted mode
-- `Ctrl/Cmd + ,` - Open settings
-
-## Contributing
-
-This is a personal trading terminal project. Feel free to fork and customize for your own needs.
-
-## License
-
-Private use only.
-
-## Author
-
-Built by [Jo Vinkenroye](https://jovweb.dev)
-
-## Disclaimer
-
-This software is for educational and informational purposes only. Trading cryptocurrencies carries significant risk. Use at your own discretion. The authors are not responsible for any financial losses.
+Phần mềm này chỉ dành cho mục đích giáo dục và tham khảo. Giao dịch tiền mã hóa có rủi ro tổn thất tài chính đáng kể. Hiệu suất quá khứ không đảm bảo kết quả tương lai. Sử dụng theo rủi ro của bạn.

@@ -295,12 +295,12 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
           <span className="whitespace-nowrap overflow-hidden text-ellipsis">█ HYPERLIQUID TERMINAL <span className="text-primary-muted font-normal text-xs hidden sm:inline">v1.0.0</span></span>
           <span className="text-primary-muted font-normal text-xs hidden lg:inline">by</span>
           <a
-            href="https://github.com/jestersimpps"
+            href="https://github.com/Dinoxv/ritex-ai"
             target="_blank"
             rel="noopener noreferrer"
             className="text-primary-muted font-normal text-xs hover:text-primary hover:underline transition-colors hidden lg:inline"
           >
-            @jestersimpps
+            RITEX AI
           </a>
         </div>
 
