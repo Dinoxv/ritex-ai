@@ -8,6 +8,34 @@ interface EncryptedData {
   salt: string;
 }
 
+function isSecureContext(): boolean {
+  return typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined';
+}
+
+// --- XOR-based fallback for non-secure (HTTP) contexts ---
+
+function xorEncrypt(data: string, password: string): string {
+  const dataBytes = new TextEncoder().encode(data);
+  const keyBytes = new TextEncoder().encode(password);
+  const out = new Uint8Array(dataBytes.length);
+  for (let i = 0; i < dataBytes.length; i++) {
+    out[i] = dataBytes[i] ^ keyBytes[i % keyBytes.length];
+  }
+  return bufferToBase64(out);
+}
+
+function xorDecrypt(encoded: string, password: string): string {
+  const dataBytes = new Uint8Array(base64ToBuffer(encoded));
+  const keyBytes = new TextEncoder().encode(password);
+  const out = new Uint8Array(dataBytes.length);
+  for (let i = 0; i < dataBytes.length; i++) {
+    out[i] = dataBytes[i] ^ keyBytes[i % keyBytes.length];
+  }
+  return new TextDecoder().decode(out);
+}
+
+// --- Web Crypto (HTTPS) path ---
+
 async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey> {
   const encoder = new TextEncoder();
   const passwordKey = await crypto.subtle.importKey(
@@ -33,6 +61,12 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
 }
 
 export async function encryptData(data: string, password: string): Promise<EncryptedData> {
+  if (!isSecureContext()) {
+    const salt = bufferToBase64(crypto.getRandomValues(new Uint8Array(SALT_LENGTH)));
+    const iv = bufferToBase64(crypto.getRandomValues(new Uint8Array(IV_LENGTH)));
+    return { encrypted: xorEncrypt(data, password), iv, salt };
+  }
+
   const encoder = new TextEncoder();
   const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
   const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
@@ -55,6 +89,10 @@ export async function decryptData(
   encryptedData: EncryptedData,
   password: string
 ): Promise<string> {
+  if (!isSecureContext()) {
+    return xorDecrypt(encryptedData.encrypted, password);
+  }
+
   const salt = base64ToBuffer(encryptedData.salt);
   const iv = base64ToBuffer(encryptedData.iv);
   const encrypted = base64ToBuffer(encryptedData.encrypted);

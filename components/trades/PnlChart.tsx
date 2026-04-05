@@ -118,7 +118,7 @@ function PnlChart({ groups }: PnlChartProps) {
         ticks: {
           color: '#9ca3af',
           font: {
-            family: 'monospace',
+            family: 'BinancePlex, sans-serif',
             size: 10
           },
           maxRotation: 0
@@ -135,7 +135,7 @@ function PnlChart({ groups }: PnlChartProps) {
         ticks: {
           color: '#9ca3af',
           font: {
-            family: 'monospace',
+            family: 'BinancePlex, sans-serif',
             size: 10
           },
           callback: function(value) {

@@ -1,4 +1,4 @@
-import type { AssetPosition, FrontendOrder } from '@nktkas/hyperliquid';
+import type { AssetPosition, FrontendOrder } from '@/lib/services/types';
 import type { UserFill } from '@/types';
 import type { AccountBalance } from '@/lib/services/types';
 

@@ -13,7 +13,7 @@ export async function generateMetadata({ params }: MultiChartPageProps): Promise
   const upperSymbol = symbol.toUpperCase();
 
   return {
-    title: `${upperSymbol} Multi-Chart | Hyperscalper`,
+    title: `${upperSymbol} Multi-Chart | RITEX AI`,
     description: `${upperSymbol} multi-timeframe analysis with synchronized charts`,
   };
 }

@@ -10,7 +10,7 @@ export async function generateMetadata({ params }: SymbolPageProps): Promise<Met
   const upperSymbol = symbol.toUpperCase();
 
   return {
-    title: `${upperSymbol} Trading | Hyperscalper`,
+    title: `${upperSymbol} Trading | RITEX AI`,
     description: `Real-time ${upperSymbol} chart with advanced scalping tools on Hyperliquid DEX`,
   };
 }

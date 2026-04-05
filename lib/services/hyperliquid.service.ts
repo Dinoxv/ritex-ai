@@ -1,21 +1,16 @@
 import {
-  PublicClient,
-  WalletClient,
-  EventClient,
+  InfoClient,
+  ExchangeClient,
+  SubscriptionClient,
   HttpTransport,
   WebSocketTransport,
-  Book,
-  Candle,
-  WsTrade,
-  PerpsClearinghouseState,
-  AssetPosition,
-  FrontendOrder,
-  OrderResponse,
-  CancelResponse,
-  PerpsMeta,
-  AllMids,
-  SuccessResponse,
-  Fill
+} from '@nktkas/hyperliquid';
+import type {
+  CandleSnapshotResponse,
+  RecentTradesResponse,
+  ClearinghouseStateResponse,
+  UserFillsResponse,
+  PerpDexsResponse,
 } from '@nktkas/hyperliquid';
 import { privateKeyToAccount } from 'viem/accounts';
 import toast from 'react-hot-toast';
@@ -33,15 +28,28 @@ import type {
   ClosePositionParams,
   AccountBalance,
   TransformedCandle,
-  MetaAndAssetCtxs
+  MetaAndAssetCtxs,
+  SpotMetaAndAssetCtxs,
+  AssetPosition,
+  FrontendOrder,
+  OrderResponse,
+  CancelResponse,
+  SuccessResponse,
+  Fill,
+  Candle,
+  WsTrade,
+  PerpsClearinghouseState,
+  PerpsMeta,
+  SpotMeta,
+  AllMids,
 } from './types';
 import { metadataCache, type SymbolMetadata } from './metadata-cache.service';
 import { accountCache } from './account-cache.service';
 
 export class HyperliquidService implements IHyperliquidService {
-  public publicClient: PublicClient;
-  private walletClient: WalletClient | null = null;
-  private eventClient: EventClient | null = null;
+  public publicClient: InfoClient;
+  private walletClient: ExchangeClient | null = null;
+  private eventClient: SubscriptionClient | null = null;
   private isTestnet: boolean;
   private wsTransport: WebSocketTransport | null = null;
   private userAddress: string | null = null;
@@ -50,24 +58,22 @@ export class HyperliquidService implements IHyperliquidService {
     this.isTestnet = isTestnet;
     this.userAddress = walletAddress;
 
-    const httpUrl = isTestnet ? 'https://api.hyperliquid-testnet.xyz' : 'https://api.hyperliquid.xyz';
     const httpTransport = new HttpTransport({
-      url: httpUrl,
+      isTestnet,
       fetchOptions: {
         keepalive: false
       }
     });
 
-    this.publicClient = new PublicClient({ transport: httpTransport });
+    this.publicClient = new InfoClient({ transport: httpTransport });
 
     if (privateKey) {
       try {
         const account = privateKeyToAccount(privateKey as `0x${string}`);
 
-        this.walletClient = new WalletClient({
+        this.walletClient = new ExchangeClient({
           wallet: account,
           transport: httpTransport,
-          isTestnet
         });
       } catch (error) {
         const errorMessage = error instanceof Error ? error.message : 'Unknown error';
@@ -79,11 +85,8 @@ export class HyperliquidService implements IHyperliquidService {
 
   private initWebSocket() {
     if (!this.wsTransport) {
-      const wsUrl = this.isTestnet
-        ? 'wss://api.hyperliquid-testnet.xyz/ws'
-        : 'wss://api.hyperliquid.xyz/ws';
-      this.wsTransport = new WebSocketTransport({ url: wsUrl });
-      this.eventClient = new EventClient({ transport: this.wsTransport });
+      this.wsTransport = new WebSocketTransport({ isTestnet: this.isTestnet });
+      this.eventClient = new SubscriptionClient({ transport: this.wsTransport });
     }
   }
 
@@ -376,6 +379,7 @@ export class HyperliquidService implements IHyperliquidService {
 
   private async getTickSize(coin: string): Promise<number> {
     const book = await this.publicClient.l2Book({ coin });
+    if (!book) return 0.01;
     const bids = book.levels[0];
 
     if (!bids || bids.length < 2) {
@@ -444,6 +448,7 @@ export class HyperliquidService implements IHyperliquidService {
 
   private async getMarketPrice(coin: string, isBuy: boolean): Promise<string> {
     const book = await this.publicClient.l2Book({ coin });
+    if (!book) throw new Error(`No order book available for ${coin}`);
     const levels = isBuy ? book.levels[1] : book.levels[0];
     if (!levels || levels.length === 0) {
       throw new Error(`No market price available for ${coin}`);
@@ -809,22 +814,26 @@ export class HyperliquidService implements IHyperliquidService {
     return await this.publicClient.allMids();
   }
 
-  async getMetaAndAssetCtxs(): Promise<MetaAndAssetCtxs> {
-    const url = this.isTestnet
-      ? 'https://api.hyperliquid-testnet.xyz/info'
-      : 'https://api.hyperliquid.xyz/info';
+  async getMetaAndAssetCtxs(dex?: string): Promise<MetaAndAssetCtxs> {
+    const params = dex !== undefined ? { dex } : undefined;
+    const [meta, assetCtxs] = await this.publicClient.metaAndAssetCtxs(params);
+    return { meta, assetCtxs };
+  }
 
-    const response = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ type: 'metaAndAssetCtxs' })
-    });
+  async getPerpDexs(): Promise<PerpDexsResponse> {
+    return await this.publicClient.perpDexs();
+  }
 
-    if (!response.ok) {
-      throw new Error(`Failed to fetch metaAndAssetCtxs: ${response.statusText}`);
-    }
+  async getAllPerpMetas(): Promise<PerpsMeta[]> {
+    return await this.publicClient.allPerpMetas();
+  }
 
-    const [meta, assetCtxs] = await response.json();
+  async getSpotMeta(): Promise<SpotMeta> {
+    return await this.publicClient.spotMeta();
+  }
+
+  async getSpotMetaAndAssetCtxs(): Promise<SpotMetaAndAssetCtxs> {
+    const [meta, assetCtxs] = await this.publicClient.spotMetaAndAssetCtxs();
     return { meta, assetCtxs };
   }
 

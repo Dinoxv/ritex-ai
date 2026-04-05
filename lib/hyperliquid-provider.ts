@@ -1,5 +1,5 @@
 import type { ExchangeProvider, CandleData } from './exchange-provider.interface';
-import type { Candle } from '@nktkas/hyperliquid';
+import type { CandleSnapshotResponse } from '@nktkas/hyperliquid';
 
 export class HyperliquidProvider implements ExchangeProvider {
   private baseUrl: string;
@@ -45,7 +45,7 @@ export class HyperliquidProvider implements ExchangeProvider {
       throw new Error(`API request failed: ${response.statusText} - ${errorText}`);
     }
 
-    const candles = await response.json() as Candle[];
+    const candles = await response.json() as CandleSnapshotResponse;
 
     if (!Array.isArray(candles)) {
       throw new Error(`Invalid response format for ${params.coin}: expected array, got ${typeof candles}`);

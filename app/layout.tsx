@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import localFont from "next/font/local";
 import "./globals.css";
 import ThemeApplier from "@/components/providers/ThemeApplier";
 import SettingsPanel from "@/components/layout/SettingsPanel";
@@ -9,22 +9,23 @@ import { ConditionalServiceProvider } from "@/components/providers/ConditionalSe
 import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "react-hot-toast";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const binancePlex = localFont({
+  src: [
+    { path: "./font/BinancePlex-Light.woff2", weight: "300", style: "normal" },
+    { path: "./font/BinancePlex-Regular.woff2", weight: "400", style: "normal" },
+    { path: "./font/BinancePlex-Medium.woff2", weight: "500", style: "normal" },
+    { path: "./font/BinancePlex-SemiBold.woff2", weight: "600", style: "normal" },
+  ],
+  variable: "--font-binance",
+  display: "swap",
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const siteUrl = "https://hyperscalper.dev";
+const siteUrl = "https://ritexai.com";
 const ogImage = `${siteUrl}/landing/hero.png`;
 
 export const metadata: Metadata = {
-  title: "Hyperscalper | Advanced Scalping Terminal for Hyperliquid DEX",
-  description: "Professional scalping terminal for Hyperliquid. Real-time charts, market scanner, divergence detection & instant execution. 100% client-side — your keys never leave your browser.",
+  title: "RITEX AI | Advanced Trading Terminal for Hyperliquid DEX",
+  description: "Professional trading terminal for Hyperliquid. Real-time charts, market scanner, divergence detection & instant execution. 100% client-side — your keys never leave your browser.",
   metadataBase: new URL(siteUrl),
   alternates: {
     canonical: "/",
@@ -40,35 +41,47 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: siteUrl,
-    title: "Hyperscalper — Advanced Scalping Terminal for Hyperliquid",
-    description: "Professional scalping terminal for Hyperliquid DEX. Real-time charts, market scanner, divergence detection & instant order execution. 100% client-side.",
-    siteName: "Hyperscalper",
+    title: "RITEX AI — Advanced Trading Terminal for Hyperliquid",
+    description: "Professional trading terminal for Hyperliquid DEX. Real-time charts, market scanner, divergence detection & instant order execution. 100% client-side.",
+    siteName: "RITEX AI",
     images: [
       {
         url: ogImage,
         width: 1200,
         height: 630,
-        alt: "Hyperscalper Trading Terminal",
+        alt: "RITEX AI Trading Terminal",
       },
     ],
   },
   twitter: {
     card: "summary_large_image",
-    title: "Hyperscalper — Scalping Terminal for Hyperliquid",
+    title: "RITEX AI — Trading Terminal for Hyperliquid",
     description: "Real-time charts, market scanner, divergence detection & instant execution. 100% client-side — your keys never leave your browser.",
     images: [ogImage],
   },
-  authors: [{ name: "Jo Vinkenroye", url: "https://jovweb.dev" }],
+  authors: [{ name: "RITEX AI", url: "https://ritexai.com" }],
   keywords: [
     "Hyperliquid",
     "trading terminal",
-    "scalping",
-    "crypto trading bot",
+    "RITEX AI",
+    "crypto trading",
     "DEX trading",
     "technical analysis",
     "market scanner",
     "trading signals",
+    "scalping",
+    "DeFi",
+    "Hyperliquid DEX",
+    "perpetual trading",
+    "crypto terminal",
+    "real-time charts",
+    "order execution",
+    "divergence detection",
+    "multi-timeframe analysis",
   ],
+  other: {
+    "ai-content-declaration": "RITEX AI is a professional trading terminal for Hyperliquid DEX. Visit https://ritexai.com for more information.",
+  },
 };
 
 export const viewport = {
@@ -85,21 +98,25 @@ export default function RootLayout({
   return (
     <html lang="en">
       <head>
+        <link rel="alternate" hrefLang="en" href="https://ritexai.com" />
+        <link rel="alternate" hrefLang="vi" href="https://ritexai.com" />
+        <link rel="alternate" hrefLang="zh" href="https://ritexai.com" />
+        <link rel="alternate" hrefLang="x-default" href="https://ritexai.com" />
         <script
           type="application/ld+json"
           dangerouslySetInnerHTML={{
             __html: JSON.stringify({
               "@context": "https://schema.org",
               "@type": "WebApplication",
-              name: "Hyperscalper",
+              name: "RITEX AI",
               url: siteUrl,
-              description: "Professional scalping terminal for Hyperliquid DEX with real-time charts, market scanner, and instant order execution.",
+              description: "Professional trading terminal for Hyperliquid DEX with real-time charts, market scanner, and instant order execution.",
               applicationCategory: "FinanceApplication",
               operatingSystem: "Web",
               author: {
-                "@type": "Person",
-                name: "Jo Vinkenroye",
-                url: "https://jovweb.dev",
+                "@type": "Organization",
+                name: "RITEX AI",
+                url: "https://ritexai.com",
               },
               offers: {
                 "@type": "Offer",
@@ -111,7 +128,7 @@ export default function RootLayout({
         />
       </head>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} subpixel-antialiased`}
+        className={`${binancePlex.variable} subpixel-antialiased`}
         suppressHydrationWarning
       >
         <CredentialsProvider>
@@ -131,7 +148,7 @@ export default function RootLayout({
               background: 'var(--background-secondary)',
               color: 'var(--primary)',
               border: '1px solid var(--border-frame)',
-              fontFamily: 'monospace',
+              fontFamily: 'var(--font-binance), BinancePlex, sans-serif',
               fontSize: '12px',
             },
             success: {

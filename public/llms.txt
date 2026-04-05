@@ -1,10 +1,10 @@
-# HyperScalper
+# RITEX AI
 
 > A professional real-time cryptocurrency trading terminal for [Hyperliquid DEX](https://hyperliquid.xyz) with advanced technical analysis, multi-timeframe charting, and automated signal detection.
 
 ## What It Does
 
-HyperScalper is a self-hosted web-based trading terminal that connects to the Hyperliquid decentralized exchange. It provides real-time charting with TradingView lightweight-charts, a multi-symbol scanner with signal detection, position/order management, and WebSocket-driven live data feeds. It supports read-only mode (wallet address only) or full trading (with private key). 100% client-side — your keys never leave your browser.
+RITEX AI is a self-hosted web-based trading terminal that connects to the Hyperliquid decentralized exchange. It provides real-time charting with TradingView lightweight-charts, a multi-symbol scanner with signal detection, position/order management, and WebSocket-driven live data feeds. It supports read-only mode (wallet address only) or full trading (with private key). 100% client-side — your keys never leave your browser.
 
 ## Key Features
 
@@ -36,7 +36,7 @@ Requires Node.js 18+.
 
 ## Author
 
-Built by [Jo Vinkenroye](https://jovweb.dev)
+Built by [RITEX AI](https://ritexai.com)
 
 ## License
 

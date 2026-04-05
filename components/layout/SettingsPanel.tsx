@@ -4,6 +4,7 @@ import { useEffect, useCallback, useState } from 'react';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { EmaConfig, ThemeName } from '@/models/Settings';
 import { CredentialsSettings } from '@/components/settings/CredentialsSettings';
+import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
 
 export default function SettingsPanel() {
   const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings } = useSettingsStore();
@@ -1418,6 +1419,7 @@ export default function SettingsPanel() {
 
           {activeTab === 'ui' && (
             <div className="space-y-3">
+              <LanguageSwitcher />
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <div className="text-primary font-mono text-xs font-bold mb-3">█ THEME</div>
                 <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">

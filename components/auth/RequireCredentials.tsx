@@ -53,7 +53,7 @@ export function RequireCredentials({ children }: RequireCredentialsProps) {
       <div className="flex items-center justify-center min-h-screen bg-gray-950 p-6">
         <div className="max-w-2xl w-full">
           <div className="text-center mb-8">
-            <h1 className="text-4xl font-bold text-white mb-2">Welcome to HyperScalper</h1>
+            <h1 className="text-4xl font-bold text-white mb-2">Welcome to RITEX AI</h1>
             <p className="text-gray-400">
               Configure your Hyperliquid credentials to get started
             </p>

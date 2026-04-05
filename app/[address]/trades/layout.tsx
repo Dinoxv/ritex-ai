@@ -8,7 +8,7 @@ interface TradesLayoutProps {
 
 export default function TradesLayout({ children }: TradesLayoutProps) {
   useEffect(() => {
-    document.title = 'Today\'s Trades - HyperScalper';
+    document.title = 'Today\'s Trades - RITEX AI';
   }, []);
 
   return (
@@ -16,7 +16,7 @@ export default function TradesLayout({ children }: TradesLayoutProps) {
       <style jsx global>{`
         body {
           background: var(--background-primary);
-          font-family: 'Courier New', monospace;
+          font-family: var(--font-binance), 'BinancePlex', sans-serif;
         }
         .terminal-border {
           border: 1px solid var(--border-frame);

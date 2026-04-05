@@ -75,7 +75,7 @@ function SymbolPnlDonut({ groups }: SymbolPnlDonutProps) {
         labels: {
           color: '#9ca3af',
           font: {
-            family: 'monospace',
+            family: 'BinancePlex, sans-serif',
             size: 11
           },
           padding: 10,

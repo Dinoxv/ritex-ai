@@ -43,7 +43,7 @@ interface ScalpingChartProps {
   onChartClick?: (data: { time: number; price: number }) => void;
   candleData?: CandleData[];
   isExternalData?: boolean;
-  macdCandleData?: Record<TimeInterval, CandleData[]>;
+  macdCandleData?: Partial<Record<TimeInterval, CandleData[]>>;
   position?: Position | null;
   orders?: Order[];
   syncZoom?: boolean;
@@ -892,6 +892,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   const detectDivergencesDebounced = useDebouncedCallback(() => {
     if (!simplifiedView && stochasticSettings.showMultiVariant && stochasticSettings.showDivergence && displayCandles.length >= 50) {
       const stochCandles = interval === '1m' ? candles : (isExternalData ? allMacdCandles['1m'] : useCandleStore.getState().candles[`${coin}-1m`]);
+      if (!stochCandles || stochCandles.length === 0) return;
       const displayStochCandles = invertCandles(stochCandles, chartSettings?.invertedMode ?? false);
 
       if (displayStochCandles && displayStochCandles.length >= 50) {

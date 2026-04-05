@@ -1,18 +1,39 @@
 import type {
-  Book,
-  Candle,
-  WsTrade,
-  PerpsClearinghouseState,
-  AssetPosition,
-  FrontendOrder,
-  OrderResponse,
-  CancelResponse,
-  PerpsMeta,
-  AllMids,
-  SuccessResponse
+  L2BookResponse,
+  CandleSnapshotResponse,
+  RecentTradesResponse,
+  ClearinghouseStateResponse,
+  FrontendOpenOrdersResponse,
+  OrderSuccessResponse,
+  CancelSuccessResponse,
+  MetaResponse,
+  AllMidsResponse,
+  UpdateLeverageSuccessResponse,
+  UserFillsResponse,
+  PerpDexsResponse,
+  SpotMetaResponse,
+  SpotMetaAndAssetCtxsResponse,
+  AllPerpMetasResponse,
 } from '@nktkas/hyperliquid';
 import type { CandleData, TimeInterval } from '@/types';
 import type { SymbolMetadata } from './metadata-cache.service';
+
+// Type aliases mapping old names to new library types
+export type Book = L2BookResponse;
+export type Candle = CandleSnapshotResponse[number];
+export type WsTrade = RecentTradesResponse[number];
+export type PerpsClearinghouseState = ClearinghouseStateResponse;
+export type AssetPosition = ClearinghouseStateResponse['assetPositions'][number];
+export type FrontendOrder = FrontendOpenOrdersResponse[number];
+export type OrderResponse = OrderSuccessResponse;
+export type CancelResponse = CancelSuccessResponse;
+export type PerpsMeta = MetaResponse;
+export type AllMids = AllMidsResponse;
+export type SuccessResponse = UpdateLeverageSuccessResponse;
+export type Fill = UserFillsResponse[number];
+export type PerpDexInfo = NonNullable<PerpDexsResponse[number]>;
+export type SpotMeta = SpotMetaResponse;
+export type SpotMetaAndAssetCtxs = { meta: SpotMetaResponse; assetCtxs: SpotMetaAndAssetCtxsResponse[1] };
 
 export interface TransformedCandle {
   time: number;
@@ -92,7 +113,7 @@ export interface AssetCtx {
   openInterest: string;
   prevDayPx: string;
   markPx: string;
-  midPx?: string;
+  midPx?: string | null;
 }
 
 export interface MetaAndAssetCtxs {
@@ -137,7 +158,11 @@ export interface IHyperliquidService {
   formatSize(size: number, coin: string): Promise<string>;
   getMeta(): Promise<PerpsMeta>;
   getAllMids(): Promise<AllMids>;
-  getMetaAndAssetCtxs(): Promise<MetaAndAssetCtxs>;
+  getMetaAndAssetCtxs(dex?: string): Promise<MetaAndAssetCtxs>;
+  getPerpDexs(): Promise<PerpDexsResponse>;
+  getAllPerpMetas(): Promise<PerpsMeta[]>;
+  getSpotMeta(): Promise<SpotMeta>;
+  getSpotMetaAndAssetCtxs(): Promise<SpotMetaAndAssetCtxs>;
   getMetadataCache(coin: string): Promise<SymbolMetadata>;
   formatPriceCached(price: number, metadata: SymbolMetadata): string;
   formatSizeCached(size: number, metadata: SymbolMetadata): string;

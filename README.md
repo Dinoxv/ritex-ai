@@ -1,6 +1,6 @@
-# HyperScalper
+# RITEX AI
 
-![HyperScalper Hero](public/landing/hero.png)
+![RITEX AI Hero](public/landing/hero.png)
 
 A professional real-time cryptocurrency trading terminal for Hyperliquid DEX with advanced technical analysis, multi-timeframe charting, and automated signal detection.
 
@@ -91,7 +91,7 @@ npm start
 ## Project Structure
 
 ```
-hyperscalper/
+ritex-ai/
 ├── app/
 │   ├── [address]/
 │   │   ├── [symbol]/          # Single symbol view

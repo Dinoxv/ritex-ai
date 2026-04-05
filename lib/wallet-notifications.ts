@@ -1,5 +1,5 @@
 import toast from 'react-hot-toast';
-import type { AssetPosition, FrontendOrder } from '@nktkas/hyperliquid';
+import type { AssetPosition, FrontendOrder } from '@/lib/services/types';
 
 const formatAddress = (address: string) => {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;

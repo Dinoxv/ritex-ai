@@ -2,4 +2,4 @@ User-agent: *
 Allow: /
 Disallow: /api/
 
-Sitemap: https://hyperscalper.dev/sitemap.xml
+Sitemap: https://ritexai.com/sitemap.xml

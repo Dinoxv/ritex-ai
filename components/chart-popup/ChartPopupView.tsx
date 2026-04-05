@@ -23,7 +23,7 @@ const EMPTY_CANDLES: CandleData[] = [];
 export default function ChartPopupView({ coin, address }: ChartPopupViewProps) {
   const router = useRouter();
   const [currentPrice, setCurrentPrice] = useState(0);
-  const [selectedTimeframe, setSelectedTimeframe] = useState<'1m' | '5m' | '15m' | '1h'>('1m');
+  const [selectedTimeframe, setSelectedTimeframe] = useState<TimeInterval>('1m');
   const [showStochastic, setShowStochastic] = useState(true);
   const getDecimals = useSymbolMetaStore((state) => state.getDecimals);
   const decimals = useMemo(() => getDecimals(coin), [getDecimals, coin]);
@@ -69,22 +69,18 @@ export default function ChartPopupView({ coin, address }: ChartPopupViewProps) {
     };
   }, [coin, candleService, fetchCandles, subscribeToCandles, unsubscribeFromCandles]);
 
-  const stochasticCandleData: Record<TimeInterval, CandleData[]> = useMemo(() => ({
+  const stochasticCandleData: Partial<Record<TimeInterval, CandleData[]>> = useMemo(() => ({
     '1m': candles1m,
     '5m': candles5m,
     '15m': candles15m,
     '1h': candles1h,
-    '4h': [],
-    '1d': [],
   }), [candles1m, candles5m, candles15m, candles1h]);
 
-  const macdCandleData: Record<TimeInterval, CandleData[]> = useMemo(() => ({
+  const macdCandleData: Partial<Record<TimeInterval, CandleData[]>> = useMemo(() => ({
     '1m': candles1m,
     '5m': candles5m,
     '15m': candles15m,
     '1h': candles1h,
-    '4h': [],
-    '1d': [],
   }), [candles1m, candles5m, candles15m, candles1h]);
 
   return (

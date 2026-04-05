@@ -5,6 +5,7 @@ import { usePositionStore } from './usePositionStore';
 import { useSymbolVolatilityStore } from './useSymbolVolatilityStore';
 import { useTopSymbolsStore } from './useTopSymbolsStore';
 import { useCandleStore } from './useCandleStore';
+import { useDexStore } from './useDexStore';
 
 interface GlobalPollingStore {
   service: HyperliquidService | null;
@@ -39,6 +40,8 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
   setService: (service: HyperliquidService) => {
     console.log('[GlobalPolling] setService called, starting global polling');
     set({ service });
+    useDexStore.getState().setService(service);
+    useDexStore.getState().fetchDexes();
     get().startGlobalPolling();
   },
 
@@ -86,24 +89,29 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
     try {
       const topSymbolsStore = useTopSymbolsStore.getState();
       const symbolsBeforeUpdate = topSymbolsStore.symbols.length;
+      const { selectedDex, marketType } = useDexStore.getState();
 
-      const metaData = await service.getMetaAndAssetCtxs().catch(err => {
-        console.error('[GlobalPolling] Error fetching meta:', err);
-        return null;
-      });
+      if (marketType === 'spot') {
+        // For spot, fetch via top symbols store directly
+        await topSymbolsStore.fetchTopSymbols();
+      } else {
+        const metaData = await service.getMetaAndAssetCtxs(selectedDex).catch(err => {
+          console.error('[GlobalPolling] Error fetching meta:', err);
+          return null;
+        });
 
-      if (metaData) {
-        const volatilityStore = useSymbolVolatilityStore.getState();
+        if (metaData) {
+          const volatilityStore = useSymbolVolatilityStore.getState();
 
-        volatilityStore.updateFromGlobalPoll(metaData);
-        topSymbolsStore.updateFromGlobalPoll(metaData);
-
-        const symbolsAfterUpdate = topSymbolsStore.symbols.length;
-
-        if (symbolsBeforeUpdate === 0 && symbolsAfterUpdate > 0) {
-          console.log('[GlobalPolling] Top symbols just loaded, triggering immediate candle fetch');
-          get().fetchCandleData();
+          volatilityStore.updateFromGlobalPoll(metaData);
+          topSymbolsStore.updateFromGlobalPoll(metaData);
         }
+      }
+
+      const symbolsAfterUpdate = topSymbolsStore.symbols.length;
+      if (symbolsBeforeUpdate === 0 && symbolsAfterUpdate > 0) {
+        console.log('[GlobalPolling] Top symbols just loaded, triggering immediate candle fetch');
+        get().fetchCandleData();
       }
 
       set({ lastSlowPollTime: Date.now() });

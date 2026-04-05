@@ -12,7 +12,7 @@ export default function SymbolLayout({ children, params }: SymbolLayoutProps) {
   const upperSymbol = symbol.toUpperCase();
 
   useEffect(() => {
-    document.title = `${upperSymbol} - HyperScalper`;
+    document.title = `${upperSymbol} - RITEX AI`;
   }, [upperSymbol]);
 
   return (
@@ -20,7 +20,7 @@ export default function SymbolLayout({ children, params }: SymbolLayoutProps) {
       <style jsx global>{`
         body {
           background: var(--background-primary);
-          font-family: 'Courier New', monospace;
+          font-family: var(--font-binance), 'BinancePlex', sans-serif;
         }
         .terminal-border {
           border: 1px solid var(--border-frame);

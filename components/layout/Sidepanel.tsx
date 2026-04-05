@@ -26,6 +26,7 @@ import {
   getInvertedArrow,
   shouldInvertCondition
 } from '@/lib/inverted-utils';
+import DexSelector from '@/components/DexSelector';
 import type { TimeInterval } from '@/types';
 
 interface SidepanelProps {
@@ -547,6 +548,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
                   {isLoadingTopSymbols ? '⟳ LOADING...' : '⟳ REFRESH'}
                 </button>
               </div>
+              <DexSelector />
             </div>
 
             {/* Add Symbols Dropdown */}

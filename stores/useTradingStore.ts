@@ -486,14 +486,14 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
       if (slResponse?.status === 'ok' && slResponse.response?.data?.statuses?.[0]) {
         const status = slResponse.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           orderStore.confirmOptimisticOrder(symbol, slTempId, String(status.resting.oid));
         }
       }
 
       if (tpResponse?.status === 'ok' && tpResponse.response?.data?.statuses?.[0]) {
         const status = tpResponse.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           orderStore.confirmOptimisticOrder(symbol, tpTempId, String(status.resting.oid));
         }
       }
@@ -603,14 +603,14 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
       if (slResponse?.status === 'ok' && slResponse.response?.data?.statuses?.[0]) {
         const status = slResponse.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           orderStore.confirmOptimisticOrder(symbol, slTempId, String(status.resting.oid));
         }
       }
 
       if (tpResponse?.status === 'ok' && tpResponse.response?.data?.statuses?.[0]) {
         const status = tpResponse.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           orderStore.confirmOptimisticOrder(symbol, tpTempId, String(status.resting.oid));
         }
       }
@@ -720,14 +720,14 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
       if (slResponse?.status === 'ok' && slResponse.response?.data?.statuses?.[0]) {
         const status = slResponse.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           orderStore.confirmOptimisticOrder(symbol, slTempId, String(status.resting.oid));
         }
       }
 
       if (tpResponse?.status === 'ok' && tpResponse.response?.data?.statuses?.[0]) {
         const status = tpResponse.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           orderStore.confirmOptimisticOrder(symbol, tpTempId, String(status.resting.oid));
         }
       }
@@ -837,14 +837,14 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
       if (slResponse?.status === 'ok' && slResponse.response?.data?.statuses?.[0]) {
         const status = slResponse.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           orderStore.confirmOptimisticOrder(symbol, slTempId, String(status.resting.oid));
         }
       }
 
       if (tpResponse?.status === 'ok' && tpResponse.response?.data?.statuses?.[0]) {
         const status = tpResponse.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           orderStore.confirmOptimisticOrder(symbol, tpTempId, String(status.resting.oid));
         }
       }
@@ -965,7 +965,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
       if (response && response.status === 'ok' && response.response?.data?.statuses?.[0]) {
         const status = response.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           const realOid = status.resting.oid;
           orderStore.confirmOptimisticOrder(symbol, tempId, String(realOid));
           toast.success('Order placed');
@@ -1067,7 +1067,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
       if (response && response.status === 'ok' && response.response?.data?.statuses?.[0]) {
         const status = response.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           const realOid = status.resting.oid;
           orderStore.confirmOptimisticOrder(symbol, tempId, String(realOid));
           toast.success(`${isTakeProfit ? 'Take profit' : 'Stop loss'} order placed`);
@@ -1231,7 +1231,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
       if (slResponse?.status === 'ok' && slResponse.response?.data?.statuses?.[0]) {
         const status = slResponse.response.data.statuses[0];
-        if ('resting' in status && status.resting?.oid) {
+        if (typeof status === 'object' && status !== null && 'resting' in status && status.resting?.oid) {
           orderStore.confirmOptimisticOrder(coin, tempId, String(status.resting.oid));
           toast.success('Stop loss moved');
         } else {
