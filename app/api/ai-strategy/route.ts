@@ -34,7 +34,12 @@ export async function POST(req: NextRequest) {
 
     if (!response.ok) {
       const err = await response.text();
-      return NextResponse.json({ error: `Claude API error: ${response.status}` }, { status: 502 });
+      let errorMsg = `Claude API error: ${response.status}`;
+      try {
+        const errJson = JSON.parse(err);
+        errorMsg = errJson.error?.message || errorMsg;
+      } catch {}
+      return NextResponse.json({ error: errorMsg }, { status: 502 });
     }
 
     const data = await response.json();

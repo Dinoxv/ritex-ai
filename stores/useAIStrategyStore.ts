@@ -42,7 +42,7 @@ export const useAIStrategyStore = create<AIStrategyStore>()((set, get) => ({
     set({ isAnalyzing: true, error: null });
 
     try {
-      const res = await fetch('/api/ai-strategy', {
+      const res = await fetch('/api/ai-strategy/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -110,7 +110,7 @@ export const useAIStrategyStore = create<AIStrategyStore>()((set, get) => ({
       .join('\n');
 
     try {
-      await fetch('/api/telegram', {
+      await fetch('/api/telegram/', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
