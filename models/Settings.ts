@@ -158,6 +158,12 @@ export interface ThemeSettings {
 
 export interface ChartSettings {
   showPivotMarkers: boolean;
+  showEmaSignals: boolean;
+  showMacdSignals: boolean;
+  showRsiSignals: boolean;
+  showDivergenceSignals: boolean;
+  showHiddenDivergence: boolean;
+  showBreakeven: boolean;
   schmecklesMode: boolean;
   invertedMode: boolean;
 }
@@ -333,6 +339,12 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   chart: {
     showPivotMarkers: true,
+    showEmaSignals: true,
+    showMacdSignals: true,
+    showRsiSignals: true,
+    showDivergenceSignals: true,
+    showHiddenDivergence: true,
+    showBreakeven: true,
     schmecklesMode: false,
     invertedMode: false,
   },

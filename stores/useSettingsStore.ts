@@ -227,6 +227,12 @@ const mergeSettings = (storedSettings: any): AppSettings => {
       },
       chart: {
         showPivotMarkers: storedSettings.chart?.showPivotMarkers ?? DEFAULT_SETTINGS.chart.showPivotMarkers,
+        showEmaSignals: storedSettings.chart?.showEmaSignals ?? DEFAULT_SETTINGS.chart.showEmaSignals,
+        showMacdSignals: storedSettings.chart?.showMacdSignals ?? DEFAULT_SETTINGS.chart.showMacdSignals,
+        showRsiSignals: storedSettings.chart?.showRsiSignals ?? DEFAULT_SETTINGS.chart.showRsiSignals,
+        showDivergenceSignals: storedSettings.chart?.showDivergenceSignals ?? DEFAULT_SETTINGS.chart.showDivergenceSignals,
+        showHiddenDivergence: storedSettings.chart?.showHiddenDivergence ?? DEFAULT_SETTINGS.chart.showHiddenDivergence,
+        showBreakeven: storedSettings.chart?.showBreakeven ?? DEFAULT_SETTINGS.chart.showBreakeven,
         schmecklesMode: storedSettings.chart?.schmecklesMode ?? DEFAULT_SETTINGS.chart.schmecklesMode,
         invertedMode: storedSettings.chart?.invertedMode ?? DEFAULT_SETTINGS.chart.invertedMode,
       },
