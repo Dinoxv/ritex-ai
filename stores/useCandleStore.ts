@@ -12,6 +12,7 @@ import { INTERVAL_TO_MS } from '@/lib/time-utils';
 interface CandleStore {
   candles: Record<string, CandleData[]>;
   loading: Record<string, boolean>;
+  loadingOlder: Record<string, boolean>;
   errors: Record<string, string | null>;
   subscriptions: Record<string, { subscriptionId: string; cleanup: () => void; refCount: number }>;
   wsService: ExchangeWebSocketService | null;
@@ -21,6 +22,7 @@ interface CandleStore {
   setService: (service: HyperliquidService) => void;
   setActiveSymbol: (coin: string | null) => void;
   fetchCandles: (coin: string, interval: TimeInterval, startTime: number, endTime: number) => Promise<void>;
+  fetchOlderCandles: (coin: string, interval: TimeInterval) => Promise<boolean>;
   subscribeToCandles: (coin: string, interval: TimeInterval) => void;
   unsubscribeFromCandles: (coin: string, interval: TimeInterval) => void;
   clearCandles: (coin: string, interval?: TimeInterval) => void;
@@ -34,6 +36,7 @@ const getCandleKey = (coin: string, interval: string): string => `${coin}-${inte
 export const useCandleStore = create<CandleStore>((set, get) => ({
   candles: {},
   loading: {},
+  loadingOlder: {},
   errors: {},
   subscriptions: {},
   wsService: null,
@@ -88,6 +91,61 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
         errors: { ...state.errors, [key]: error instanceof Error ? error.message : 'Unknown error' },
         loading: { ...state.loading, [key]: false },
       }));
+    }
+  },
+
+  fetchOlderCandles: async (coin, interval) => {
+    const key = getCandleKey(coin, interval);
+    const { loadingOlder, service, candles } = get();
+
+    if (!service || loadingOlder[key]) return false;
+
+    const existing = candles[key];
+    if (!existing || existing.length === 0) return false;
+
+    const oldestTime = existing[0].time as number;
+    const intervalMs = INTERVAL_TO_MS[interval];
+    const batchSize = 500;
+    const endTime = oldestTime * 1000; // convert seconds to ms
+    const startTime = endTime - (batchSize * intervalMs);
+
+    set((state) => ({
+      loadingOlder: { ...state.loadingOlder, [key]: true },
+    }));
+
+    try {
+      const data = await service.getCandles({
+        coin,
+        interval,
+        startTime,
+        endTime: endTime - 1,
+      });
+
+      if (data.length === 0) {
+        set((state) => ({ loadingOlder: { ...state.loadingOlder, [key]: false } }));
+        return false;
+      }
+
+      const formattedData = data.map((candle) => formatCandle(candle, coin));
+      const existingTimes = new Set(existing.map(c => c.time));
+      const newCandles = formattedData.filter(c => !existingTimes.has(c.time));
+
+      if (newCandles.length === 0) {
+        set((state) => ({ loadingOlder: { ...state.loadingOlder, [key]: false } }));
+        return false;
+      }
+
+      const merged = [...newCandles, ...existing].sort((a, b) => (a.time as number) - (b.time as number));
+
+      set((state) => ({
+        candles: { ...state.candles, [key]: merged },
+        loadingOlder: { ...state.loadingOlder, [key]: false },
+      }));
+
+      return true;
+    } catch (error) {
+      set((state) => ({ loadingOlder: { ...state.loadingOlder, [key]: false } }));
+      return false;
     }
   },
 

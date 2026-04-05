@@ -795,6 +795,38 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     lastCandleTimeRef.current = null;
   }, [interval]);
 
+  // Infinite scroll: load older candles when user scrolls to left edge
+  useEffect(() => {
+    if (!chartRef.current || !chartReady || isExternalData) return;
+
+    const chart = chartRef.current;
+    const timeScale = chart.timeScale();
+    let isLoadingRef = false;
+
+    const handleLogicalRangeChange = () => {
+      if (isLoadingRef) return;
+
+      const logicalRange = timeScale.getVisibleLogicalRange();
+      if (!logicalRange) return;
+
+      // When the left edge of visible area is near or past the first candle (index ~0)
+      if (logicalRange.from <= 5) {
+        isLoadingRef = true;
+        const { fetchOlderCandles } = useCandleStore.getState();
+        fetchOlderCandles(coin, interval).then((loaded) => {
+          // Cooldown to prevent rapid-fire requests
+          setTimeout(() => { isLoadingRef = false; }, loaded ? 500 : 2000);
+        });
+      }
+    };
+
+    const unsubscribe = timeScale.subscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
+
+    return () => {
+      unsubscribe();
+    };
+  }, [coin, interval, chartReady, isExternalData]);
+
   const closePrices = useMemo(() => displayCandles.map(c => c.close), [displayCandles]);
 
   const ema1 = useMemo(() =>
