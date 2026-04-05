@@ -806,24 +806,32 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     const handleLogicalRangeChange = () => {
       if (isLoadingRef) return;
 
-      const logicalRange = timeScale.getVisibleLogicalRange();
-      if (!logicalRange) return;
+      try {
+        const logicalRange = timeScale.getVisibleLogicalRange();
+        if (!logicalRange) return;
 
-      // When the left edge of visible area is near or past the first candle (index ~0)
-      if (logicalRange.from <= 5) {
-        isLoadingRef = true;
-        const { fetchOlderCandles } = useCandleStore.getState();
-        fetchOlderCandles(coin, interval).then((loaded) => {
-          // Cooldown to prevent rapid-fire requests
-          setTimeout(() => { isLoadingRef = false; }, loaded ? 500 : 2000);
-        });
+        // When the left edge of visible area is near or past the first candle (index ~0)
+        if (logicalRange.from <= 5) {
+          isLoadingRef = true;
+          const { fetchOlderCandles } = useCandleStore.getState();
+          fetchOlderCandles(coin, interval).then((loaded) => {
+            // Cooldown to prevent rapid-fire requests
+            setTimeout(() => { isLoadingRef = false; }, loaded ? 500 : 2000);
+          });
+        }
+      } catch (e) {
+        // Chart may have been disposed
       }
     };
 
-    const unsubscribe = timeScale.subscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
+    timeScale.subscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
 
     return () => {
-      unsubscribe();
+      try {
+        timeScale.unsubscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
+      } catch (e) {
+        // Chart may have been disposed
+      }
     };
   }, [coin, interval, chartReady, isExternalData]);
 
