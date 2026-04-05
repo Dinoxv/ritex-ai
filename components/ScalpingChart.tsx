@@ -241,6 +241,8 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   const [divergencePoints, setDivergencePoints] = useState<DivergencePoint[]>([]);
   const candlesBufferRef = useRef<CandleData[]>([]);
   const lastCandleTimeRef = useRef<number | null>(null);
+  const firstCandleTimeRef = useRef<number | null>(null);
+  const candlesLengthRef = useRef<number>(0);
 
   const candleKey = `${coin}-${interval}`;
   const storeCandles = useCandleStore((state) => state.candles[candleKey]) || [];
@@ -803,7 +805,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     const timeScale = chart.timeScale();
     let isLoadingRef = false;
 
-    const handleLogicalRangeChange = () => {
+    const tryLoadOlder = () => {
       if (isLoadingRef) return;
 
       try {
@@ -811,12 +813,15 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         if (!logicalRange) return;
 
         // When the left edge of visible area is near or past the first candle (index ~0)
-        if (logicalRange.from <= 5) {
+        if (logicalRange.from <= 10) {
           isLoadingRef = true;
           const { fetchOlderCandles } = useCandleStore.getState();
           fetchOlderCandles(coin, interval).then((loaded) => {
-            // Cooldown to prevent rapid-fire requests
-            setTimeout(() => { isLoadingRef = false; }, loaded ? 500 : 2000);
+            setTimeout(() => {
+              isLoadingRef = false;
+              // Auto-continue: if still near edge after load, trigger again
+              if (loaded) tryLoadOlder();
+            }, loaded ? 300 : 3000);
           });
         }
       } catch (e) {
@@ -824,11 +829,11 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
       }
     };
 
-    timeScale.subscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
+    timeScale.subscribeVisibleLogicalRangeChange(tryLoadOlder);
 
     return () => {
       try {
-        timeScale.unsubscribeVisibleLogicalRangeChange(handleLogicalRangeChange);
+        timeScale.unsubscribeVisibleLogicalRangeChange(tryLoadOlder);
       } catch (e) {
         // Chart may have been disposed
       }
@@ -992,9 +997,14 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     }));
 
     const lastCandle = displayCandles[displayCandles.length - 1];
+    const firstCandle = displayCandles[0];
     const isNewCandle = lastCandleTimeRef.current !== null && lastCandle.time !== lastCandleTimeRef.current;
+    const isHistoryPrepended = firstCandleTimeRef.current !== null && firstCandle.time !== firstCandleTimeRef.current;
+    const isLengthChanged = candlesLengthRef.current !== displayCandles.length;
 
-    if (isNewCandle || lastCandleTimeRef.current === null) {
+    if (isNewCandle || isHistoryPrepended || isLengthChanged || lastCandleTimeRef.current === null) {
+      const shouldPreservePosition = isHistoryPrepended && !isNewCandle;
+
       updateChartWithRAF(() => {
         candleSeriesRef.current?.setData(candleData);
         volumeSeriesRef.current?.setData(volumeData);
@@ -1063,6 +1073,8 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     }
 
     lastCandleTimeRef.current = lastCandle.time;
+    firstCandleTimeRef.current = firstCandle.time;
+    candlesLengthRef.current = displayCandles.length;
 
     if (onPriceUpdate) {
       onPriceUpdate(lastCandle.close);
