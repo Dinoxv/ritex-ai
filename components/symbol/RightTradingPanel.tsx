@@ -127,7 +127,7 @@ function RightTradingPanel({
                   ? schmecklesMode
                     ? `${formatPnlSchmeckles(position.pnl, position.size * position.currentPrice)} / ${position.pnlPercentage >= 0 ? '+' : ''}${position.pnlPercentage.toFixed(2)}%`
                     : `${position.pnl >= 0 ? '+' : ''}${position.pnl.toFixed(2)} USD (${position.pnlPercentage >= 0 ? '+' : ''}${position.pnlPercentage.toFixed(2)}%)`
-                  : schmecklesMode ? '+- SH' : '+-.-- USD'}
+                  : schmecklesMode ? '+- $' : '+-.-- USD'}
               </span>
             </div>
             <div className="flex justify-between">

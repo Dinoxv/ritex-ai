@@ -46,7 +46,7 @@ export const formatPnlSchmeckles = (
   accountValue?: number
 ): string => {
   if (pnl === undefined || pnl === null) {
-    return '+- SH';
+    return '+- $';
   }
 
   let divisor: number;
@@ -54,11 +54,11 @@ export const formatPnlSchmeckles = (
     divisor = accountValue;
   } else {
     if (positionValue === undefined || positionValue === null || positionValue === 0) {
-      return '+- SH';
+      return '+- $';
     }
     divisor = positionValue;
   }
 
   const schmeckles = (pnl / divisor) * 2000;
-  return `${schmeckles >= 0 ? '+' : ''}${schmeckles.toFixed(2)} SH`;
+  return `${schmeckles >= 0 ? '+' : ''}${schmeckles.toFixed(2)} $`;
 };
