@@ -429,4 +429,27 @@ export interface Translations {
     save: string;
     step: string;
   };
+  // AI Strategy
+  ai: {
+    title: string;
+    enableAI: string;
+    claudeApiKey: string;
+    claudeModel: string;
+    confidenceThreshold: string;
+    strategy: string;
+    maxCallsPerHour: string;
+    stochasticReversalScalp: string;
+    stochasticReversalScalpDesc: string;
+    telegramNotifications: string;
+    enableTelegram: string;
+    botToken: string;
+    chatId: string;
+    analyzing: string;
+    setApiKey: string;
+    confidence: string;
+    entry: string;
+    reasoning: string;
+    recent: string;
+    callsPerHour: string;
+  };
 }

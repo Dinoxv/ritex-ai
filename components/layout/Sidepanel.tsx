@@ -20,6 +20,7 @@ import { usePriceVolumeAnimation } from '@/hooks/usePriceVolumeAnimation';
 import MiniPriceChart from '@/components/scanner/MiniPriceChart';
 import SymbolItem from '@/components/sidepanel/SymbolItem';
 import ScannerResultItem from '@/components/scanner/ScannerResultItem';
+import AIStrategyPanel from '@/components/ai/AIStrategyPanel';
 import {
   getInvertedColorClass,
   getInvertedAnimationClass,
@@ -527,6 +528,9 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
               </>
             )}
           </div>
+
+          {/* AI Strategy Panel */}
+          <AIStrategyPanel />
         </div>
       )}
 

@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings } from '@/models/Settings';
+import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings, AIStrategyConfig } from '@/models/Settings';
 
-type TabType = 'scanner' | 'indicators' | 'orders' | 'ui' | 'credentials';
+type TabType = 'scanner' | 'indicators' | 'orders' | 'ui' | 'credentials' | 'ai';
 type MobileTabType = 'scanner' | 'symbols' | 'chart' | 'actions' | 'orders-positions';
 
 interface SettingsStore {
@@ -23,6 +23,7 @@ interface SettingsStore {
   updateScannerSettings: (settings: Partial<ScannerSettings>) => void;
   updateOrderSettings: (settings: Partial<OrderSettings>) => void;
   updateThemeSettings: (settings: Partial<ThemeSettings>) => void;
+  updateAISettings: (settings: Partial<AIStrategyConfig>) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
   pinSymbol: (symbol: string) => void;
   unpinSymbol: (symbol: string) => void;
@@ -229,6 +230,17 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         schmecklesMode: storedSettings.chart?.schmecklesMode ?? DEFAULT_SETTINGS.chart.schmecklesMode,
         invertedMode: storedSettings.chart?.invertedMode ?? DEFAULT_SETTINGS.chart.invertedMode,
       },
+      ai: {
+        enabled: storedSettings.ai?.enabled ?? DEFAULT_SETTINGS.ai.enabled,
+        claudeApiKey: storedSettings.ai?.claudeApiKey ?? DEFAULT_SETTINGS.ai.claudeApiKey,
+        claudeModel: storedSettings.ai?.claudeModel ?? DEFAULT_SETTINGS.ai.claudeModel,
+        confidenceThreshold: storedSettings.ai?.confidenceThreshold ?? DEFAULT_SETTINGS.ai.confidenceThreshold,
+        telegramEnabled: storedSettings.ai?.telegramEnabled ?? DEFAULT_SETTINGS.ai.telegramEnabled,
+        telegramBotToken: storedSettings.ai?.telegramBotToken ?? DEFAULT_SETTINGS.ai.telegramBotToken,
+        telegramChatId: storedSettings.ai?.telegramChatId ?? DEFAULT_SETTINGS.ai.telegramChatId,
+        strategy: storedSettings.ai?.strategy ?? DEFAULT_SETTINGS.ai.strategy,
+        maxCallsPerHour: storedSettings.ai?.maxCallsPerHour ?? DEFAULT_SETTINGS.ai.maxCallsPerHour,
+      },
       pinnedSymbols: storedSettings.pinnedSymbols ?? DEFAULT_SETTINGS.pinnedSymbols,
     };
   } catch (error) {
@@ -315,6 +327,16 @@ export const useSettingsStore = create<SettingsStore>()(
             ...state.settings,
             theme: {
               ...state.settings.theme,
+              ...updates,
+            },
+          },
+        })),
+      updateAISettings: (updates) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            ai: {
+              ...state.settings.ai,
               ...updates,
             },
           },

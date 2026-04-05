@@ -162,12 +162,25 @@ export interface ChartSettings {
   invertedMode: boolean;
 }
 
+export interface AIStrategyConfig {
+  enabled: boolean;
+  claudeApiKey: string;
+  claudeModel: string;
+  confidenceThreshold: number;
+  telegramEnabled: boolean;
+  telegramBotToken: string;
+  telegramChatId: string;
+  strategy: 'stochastic_reversal_scalp';
+  maxCallsPerHour: number;
+}
+
 export interface AppSettings {
   indicators: IndicatorSettings;
   scanner: ScannerSettings;
   orders: OrderSettings;
   theme: ThemeSettings;
   chart: ChartSettings;
+  ai: AIStrategyConfig;
   pinnedSymbols: string[];
 }
 
@@ -322,6 +335,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showPivotMarkers: true,
     schmecklesMode: false,
     invertedMode: false,
+  },
+  ai: {
+    enabled: false,
+    claudeApiKey: '',
+    claudeModel: 'claude-sonnet-4-20250514',
+    confidenceThreshold: 0.7,
+    telegramEnabled: false,
+    telegramBotToken: '',
+    telegramChatId: '',
+    strategy: 'stochastic_reversal_scalp',
+    maxCallsPerHour: 30,
   },
   pinnedSymbols: [],
 };

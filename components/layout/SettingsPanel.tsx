@@ -7,7 +7,7 @@ import { CredentialsSettings } from '@/components/settings/CredentialsSettings';
 import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
 
 export default function SettingsPanel() {
-  const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings } = useSettingsStore();
+  const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings, updateAISettings } = useSettingsStore();
   const [isStochasticExpanded, setIsStochasticExpanded] = useState(false);
   const [isEmaExpanded, setIsEmaExpanded] = useState(false);
   const [isMacdExpanded, setIsMacdExpanded] = useState(false);
@@ -133,6 +133,16 @@ export default function SettingsPanel() {
             }`}
           >
             Credentials
+          </button>
+          <button
+            onClick={() => setActiveTab('ai')}
+            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider transition-all whitespace-nowrap ${
+              activeTab === 'ai'
+                ? 'bg-primary/10 text-primary border-b-2 border-primary'
+                : 'text-primary-muted hover:text-primary hover:bg-primary/5'
+            }`}
+          >
+            AI
           </button>
         </div>
 
@@ -1539,6 +1549,134 @@ export default function SettingsPanel() {
           {activeTab === 'credentials' && (
             <div className="space-y-3">
               <CredentialsSettings />
+            </div>
+          )}
+
+          {activeTab === 'ai' && (
+            <div className="space-y-3">
+              {/* Enable AI Strategy */}
+              <div className="p-3 bg-bg-secondary border border-frame rounded">
+                <label className="flex items-center justify-between cursor-pointer">
+                  <span className="text-primary-muted text-xs font-mono">ENABLE AI STRATEGY</span>
+                  <input
+                    type="checkbox"
+                    checked={settings.ai.enabled}
+                    onChange={(e) => updateAISettings({ enabled: e.target.checked })}
+                    className="w-4 h-4 accent-primary cursor-pointer"
+                  />
+                </label>
+              </div>
+
+              {/* Claude API Key */}
+              <div className="p-3 bg-bg-secondary border border-frame rounded">
+                <label className="block text-primary-muted text-xs font-mono mb-2">CLAUDE API KEY</label>
+                <input
+                  type="password"
+                  value={settings.ai.claudeApiKey}
+                  onChange={(e) => updateAISettings({ claudeApiKey: e.target.value })}
+                  placeholder="sk-ant-..."
+                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                />
+              </div>
+
+              {/* Claude Model */}
+              <div className="p-3 bg-bg-secondary border border-frame rounded">
+                <label className="block text-primary-muted text-xs font-mono mb-2">CLAUDE MODEL</label>
+                <select
+                  value={settings.ai.claudeModel}
+                  onChange={(e) => updateAISettings({ claudeModel: e.target.value })}
+                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary focus:outline-none focus:border-primary"
+                >
+                  <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
+                  <option value="claude-haiku-4-20250514">Claude Haiku 4</option>
+                </select>
+              </div>
+
+              {/* Confidence Threshold */}
+              <div className="p-3 bg-bg-secondary border border-frame rounded">
+                <label className="block text-primary-muted text-xs font-mono mb-2">
+                  CONFIDENCE THRESHOLD: {(settings.ai.confidenceThreshold * 100).toFixed(0)}%
+                </label>
+                <input
+                  type="range"
+                  min="0.5"
+                  max="0.95"
+                  step="0.05"
+                  value={settings.ai.confidenceThreshold}
+                  onChange={(e) => updateAISettings({ confidenceThreshold: parseFloat(e.target.value) })}
+                  className="w-full accent-primary cursor-pointer"
+                />
+                <div className="flex justify-between text-[10px] font-mono text-primary-muted/50 mt-1">
+                  <span>50%</span>
+                  <span>95%</span>
+                </div>
+              </div>
+
+              {/* Strategy */}
+              <div className="p-3 bg-bg-secondary border border-frame rounded">
+                <label className="block text-primary-muted text-xs font-mono mb-2">STRATEGY</label>
+                <div className="bg-bg-primary border border-frame rounded px-3 py-2">
+                  <div className="text-xs font-mono text-primary">Stochastic Reversal Scalp</div>
+                  <div className="text-[10px] font-mono text-primary-muted mt-1">
+                    Stochastic exits oversold/overbought + MACD confirms. TP 2%.
+                  </div>
+                </div>
+              </div>
+
+              {/* Max Calls Per Hour */}
+              <div className="p-3 bg-bg-secondary border border-frame rounded">
+                <label className="block text-primary-muted text-xs font-mono mb-2">
+                  MAX CALLS / HOUR: {settings.ai.maxCallsPerHour}
+                </label>
+                <input
+                  type="range"
+                  min="5"
+                  max="60"
+                  step="5"
+                  value={settings.ai.maxCallsPerHour}
+                  onChange={(e) => updateAISettings({ maxCallsPerHour: parseInt(e.target.value) })}
+                  className="w-full accent-primary cursor-pointer"
+                />
+              </div>
+
+              {/* Telegram Section */}
+              <div className="border-t border-frame pt-3 mt-3">
+                <div className="text-primary text-xs font-mono mb-3 uppercase tracking-wider">Telegram Notifications</div>
+
+                <div className="p-3 bg-bg-secondary border border-frame rounded mb-3">
+                  <label className="flex items-center justify-between cursor-pointer">
+                    <span className="text-primary-muted text-xs font-mono">ENABLE TELEGRAM</span>
+                    <input
+                      type="checkbox"
+                      checked={settings.ai.telegramEnabled}
+                      onChange={(e) => updateAISettings({ telegramEnabled: e.target.checked })}
+                      className="w-4 h-4 accent-primary cursor-pointer"
+                    />
+                  </label>
+                </div>
+
+                <div className="p-3 bg-bg-secondary border border-frame rounded mb-3">
+                  <label className="block text-primary-muted text-xs font-mono mb-2">BOT TOKEN</label>
+                  <input
+                    type="password"
+                    value={settings.ai.telegramBotToken}
+                    onChange={(e) => updateAISettings({ telegramBotToken: e.target.value })}
+                    placeholder="123456:ABC-..."
+                    className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                  />
+                </div>
+
+                <div className="p-3 bg-bg-secondary border border-frame rounded">
+                  <label className="block text-primary-muted text-xs font-mono mb-2">CHAT ID</label>
+                  <input
+                    type="text"
+                    value={settings.ai.telegramChatId}
+                    onChange={(e) => updateAISettings({ telegramChatId: e.target.value })}
+                    placeholder="-100..."
+                    className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                  />
+                </div>
+              </div>
             </div>
           )}
         </div>

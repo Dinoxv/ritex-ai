@@ -5,6 +5,8 @@ import { ScannerService } from '@/lib/services/scanner.service';
 import { useSettingsStore } from './useSettingsStore';
 import { useTopSymbolsStore } from './useTopSymbolsStore';
 import { playNotificationSound } from '@/lib/sound-utils';
+import { useAIStrategyStore } from './useAIStrategyStore';
+import type { IndicatorSnapshot } from '@/lib/ai/types';
 
 interface ScannerStore {
   results: ScanResult[];
@@ -170,6 +172,24 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
           error: null,
         },
       });
+
+      // AI Strategy: analyze first signal if AI is enabled
+      const aiSettings = useSettingsStore.getState().settings.ai;
+      if (aiSettings.enabled && aiSettings.claudeApiKey && newResults.length > 0) {
+        const firstSignal = newResults[0];
+        const snapshot: IndicatorSnapshot = {
+          symbol: firstSignal.symbol,
+          signalType: firstSignal.signalType,
+          scanType: firstSignal.scanType,
+          description: firstSignal.description,
+          matchedAt: Date.now(),
+          stochastics: firstSignal.stochastics,
+          macdReversals: firstSignal.macdReversals,
+          rsiReversals: firstSignal.rsiReversals,
+          closePrices: firstSignal.closePrices,
+        };
+        useAIStrategyStore.getState().analyzeSignal(snapshot);
+      }
     } catch (error) {
       console.error('Scanner error:', error);
       set({
