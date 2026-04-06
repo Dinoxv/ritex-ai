@@ -162,6 +162,24 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
         console.log('[Scanner] Sound disabled in settings');
       }
 
+      // Scanner Telegram Alerts
+      if (
+        newResults.length > 0 &&
+        settings.telegramEnabled &&
+        settings.telegramBotToken &&
+        settings.telegramChatId
+      ) {
+        const filteredResults = settings.telegramSignalFilter === 'all'
+          ? newResults
+          : newResults.filter(r => r.signalType === settings.telegramSignalFilter);
+
+        if (filteredResults.length > 0) {
+          sendScannerTelegramAlerts(filteredResults, settings.telegramBotToken, settings.telegramChatId).catch(err =>
+            console.error('[Scanner Telegram] Error sending alerts:', err)
+          );
+        }
+      }
+
       set({
         results: newResults,
         previousSymbols: newSymbols,
@@ -266,3 +284,43 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
     set({ results: [], previousSymbols: new Set() });
   },
 }));
+
+const SCAN_TYPE_LABELS: Record<string, string> = {
+  stochastic: 'Stochastic',
+  emaAlignment: 'EMA Alignment',
+  channel: 'Channel',
+  divergence: 'Divergence',
+  macdReversal: 'MACD Reversal',
+  rsiReversal: 'RSI Reversal',
+  volumeSpike: 'Volume Spike',
+  supportResistance: 'S/R Level',
+};
+
+async function sendScannerTelegramAlerts(
+  results: ScanResult[],
+  botToken: string,
+  chatId: string,
+) {
+  const lines: string[] = [`🔔 <b>Scanner Alert — ${results.length} signal(s)</b>`, ''];
+
+  for (const r of results) {
+    const emoji = r.signalType === 'bullish' ? '🟢' : '🔴';
+    const label = SCAN_TYPE_LABELS[r.scanType] || r.scanType;
+    lines.push(`${emoji} <b>${r.symbol}</b> — ${label}`);
+    lines.push(`   ${r.description}`);
+  }
+
+  lines.push('');
+  lines.push(`🕐 ${new Date().toLocaleTimeString()}`);
+
+  try {
+    await fetch('/api/telegram/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ botToken, chatId, message: lines.join('\n') }),
+    });
+    console.log(`[Scanner Telegram] Sent ${results.length} alert(s)`);
+  } catch (err) {
+    console.error('[Scanner Telegram] Failed to send:', err);
+  }
+}

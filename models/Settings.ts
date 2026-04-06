@@ -132,6 +132,10 @@ export interface ScannerSettings {
   topMarkets: number;
   playSound: boolean;
   candleCacheDuration: number;
+  telegramEnabled: boolean;
+  telegramBotToken: string;
+  telegramChatId: string;
+  telegramSignalFilter: 'all' | 'bullish' | 'bearish';
   stochasticScanner: StochasticScannerConfig;
   emaAlignmentScanner: EmaAlignmentScannerConfig;
   channelScanner: ChannelScannerConfig;
@@ -158,12 +162,6 @@ export interface ThemeSettings {
 
 export interface ChartSettings {
   showPivotMarkers: boolean;
-  showEmaSignals: boolean;
-  showMacdSignals: boolean;
-  showRsiSignals: boolean;
-  showDivergenceSignals: boolean;
-  showHiddenDivergence: boolean;
-  showBreakeven: boolean;
   schmecklesMode: boolean;
   invertedMode: boolean;
 }
@@ -261,6 +259,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     topMarkets: 20,
     playSound: true,
     candleCacheDuration: 1,
+    telegramEnabled: false,
+    telegramBotToken: '',
+    telegramChatId: '',
+    telegramSignalFilter: 'all',
     stochasticScanner: {
       enabled: false,
       oversoldThreshold: 20,
@@ -339,12 +341,6 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   chart: {
     showPivotMarkers: true,
-    showEmaSignals: true,
-    showMacdSignals: true,
-    showRsiSignals: true,
-    showDivergenceSignals: true,
-    showHiddenDivergence: true,
-    showBreakeven: true,
     schmecklesMode: false,
     invertedMode: false,
   },

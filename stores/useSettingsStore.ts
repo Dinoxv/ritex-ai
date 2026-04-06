@@ -149,6 +149,10 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         topMarkets: storedSettings.scanner?.topMarkets ?? DEFAULT_SETTINGS.scanner.topMarkets,
         playSound: storedSettings.scanner?.playSound ?? DEFAULT_SETTINGS.scanner.playSound,
         candleCacheDuration: storedSettings.scanner?.candleCacheDuration ?? DEFAULT_SETTINGS.scanner.candleCacheDuration,
+        telegramEnabled: storedSettings.scanner?.telegramEnabled ?? DEFAULT_SETTINGS.scanner.telegramEnabled,
+        telegramBotToken: storedSettings.scanner?.telegramBotToken ?? DEFAULT_SETTINGS.scanner.telegramBotToken,
+        telegramChatId: storedSettings.scanner?.telegramChatId ?? DEFAULT_SETTINGS.scanner.telegramChatId,
+        telegramSignalFilter: storedSettings.scanner?.telegramSignalFilter ?? DEFAULT_SETTINGS.scanner.telegramSignalFilter,
         stochasticScanner: {
           enabled: storedSettings.scanner?.stochasticScanner?.enabled ?? DEFAULT_SETTINGS.scanner.stochasticScanner.enabled,
           oversoldThreshold: storedSettings.scanner?.stochasticScanner?.oversoldThreshold ?? DEFAULT_SETTINGS.scanner.stochasticScanner.oversoldThreshold,
@@ -227,12 +231,6 @@ const mergeSettings = (storedSettings: any): AppSettings => {
       },
       chart: {
         showPivotMarkers: storedSettings.chart?.showPivotMarkers ?? DEFAULT_SETTINGS.chart.showPivotMarkers,
-        showEmaSignals: storedSettings.chart?.showEmaSignals ?? DEFAULT_SETTINGS.chart.showEmaSignals,
-        showMacdSignals: storedSettings.chart?.showMacdSignals ?? DEFAULT_SETTINGS.chart.showMacdSignals,
-        showRsiSignals: storedSettings.chart?.showRsiSignals ?? DEFAULT_SETTINGS.chart.showRsiSignals,
-        showDivergenceSignals: storedSettings.chart?.showDivergenceSignals ?? DEFAULT_SETTINGS.chart.showDivergenceSignals,
-        showHiddenDivergence: storedSettings.chart?.showHiddenDivergence ?? DEFAULT_SETTINGS.chart.showHiddenDivergence,
-        showBreakeven: storedSettings.chart?.showBreakeven ?? DEFAULT_SETTINGS.chart.showBreakeven,
         schmecklesMode: storedSettings.chart?.schmecklesMode ?? DEFAULT_SETTINGS.chart.schmecklesMode,
         invertedMode: storedSettings.chart?.invertedMode ?? DEFAULT_SETTINGS.chart.invertedMode,
       },

@@ -878,19 +878,12 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   }, [displayCandles, chartSettings?.showPivotMarkers]);
 
   const divergenceMarkers = useMemo(() => {
-    if (!stochasticSettings.showDivergence || divergencePoints.length === 0) return [];
-    const showDiv = chartSettings?.showDivergenceSignals ?? true;
-    const showHDiv = chartSettings?.showHiddenDivergence ?? true;
-    if (!showDiv && !showHDiv) return [];
-    const filtered = divergencePoints.filter((d) => {
-      if (d.type === 'bullish' || d.type === 'bearish') return showDiv;
-      return showHDiv;
-    });
-    return createDivergenceMarkers(filtered);
-  }, [divergencePoints, stochasticSettings.showDivergence, chartSettings?.showDivergenceSignals, chartSettings?.showHiddenDivergence]);
+    return stochasticSettings.showDivergence && divergencePoints.length > 0
+      ? createDivergenceMarkers(divergencePoints)
+      : [];
+  }, [divergencePoints, stochasticSettings.showDivergence]);
 
   const macdReversalMarkers = useMemo(() => {
-    if (!(chartSettings?.showMacdSignals ?? true)) return [];
     return macdResult.macd.length > 0
       ? detectMacdReversals(macdResult, displayCandles).map(r => ({
           time: r.time / 1000,
@@ -900,10 +893,9 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           text: '',
         }))
       : [];
-  }, [macdResult, displayCandles, chartSettings?.showMacdSignals]);
+  }, [macdResult, displayCandles]);
 
   const rsiReversalMarkers = useMemo(() => {
-    if (!(chartSettings?.showRsiSignals ?? true)) return [];
     return rsi.length > 0
       ? detectRsiReversals(rsi, displayCandles, 30, 70).map(r => ({
           time: r.time / 1000,
@@ -913,16 +905,15 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           text: '',
         }))
       : [];
-  }, [rsi, displayCandles, chartSettings?.showRsiSignals]);
+  }, [rsi, displayCandles]);
 
   const crossoverMarkers = useMemo(() => {
-    if (!(chartSettings?.showEmaSignals ?? true)) return [];
     if (emaSettings.ema1.enabled && emaSettings.ema2.enabled && ema1.length > 0 && ema2.length > 0) {
       const ema3ForDetection = emaSettings.ema3.enabled && ema3.length > 0 ? ema3 : null;
       return detectCrossovers(ema1, ema2, ema3ForDetection, displayCandles);
     }
     return [];
-  }, [chartSettings?.showEmaSignals, emaSettings.ema1.enabled, emaSettings.ema2.enabled, emaSettings.ema3.enabled, ema1, ema2, ema3, displayCandles]);
+  }, [emaSettings.ema1.enabled, emaSettings.ema2.enabled, emaSettings.ema3.enabled, ema1, ema2, ema3, displayCandles]);
 
   const rafRef = useRef<number | null>(null);
   const pendingUpdateRef = useRef(false);
@@ -1450,9 +1441,6 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
       breakevenBandSeriesRef.current = null;
     }
 
-    // Check if breakeven display is enabled
-    if (!(chartSettings?.showBreakeven ?? true)) return;
-
     // Create breakeven band if position exists and we have candles to display
     if (position && displayCandles.length > 0) {
       const breakevenPrice = calculateBreakevenPrice(
@@ -1510,7 +1498,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         breakevenBandSeriesRef.current = null;
       }
     };
-  }, [position, chartReady, chartSettings?.invertedMode, chartSettings?.showBreakeven, displayCandles, candles, decimals.price]);
+  }, [position, chartReady, chartSettings?.invertedMode, displayCandles, candles, decimals.price]);
 
   // Order price lines overlay
   useEffect(() => {
@@ -1593,6 +1581,20 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     };
   }, [orders, chartReady, chartSettings?.invertedMode, displayCandles.length, candles]);
 
+  const variantColorVars: Record<string, string> = {
+    ultraFast: '#FF10FF',
+    fast: '#00D9FF',
+    medium: '#FF8C00',
+    slow: '#00FF7F',
+  };
+
+  const variantLabels: Record<string, string> = {
+    ultraFast: 'UF',
+    fast: 'F',
+    medium: 'M',
+    slow: 'S',
+  };
+
   return (
     <div className="relative flex flex-col h-full w-full">
       {isLoading && (
@@ -1601,8 +1603,65 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         </div>
       )}
       <div ref={chartContainerRef} className="flex-1 min-h-0" />
-      <div className="mt-1">
-        <ChartLegend />
+      <div className="mt-1 flex gap-3 text-[9px] items-center">
+        <ChartLegend className="flex-shrink-0" />
+        {emaSettings.ema1.enabled && (
+          <div className="flex items-center gap-1">
+            <div className="w-6 h-0.5" style={{ backgroundColor: 'var(--accent-blue)' }}></div>
+            <span className="text-primary-muted">EMA {emaSettings.ema1.period}</span>
+          </div>
+        )}
+        {emaSettings.ema2.enabled && (
+          <div className="flex items-center gap-1">
+            <div className="w-6 h-0.5" style={{ backgroundColor: 'var(--accent-rose)' }}></div>
+            <span className="text-primary-muted">EMA {emaSettings.ema2.period}</span>
+          </div>
+        )}
+        {emaSettings.ema3.enabled && (
+          <div className="flex items-center gap-1">
+            <div className="w-6 h-0.5" style={{ backgroundColor: 'var(--status-bullish)' }}></div>
+            <span className="text-primary-muted">EMA {emaSettings.ema3.period}</span>
+          </div>
+        )}
+        {macdResult.macd.length > 0 && (
+          <>
+            <div className="w-px h-4 bg-frame mx-1"></div>
+            <div className="flex items-center gap-1">
+              <div className="w-6 h-0.5" style={{ backgroundColor: 'var(--accent-blue)' }}></div>
+              <span className="text-primary-muted">MACD</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-6 h-0.5" style={{ backgroundColor: 'var(--accent-rose)' }}></div>
+              <span className="text-primary-muted">Signal</span>
+            </div>
+          </>
+        )}
+        {simplifiedView && simpleStochastic && (
+          <>
+            <div className="w-px h-4 bg-frame mx-1"></div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-0.5 bg-accent-green"></div>
+              <span className="text-primary-muted">Stoch K</span>
+            </div>
+            <div className="flex items-center gap-1">
+              <div className="w-3 h-0.5 bg-accent-purple"></div>
+              <span className="text-primary-muted">Stoch D</span>
+            </div>
+          </>
+        )}
+        {!simplifiedView && stochasticSettings.showMultiVariant && Object.entries(stochasticSettings.variants).some(([_, v]) => v.enabled) && (
+          <>
+            <div className="w-px h-4 bg-frame mx-1"></div>
+            {Object.entries(stochasticSettings.variants)
+              .filter(([_, config]) => config.enabled)
+              .map(([variantName]) => (
+                <div key={variantName} className="flex items-center gap-1">
+                  <div className="w-6 h-0.5" style={{ backgroundColor: variantColorVars[variantName] }}></div>
+                  <span className="text-primary-muted">STOCH {variantLabels[variantName]}</span>
+                </div>
+              ))}
+          </>
+        )}
       </div>
     </div>
   );

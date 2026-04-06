@@ -214,6 +214,68 @@ export default function SettingsPanel() {
                     </div>
                   </div>
 
+                  {/* Scanner Telegram Alerts */}
+                  <div className="border border-frame rounded overflow-hidden">
+                    <div className="p-3 bg-bg-secondary">
+                      <div className="text-primary text-xs font-mono mb-3 uppercase tracking-wider">📲 Telegram Scanner Alerts</div>
+
+                      <div className="space-y-3">
+                        <label className="flex items-center justify-between cursor-pointer">
+                          <span className="text-primary-muted text-xs font-mono">ENABLE TELEGRAM ALERTS</span>
+                          <input
+                            type="checkbox"
+                            checked={settings.scanner.telegramEnabled || false}
+                            onChange={(e) => updateScannerSettings({ telegramEnabled: e.target.checked })}
+                            className="w-4 h-4 accent-primary cursor-pointer"
+                          />
+                        </label>
+
+                        {settings.scanner.telegramEnabled && (
+                          <>
+                            <div>
+                              <label className="block text-primary-muted text-xs font-mono mb-1">BOT TOKEN</label>
+                              <input
+                                type="password"
+                                value={settings.scanner.telegramBotToken || ''}
+                                onChange={(e) => updateScannerSettings({ telegramBotToken: e.target.value })}
+                                placeholder="123456:ABC-..."
+                                className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-primary-muted text-xs font-mono mb-1">CHAT ID</label>
+                              <input
+                                type="text"
+                                value={settings.scanner.telegramChatId || ''}
+                                onChange={(e) => updateScannerSettings({ telegramChatId: e.target.value })}
+                                placeholder="-100..."
+                                className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                              />
+                            </div>
+
+                            <div>
+                              <label className="block text-primary-muted text-xs font-mono mb-1">SIGNAL FILTER</label>
+                              <select
+                                value={settings.scanner.telegramSignalFilter || 'all'}
+                                onChange={(e) => updateScannerSettings({ telegramSignalFilter: e.target.value as 'all' | 'bullish' | 'bearish' })}
+                                className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary focus:outline-none focus:border-primary"
+                              >
+                                <option value="all">All Signals</option>
+                                <option value="bullish">Bullish Only</option>
+                                <option value="bearish">Bearish Only</option>
+                              </select>
+                            </div>
+
+                            <div className="text-primary-muted font-mono text-[10px]">
+                              Sends a Telegram message each time the scanner detects an entry signal matching your filter.
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+
                   <div className="border border-frame rounded overflow-hidden">
                     <button
                       onClick={() => setIsScannerStochExpanded(!isScannerStochExpanded)}
