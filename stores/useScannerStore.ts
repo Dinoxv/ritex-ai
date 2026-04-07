@@ -334,6 +334,12 @@ function getEntryPrice(result: ScanResult): number {
   return 0;
 }
 
+function getVolumeDeltaRaw(result: ScanResult): number {
+  if (result.kalmanTrends?.[0]) return Math.abs(result.kalmanTrends[0].delta);
+  if (result.volumeSpikes?.[0]) return result.volumeSpikes[0].volumeRatio;
+  return 1.0;
+}
+
 function getVolumeDelta(result: ScanResult): string {
   if (result.kalmanTrends?.[0]) {
     const d = result.kalmanTrends[0].delta;
@@ -380,24 +386,37 @@ async function sendScannerTelegramAlerts(
     ];
 
     if (showTpSl && entry > 0) {
-      const tpMultipliers = isBuy ? [1.018, 1.035, 1.055, 1.08] : [0.982, 0.965, 0.945, 0.92];
-      const slMultiplier = isBuy ? 0.98 : 1.02;
-      const tpPcts = isBuy ? ['+1.8%', '+3.5%', '+5.5%', '+8.0%'] : ['-1.8%', '-3.5%', '-5.5%', '-8.0%'];
-      const slPct = isBuy ? '-2.0%' : '+2.0%';
+      const deltaRaw = getVolumeDeltaRaw(r);
+      // Clamp delta between 0.5 and 5.0 for reasonable TP/SL ranges
+      const d = Math.max(0.5, Math.min(deltaRaw, 5.0));
 
-      const tp1 = entry * tpMultipliers[0];
-      const tp2 = entry * tpMultipliers[1];
-      const tp3 = entry * tpMultipliers[2];
-      const tp4 = entry * tpMultipliers[3];
-      const sl = entry * slMultiplier;
+      // TP/SL % scales with volume delta strength
+      const tp1Pct = d * 1.5;   // e.g. delta 1.2 → 1.8%
+      const tp2Pct = d * 3.0;   // e.g. delta 1.2 → 3.6%
+      const tp3Pct = d * 5.0;   // e.g. delta 1.2 → 6.0%
+      const tp4Pct = d * 7.0;   // e.g. delta 1.2 → 8.4%
+      const slPct  = d * 1.5;   // e.g. delta 1.2 → 1.8%
+
+      const sign = isBuy ? 1 : -1;
+      const tp1 = entry * (1 + sign * tp1Pct / 100);
+      const tp2 = entry * (1 + sign * tp2Pct / 100);
+      const tp3 = entry * (1 + sign * tp3Pct / 100);
+      const tp4 = entry * (1 + sign * tp4Pct / 100);
+      const sl  = entry * (1 - sign * slPct / 100);
+
+      const tp1Label = `${isBuy ? '+' : '-'}${tp1Pct.toFixed(1)}%`;
+      const tp2Label = `${isBuy ? '+' : '-'}${tp2Pct.toFixed(1)}%`;
+      const tp3Label = `${isBuy ? '+' : '-'}${tp3Pct.toFixed(1)}%`;
+      const tp4Label = `${isBuy ? '+' : '-'}${tp4Pct.toFixed(1)}%`;
+      const slLabel  = `${isBuy ? '-' : '+'}${slPct.toFixed(1)}%`;
 
       lines.push(
         `📌 <b>Take Profit:</b>`,
-        `  🎯 TP1: ${formatPrice(tp1)} (${tpPcts[0]})`,
-        `  🎯 TP2: ${formatPrice(tp2)} (${tpPcts[1]})`,
-        `  🎯 TP3: ${formatPrice(tp3)} (${tpPcts[2]})`,
-        `  🎯 TP4: ${formatPrice(tp4)} (${tpPcts[3]})`,
-        `🛑 Stop Loss: ${formatPrice(sl)} (${slPct})`,
+        `  🎯 TP1: ${formatPrice(tp1)} (${tp1Label})`,
+        `  🎯 TP2: ${formatPrice(tp2)} (${tp2Label})`,
+        `  🎯 TP3: ${formatPrice(tp3)} (${tp3Label})`,
+        `  🎯 TP4: ${formatPrice(tp4)} (${tp4Label})`,
+        `🛑 Stop Loss: ${formatPrice(sl)} (${slLabel})`,
         `━━━━━━━━━━━━━━━━━━━━━━`,
       );
     }
