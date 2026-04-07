@@ -7,10 +7,11 @@ import { CredentialsSettings } from '@/components/settings/CredentialsSettings';
 import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
 
 export default function SettingsPanel() {
-  const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings, updateAISettings } = useSettingsStore();
+  const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateKalmanTrendSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings, updateAISettings } = useSettingsStore();
   const [isStochasticExpanded, setIsStochasticExpanded] = useState(false);
   const [isEmaExpanded, setIsEmaExpanded] = useState(false);
   const [isMacdExpanded, setIsMacdExpanded] = useState(false);
+  const [isKalmanExpanded, setIsKalmanExpanded] = useState(false);
   const [isScannerStochExpanded, setIsScannerStochExpanded] = useState(false);
   const [isScannerEmaExpanded, setIsScannerEmaExpanded] = useState(false);
   const [isScannerDivExpanded, setIsScannerDivExpanded] = useState(false);
@@ -971,6 +972,67 @@ export default function SettingsPanel() {
                         )}
                       </div>
                     )}
+
+                    {/* Kalman Trend Scanner */}
+                    {settings.scanner.enabled && (
+                      <div className="space-y-3">
+                        <div className="p-3 bg-bg-secondary border border-frame rounded">
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-primary-muted text-xs font-mono">ENABLE KALMAN TREND SCANNER</span>
+                            <input
+                              type="checkbox"
+                              checked={settings.scanner.kalmanTrendScanner?.enabled || false}
+                              onChange={(e) =>
+                                updateScannerSettings({
+                                  kalmanTrendScanner: {
+                                    ...settings.scanner.kalmanTrendScanner,
+                                    enabled: e.target.checked,
+                                  },
+                                })
+                              }
+                              className="w-4 h-4 accent-primary cursor-pointer"
+                            />
+                          </label>
+                        </div>
+
+                        {settings.scanner.kalmanTrendScanner?.enabled && (
+                          <>
+                            <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
+                              <div className="text-primary font-mono text-xs font-bold mb-2">TIMEFRAMES TO SCAN</div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {(['1m', '5m'] as const).map((tf) => (
+                                  <label key={tf} className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={settings.scanner.kalmanTrendScanner?.timeframes.includes(tf) || false}
+                                      onChange={(e) => {
+                                        const newTimeframes = e.target.checked
+                                          ? [...(settings.scanner.kalmanTrendScanner?.timeframes || []), tf]
+                                          : (settings.scanner.kalmanTrendScanner?.timeframes || []).filter((t: string) => t !== tf);
+                                        updateScannerSettings({
+                                          kalmanTrendScanner: {
+                                            ...settings.scanner.kalmanTrendScanner,
+                                            timeframes: newTimeframes,
+                                          },
+                                        });
+                                      }}
+                                      className="w-4 h-4 accent-primary cursor-pointer"
+                                    />
+                                    <span className="text-primary-muted text-xs font-mono">{tf.toUpperCase()}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="p-3 bg-bg-secondary border border-frame rounded">
+                              <div className="text-primary-muted text-xs font-mono">
+                                Detects Kalman Filter trend reversals. Shows BUY/SELL signals when price crosses the Kalman trend line with volume confirmation.
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -1374,6 +1436,121 @@ export default function SettingsPanel() {
                         );
                       })}
                     </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Kalman Volume Trend */}
+              <div className="border border-frame rounded overflow-hidden">
+                <button
+                  onClick={() => setIsKalmanExpanded(!isKalmanExpanded)}
+                  className="w-full flex items-center justify-between p-3 bg-bg-secondary hover:bg-bg-primary transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-primary font-mono text-xs font-bold">█ KALMAN VOLUME TREND</span>
+                  </div>
+                  <span className="text-primary text-base">{isKalmanExpanded ? '▼' : '▶'}</span>
+                </button>
+
+                {isKalmanExpanded && (
+                  <div className="p-4 space-y-3 bg-bg-primary">
+                    {/* Enable Toggle */}
+                    <div className="p-3 bg-bg-secondary border border-frame rounded">
+                      <label className="flex items-center justify-between cursor-pointer">
+                        <span className="text-primary font-mono text-xs font-bold">ENABLED</span>
+                        <input
+                          type="checkbox"
+                          checked={settings.indicators.kalmanTrend.enabled}
+                          onChange={(e) => updateKalmanTrendSettings({ enabled: e.target.checked })}
+                          className="w-4 h-4 accent-primary cursor-pointer"
+                        />
+                      </label>
+                    </div>
+
+                    {settings.indicators.kalmanTrend.enabled && (
+                      <div className="space-y-3">
+                        {/* Show Signals */}
+                        <div className="p-3 bg-bg-secondary border border-frame rounded">
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-primary-muted font-mono text-xs">SHOW BUY/SELL SIGNALS</span>
+                            <input
+                              type="checkbox"
+                              checked={settings.indicators.kalmanTrend.showSignals}
+                              onChange={(e) => updateKalmanTrendSettings({ showSignals: e.target.checked })}
+                              className="w-4 h-4 accent-primary cursor-pointer"
+                            />
+                          </label>
+                        </div>
+
+                        {/* Volume Confirmation */}
+                        <div className="p-3 bg-bg-secondary border border-frame rounded">
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-primary-muted font-mono text-xs">VOLUME CONFIRMATION</span>
+                            <input
+                              type="checkbox"
+                              checked={settings.indicators.kalmanTrend.volConfirm}
+                              onChange={(e) => updateKalmanTrendSettings({ volConfirm: e.target.checked })}
+                              className="w-4 h-4 accent-primary cursor-pointer"
+                            />
+                          </label>
+                        </div>
+
+                        {/* Parameters */}
+                        <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
+                          <div className="text-primary font-mono text-xs font-bold mb-2">PARAMETERS</div>
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">PROCESS NOISE (Q)</label>
+                              <input
+                                type="number"
+                                min="0.0001"
+                                max="0.01"
+                                step="0.0001"
+                                value={settings.indicators.kalmanTrend.processNoise}
+                                onChange={(e) => updateKalmanTrendSettings({ processNoise: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">MEAS. NOISE (R)</label>
+                              <input
+                                type="number"
+                                min="0.01"
+                                max="2.0"
+                                step="0.01"
+                                value={settings.indicators.kalmanTrend.measurementNoise}
+                                onChange={(e) => updateKalmanTrendSettings({ measurementNoise: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">BAND MULTIPLIER</label>
+                              <input
+                                type="number"
+                                min="0.5"
+                                max="5.0"
+                                step="0.1"
+                                value={settings.indicators.kalmanTrend.bandMultiplier}
+                                onChange={(e) => updateKalmanTrendSettings({ bandMultiplier: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">VOL THRESHOLD</label>
+                              <input
+                                type="number"
+                                min="0.0"
+                                max="2.0"
+                                step="0.1"
+                                value={settings.indicators.kalmanTrend.volThreshold}
+                                onChange={(e) => updateKalmanTrendSettings({ volThreshold: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>

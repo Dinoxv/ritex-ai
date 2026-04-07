@@ -77,8 +77,16 @@ export interface SupportResistanceValue {
   nearLevel: 'support' | 'resistance';
 }
 
+export interface KalmanTrendValue {
+  direction: 'bullish' | 'bearish';
+  timeframe: TimeInterval;
+  buySignal: boolean;
+  sellSignal: boolean;
+  delta: number;
+}
+
 export type SignalType = 'bullish' | 'bearish';
-export type ScanType = 'stochastic' | 'emaAlignment' | 'channel' | 'divergence' | 'macdReversal' | 'rsiReversal' | 'volumeSpike' | 'supportResistance';
+export type ScanType = 'stochastic' | 'emaAlignment' | 'channel' | 'divergence' | 'macdReversal' | 'rsiReversal' | 'volumeSpike' | 'supportResistance' | 'kalmanTrend';
 
 export interface ScanResult {
   symbol: string;
@@ -90,6 +98,7 @@ export interface ScanResult {
   rsiReversals?: RsiReversalValue[];
   volumeSpikes?: VolumeValue[];
   supportResistanceLevels?: SupportResistanceValue[];
+  kalmanTrends?: KalmanTrendValue[];
   matchedAt: number;
   signalType: SignalType;
   description: string;

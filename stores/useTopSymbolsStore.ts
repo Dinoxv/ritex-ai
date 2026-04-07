@@ -52,7 +52,7 @@ export const useTopSymbolsStore = create<TopSymbolsStore>((set, get) => ({
           }))
           .filter((s: SymbolWithVolume) => s.volume > 0)
           .sort((a: SymbolWithVolume, b: SymbolWithVolume) => b.volume - a.volume)
-          .slice(0, 20)
+          .slice(0, 50)
           .map(({ name, volume }: SymbolWithVolume) => ({ name, volume }));
       } else {
         const { meta, assetCtxs } = await service.getMetaAndAssetCtxs(selectedDex);
@@ -64,7 +64,7 @@ export const useTopSymbolsStore = create<TopSymbolsStore>((set, get) => ({
           }))
           .filter((s) => !s.isDelisted)
           .sort((a, b) => b.volume - a.volume)
-          .slice(0, 20)
+          .slice(0, 50)
           .map(({ name, volume }) => ({ name, volume }));
       }
 
@@ -95,7 +95,7 @@ export const useTopSymbolsStore = create<TopSymbolsStore>((set, get) => ({
       }))
       .filter((s: any) => !s.isDelisted)
       .sort((a: any, b: any) => b.volume - a.volume)
-      .slice(0, 20)
+      .slice(0, 50)
       .map(({ name, volume }: any) => ({ name, volume }));
 
     set({ symbols: symbolsWithVolume });

@@ -9,7 +9,8 @@ import type {
   RsiReversalValue,
   ChannelValue,
   DivergenceValue,
-  SupportResistanceValue
+  SupportResistanceValue,
+  KalmanTrendValue
 } from '@/models/Scanner';
 import type {
   StochasticScannerConfig,
@@ -20,7 +21,8 @@ import type {
   RsiReversalScannerConfig,
   ChannelScannerConfig,
   DivergenceScannerConfig,
-  SupportResistanceScannerConfig
+  SupportResistanceScannerConfig,
+  KalmanTrendScannerConfig
 } from '@/models/Settings';
 import type { TransformedCandle } from './types';
 import {
@@ -35,6 +37,7 @@ import {
   detectDivergence,
   calculateTrendlines,
   calculateATR,
+  calculateKalmanTrend,
   type DivergenceOptions
 } from '@/lib/indicators';
 import { aggregate1mTo5m } from '@/lib/candle-aggregator';
@@ -88,6 +91,12 @@ export interface SupportResistanceScanParams {
   symbol: string;
   timeframes: TimeInterval[];
   config: SupportResistanceScannerConfig;
+}
+
+export interface KalmanTrendScanParams {
+  symbol: string;
+  timeframes: TimeInterval[];
+  config: KalmanTrendScannerConfig;
 }
 
 export class ScannerService {
@@ -981,6 +990,85 @@ export class ScannerService {
     const results = await Promise.allSettled(
       symbols.map(symbol =>
         this.scanSupportResistance({ ...params, symbol })
+      )
+    );
+
+    return results
+      .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
+        result.status === 'fulfilled' && result.value !== null
+      )
+      .map(result => result.value as ScanResult);
+  }
+
+  async scanKalmanTrend(params: KalmanTrendScanParams): Promise<ScanResult | null> {
+    const { symbol, timeframes, config } = params;
+
+    const candleStore = useCandleStore.getState();
+    const closePrices = candleStore.getClosePrices(symbol, '1m', 100) || [];
+
+    for (const timeframe of timeframes) {
+      try {
+        const lookbackCandles = 150;
+        const candles = this.getCandlesFromStore(symbol, timeframe, lookbackCandles);
+
+        if (!candles || candles.length < 50) {
+          continue;
+        }
+
+        const kalmanResult = calculateKalmanTrend(candles as any);
+
+        if (!kalmanResult || !kalmanResult.buySignals || !kalmanResult.sellSignals) {
+          continue;
+        }
+
+        const lastIndex = kalmanResult.buySignals.length - 1;
+        if (lastIndex < 0) continue;
+
+        // Check last 3 bars for signals
+        const recentBuy = kalmanResult.buySignals.slice(-3).some(Boolean);
+        const recentSell = kalmanResult.sellSignals.slice(-3).some(Boolean);
+
+        if (!recentBuy && !recentSell) {
+          continue;
+        }
+
+        const directionValue = kalmanResult.direction[lastIndex];
+        const signalType = recentBuy ? 'bullish' : 'bearish';
+        const delta = kalmanResult.delta[lastIndex] || 0;
+
+        const kalmanTrendValue: KalmanTrendValue = {
+          direction: directionValue ? 'bullish' : 'bearish',
+          timeframe,
+          buySignal: recentBuy,
+          sellSignal: recentSell,
+          delta,
+        };
+
+        return {
+          symbol,
+          kalmanTrends: [kalmanTrendValue],
+          matchedAt: Date.now(),
+          signalType: signalType as 'bullish' | 'bearish',
+          description: `Kalman Trend ${signalType === 'bullish' ? 'BUY' : 'SELL'} signal on ${timeframe}`,
+          scanType: 'kalmanTrend',
+          closePrices,
+        };
+      } catch (error) {
+        console.error(`Error scanning Kalman Trend for ${symbol} on ${timeframe}:`, error);
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  async scanMultipleSymbolsForKalmanTrend(
+    symbols: string[],
+    params: Omit<KalmanTrendScanParams, 'symbol'>
+  ): Promise<ScanResult[]> {
+    const results = await Promise.allSettled(
+      symbols.map(symbol =>
+        this.scanKalmanTrend({ ...params, symbol })
       )
     );
 

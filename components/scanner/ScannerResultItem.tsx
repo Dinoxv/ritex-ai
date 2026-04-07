@@ -15,6 +15,7 @@ interface ProcessedSignal {
   macd: boolean;
   rsi: boolean;
   vol: boolean;
+  kalman: boolean;
   channel: string | null;
   sr: 'support' | 'resistance' | null;
   srDistance: number | null;
@@ -112,6 +113,9 @@ const ScannerResultItem = ({
                     )}
                     {signals.vol && (
                       <span className={`${badgeBg} text-bg-primary px-1.5 py-0.5 rounded font-bold`}>VOL</span>
+                    )}
+                    {signals.kalman && (
+                      <span className={`${badgeBg} text-bg-primary px-1.5 py-0.5 rounded font-bold`}>KLM</span>
                     )}
                     {signals.channel && (
                       <span className={`${badgeBg} text-bg-primary px-1.5 py-0.5 rounded font-bold`}>{signals.channel}CH</span>

@@ -148,6 +148,14 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
         newResults.push(...supportResistanceResults);
       }
 
+      if (settings.kalmanTrendScanner?.enabled) {
+        const kalmanResults = await scannerService.scanMultipleSymbolsForKalmanTrend(symbols, {
+          timeframes: settings.kalmanTrendScanner.timeframes,
+          config: settings.kalmanTrendScanner,
+        });
+        newResults.push(...kalmanResults);
+      }
+
       const newSymbols = new Set(newResults.map((r: ScanResult) => r.symbol));
 
       if (newResults.length > 0 && settings.playSound) {
@@ -294,6 +302,7 @@ const SCAN_TYPE_LABELS: Record<string, string> = {
   rsiReversal: 'RSI Reversal',
   volumeSpike: 'Volume Spike',
   supportResistance: 'S/R Level',
+  kalmanTrend: 'Kalman Trend',
 };
 
 async function sendScannerTelegramAlerts(

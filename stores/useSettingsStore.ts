@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings, AIStrategyConfig } from '@/models/Settings';
+import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, KalmanTrendSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings, AIStrategyConfig } from '@/models/Settings';
 
 type TabType = 'scanner' | 'indicators' | 'orders' | 'ui' | 'credentials' | 'ai';
 type MobileTabType = 'scanner' | 'symbols' | 'chart' | 'actions' | 'orders-positions';
@@ -20,8 +20,10 @@ interface SettingsStore {
   updateStochasticSettings: (settings: Partial<StochasticSettings>) => void;
   updateEmaSettings: (settings: Partial<EmaSettings>) => void;
   updateMacdSettings: (settings: Partial<MacdSettings>) => void;
+  updateKalmanTrendSettings: (settings: Partial<KalmanTrendSettings>) => void;
   updateScannerSettings: (settings: Partial<ScannerSettings>) => void;
   updateOrderSettings: (settings: Partial<OrderSettings>) => void;
+  updateChartSettings: (settings: Partial<ChartSettings>) => void;
   updateThemeSettings: (settings: Partial<ThemeSettings>) => void;
   updateAISettings: (settings: Partial<AIStrategyConfig>) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
@@ -142,6 +144,15 @@ const mergeSettings = (storedSettings: any): AppSettings => {
           // Use defaults
           return DEFAULT_SETTINGS.indicators.macd;
         })(),
+        kalmanTrend: {
+          enabled: storedSettings.indicators?.kalmanTrend?.enabled ?? DEFAULT_SETTINGS.indicators.kalmanTrend.enabled,
+          processNoise: storedSettings.indicators?.kalmanTrend?.processNoise ?? DEFAULT_SETTINGS.indicators.kalmanTrend.processNoise,
+          measurementNoise: storedSettings.indicators?.kalmanTrend?.measurementNoise ?? DEFAULT_SETTINGS.indicators.kalmanTrend.measurementNoise,
+          bandMultiplier: storedSettings.indicators?.kalmanTrend?.bandMultiplier ?? DEFAULT_SETTINGS.indicators.kalmanTrend.bandMultiplier,
+          volConfirm: storedSettings.indicators?.kalmanTrend?.volConfirm ?? DEFAULT_SETTINGS.indicators.kalmanTrend.volConfirm,
+          volThreshold: storedSettings.indicators?.kalmanTrend?.volThreshold ?? DEFAULT_SETTINGS.indicators.kalmanTrend.volThreshold,
+          showSignals: storedSettings.indicators?.kalmanTrend?.showSignals ?? DEFAULT_SETTINGS.indicators.kalmanTrend.showSignals,
+        },
       },
       scanner: {
         enabled: storedSettings.scanner?.enabled ?? DEFAULT_SETTINGS.scanner.enabled,
@@ -218,6 +229,10 @@ const mergeSettings = (storedSettings: any): AppSettings => {
           distanceThreshold: storedSettings.scanner?.supportResistanceScanner?.distanceThreshold ?? DEFAULT_SETTINGS.scanner.supportResistanceScanner.distanceThreshold,
           minTouches: storedSettings.scanner?.supportResistanceScanner?.minTouches ?? DEFAULT_SETTINGS.scanner.supportResistanceScanner.minTouches,
         },
+        kalmanTrendScanner: {
+          enabled: storedSettings.scanner?.kalmanTrendScanner?.enabled ?? DEFAULT_SETTINGS.scanner.kalmanTrendScanner.enabled,
+          timeframes: storedSettings.scanner?.kalmanTrendScanner?.timeframes ?? DEFAULT_SETTINGS.scanner.kalmanTrendScanner.timeframes,
+        },
       },
       orders: {
         cloudPercentage: storedSettings.orders?.cloudPercentage ?? DEFAULT_SETTINGS.orders.cloudPercentage,
@@ -231,6 +246,11 @@ const mergeSettings = (storedSettings: any): AppSettings => {
       },
       chart: {
         showPivotMarkers: storedSettings.chart?.showPivotMarkers ?? DEFAULT_SETTINGS.chart.showPivotMarkers,
+        showRsiMarkers: storedSettings.chart?.showRsiMarkers ?? DEFAULT_SETTINGS.chart.showRsiMarkers,
+        showDivergenceMarkers: storedSettings.chart?.showDivergenceMarkers ?? DEFAULT_SETTINGS.chart.showDivergenceMarkers,
+        showMacdMarkers: storedSettings.chart?.showMacdMarkers ?? DEFAULT_SETTINGS.chart.showMacdMarkers,
+        showCrossoverMarkers: storedSettings.chart?.showCrossoverMarkers ?? DEFAULT_SETTINGS.chart.showCrossoverMarkers,
+        showBreakeven: storedSettings.chart?.showBreakeven ?? DEFAULT_SETTINGS.chart.showBreakeven,
         schmecklesMode: storedSettings.chart?.schmecklesMode ?? DEFAULT_SETTINGS.chart.schmecklesMode,
         invertedMode: storedSettings.chart?.invertedMode ?? DEFAULT_SETTINGS.chart.invertedMode,
       },
@@ -305,6 +325,19 @@ export const useSettingsStore = create<SettingsStore>()(
             },
           },
         })),
+      updateKalmanTrendSettings: (updates) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            indicators: {
+              ...state.settings.indicators,
+              kalmanTrend: {
+                ...state.settings.indicators.kalmanTrend,
+                ...updates,
+              },
+            },
+          },
+        })),
       updateScannerSettings: (updates) =>
         set((state) => ({
           settings: {
@@ -321,6 +354,16 @@ export const useSettingsStore = create<SettingsStore>()(
             ...state.settings,
             orders: {
               ...state.settings.orders,
+              ...updates,
+            },
+          },
+        })),
+      updateChartSettings: (updates) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            chart: {
+              ...state.settings.chart,
               ...updates,
             },
           },

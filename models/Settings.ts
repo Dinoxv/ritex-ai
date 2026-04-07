@@ -47,10 +47,21 @@ export interface MacdSettings {
   };
 }
 
+export interface KalmanTrendSettings {
+  enabled: boolean;
+  processNoise: number;
+  measurementNoise: number;
+  bandMultiplier: number;
+  volConfirm: boolean;
+  volThreshold: number;
+  showSignals: boolean;
+}
+
 export interface IndicatorSettings {
   stochastic: StochasticSettings;
   ema: EmaSettings;
   macd: MacdSettings;
+  kalmanTrend: KalmanTrendSettings;
 }
 
 export interface StochasticScannerConfig {
@@ -126,6 +137,11 @@ export interface SupportResistanceScannerConfig {
   minTouches: number;
 }
 
+export interface KalmanTrendScannerConfig {
+  enabled: boolean;
+  timeframes: ('1m' | '5m')[];
+}
+
 export interface ScannerSettings {
   enabled: boolean;
   scanInterval: number;
@@ -144,6 +160,7 @@ export interface ScannerSettings {
   rsiReversalScanner: RsiReversalScannerConfig;
   volumeSpikeScanner: VolumeSpikeConfig;
   supportResistanceScanner: SupportResistanceScannerConfig;
+  kalmanTrendScanner: KalmanTrendScannerConfig;
 }
 
 export interface OrderSettings {
@@ -162,6 +179,11 @@ export interface ThemeSettings {
 
 export interface ChartSettings {
   showPivotMarkers: boolean;
+  showRsiMarkers: boolean;
+  showDivergenceMarkers: boolean;
+  showMacdMarkers: boolean;
+  showCrossoverMarkers: boolean;
+  showBreakeven: boolean;
   schmecklesMode: boolean;
   invertedMode: boolean;
 }
@@ -252,11 +274,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
         '1h': { ...DEFAULT_MACD_CONFIG, enabled: false },
       },
     },
+    kalmanTrend: {
+      enabled: false,
+      processNoise: 0.0005,
+      measurementNoise: 0.4,
+      bandMultiplier: 2.0,
+      volConfirm: true,
+      volThreshold: 0.3,
+      showSignals: true,
+    },
   },
   scanner: {
     enabled: false,
     scanInterval: 1,
-    topMarkets: 20,
+    topMarkets: 50,
     playSound: true,
     candleCacheDuration: 1,
     telegramEnabled: false,
@@ -328,6 +359,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
       distanceThreshold: 1.0,
       minTouches: 2,
     },
+    kalmanTrendScanner: {
+      enabled: false,
+      timeframes: ['1m', '5m'],
+    },
   },
   orders: {
     cloudPercentage: 5,
@@ -341,6 +376,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   },
   chart: {
     showPivotMarkers: true,
+    showRsiMarkers: true,
+    showDivergenceMarkers: true,
+    showMacdMarkers: true,
+    showCrossoverMarkers: true,
+    showBreakeven: true,
     schmecklesMode: false,
     invertedMode: false,
   },

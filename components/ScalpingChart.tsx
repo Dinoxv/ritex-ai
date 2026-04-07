@@ -19,6 +19,7 @@ import {
   calculateEMAMemoized,
   calculateMACDMemoized,
   calculateStochasticMemoized,
+  calculateKalmanTrend,
   detectPivots,
   detectStochasticPivots,
   detectDivergence,
@@ -232,6 +233,8 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   const stochReferenceLinesRef = useRef<any[]>([]);
   const supportLineSeriesRef = useRef<any[]>([]);
   const resistanceLineSeriesRef = useRef<any[]>([]);
+  const kalmanTrendSeriesRef = useRef<any>(null);
+  const kalmanVolBarSeriesRef = useRef<any>(null);
   const positionLineRef = useRef<any>(null);
   const breakevenBandSeriesRef = useRef<any>(null);
   const orderLinesRef = useRef<any[]>([]);
@@ -256,7 +259,13 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   const emaSettings = useSettingsStore((state) => state.settings.indicators.ema);
   const stochasticSettings = useSettingsStore((state) => state.settings.indicators.stochastic);
   const macdSettings = useSettingsStore((state) => state.settings.indicators.macd);
+  const kalmanTrendSettings = useSettingsStore((state) => state.settings.indicators.kalmanTrend);
   const chartSettings = useSettingsStore((state) => state.settings.chart);
+  const updateEmaSettings = useSettingsStore((state) => state.updateEmaSettings);
+  const updateStochasticSettings = useSettingsStore((state) => state.updateStochasticSettings);
+  const updateMacdSettings = useSettingsStore((state) => state.updateMacdSettings);
+  const updateKalmanTrendSettings = useSettingsStore((state) => state.updateKalmanTrendSettings);
+  const updateChartSettings = useSettingsStore((state) => state.updateChartSettings);
 
   const displayCandles = useMemo(
     () => invertCandles(candles, chartSettings?.invertedMode ?? false),
@@ -362,6 +371,14 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           priceLineVisible: false,
         });
 
+        // Kalman Trend series
+        const kalmanTrendSeries = chart.addLineSeries({
+          color: '#1a6cca',
+          lineWidth: 3,
+          lastValueVisible: false,
+          priceLineVisible: false,
+        });
+        kalmanTrendSeriesRef.current = kalmanTrendSeries;
 
         // Stochastic series for variants
         const variantColors: Record<string, string> = {
@@ -578,6 +595,8 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         ema1SeriesRef.current = null;
         ema2SeriesRef.current = null;
         ema3SeriesRef.current = null;
+        kalmanTrendSeriesRef.current = null;
+
         stochSeriesRefsRef.current = {};
       }
     };
@@ -868,6 +887,18 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     return calculateRSI(closePrices, 14);
   }, [closePrices]);
 
+  const kalmanTrend = useMemo(() => {
+    if (!kalmanTrendSettings?.enabled || displayCandles.length < 10) return null;
+    return calculateKalmanTrend(
+      displayCandles,
+      kalmanTrendSettings.processNoise,
+      kalmanTrendSettings.measurementNoise,
+      kalmanTrendSettings.bandMultiplier,
+      kalmanTrendSettings.volConfirm,
+      kalmanTrendSettings.volThreshold,
+    );
+  }, [displayCandles, kalmanTrendSettings?.enabled, kalmanTrendSettings?.processNoise, kalmanTrendSettings?.measurementNoise, kalmanTrendSettings?.bandMultiplier, kalmanTrendSettings?.volConfirm, kalmanTrendSettings?.volThreshold]);
+
   const simpleStochastic = useMemo(() => {
     if (!simplifiedView) return null;
     return calculateStochasticMemoized(displayCandles, 14, 3, 3);
@@ -878,13 +909,13 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   }, [displayCandles, chartSettings?.showPivotMarkers]);
 
   const divergenceMarkers = useMemo(() => {
-    return stochasticSettings.showDivergence && divergencePoints.length > 0
+    return stochasticSettings.showDivergence && (chartSettings?.showDivergenceMarkers !== false) && divergencePoints.length > 0
       ? createDivergenceMarkers(divergencePoints)
       : [];
-  }, [divergencePoints, stochasticSettings.showDivergence]);
+  }, [divergencePoints, stochasticSettings.showDivergence, chartSettings?.showDivergenceMarkers]);
 
   const macdReversalMarkers = useMemo(() => {
-    return macdResult.macd.length > 0
+    return (chartSettings?.showMacdMarkers !== false) && macdResult.macd.length > 0
       ? detectMacdReversals(macdResult, displayCandles).map(r => ({
           time: r.time / 1000,
           position: r.position,
@@ -893,10 +924,10 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           text: '',
         }))
       : [];
-  }, [macdResult, displayCandles]);
+  }, [macdResult, displayCandles, chartSettings?.showMacdMarkers]);
 
   const rsiReversalMarkers = useMemo(() => {
-    return rsi.length > 0
+    return (chartSettings?.showRsiMarkers !== false) && rsi.length > 0
       ? detectRsiReversals(rsi, displayCandles, 30, 70).map(r => ({
           time: r.time / 1000,
           position: r.position,
@@ -905,15 +936,15 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           text: '',
         }))
       : [];
-  }, [rsi, displayCandles]);
+  }, [rsi, displayCandles, chartSettings?.showRsiMarkers]);
 
   const crossoverMarkers = useMemo(() => {
-    if (emaSettings.ema1.enabled && emaSettings.ema2.enabled && ema1.length > 0 && ema2.length > 0) {
+    if ((chartSettings?.showCrossoverMarkers !== false) && emaSettings.ema1.enabled && emaSettings.ema2.enabled && ema1.length > 0 && ema2.length > 0) {
       const ema3ForDetection = emaSettings.ema3.enabled && ema3.length > 0 ? ema3 : null;
       return detectCrossovers(ema1, ema2, ema3ForDetection, displayCandles);
     }
     return [];
-  }, [emaSettings.ema1.enabled, emaSettings.ema2.enabled, emaSettings.ema3.enabled, ema1, ema2, ema3, displayCandles]);
+  }, [emaSettings.ema1.enabled, emaSettings.ema2.enabled, emaSettings.ema3.enabled, ema1, ema2, ema3, displayCandles, chartSettings?.showCrossoverMarkers]);
 
   const rafRef = useRef<number | null>(null);
   const pendingUpdateRef = useRef(false);
@@ -1039,9 +1070,54 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           ema3SeriesRef.current?.setData([]);
         }
 
+        // Kalman Trend data
+        if (kalmanTrend && kalmanTrendSettings?.enabled) {
+          const upColor = '#1a6cca';
+          const dnColor = '#ca1aad';
+
+          const trendData = kalmanTrend.trendLine.map((value, i) => {
+            const isChange = i > 0 && kalmanTrend.direction[i] !== kalmanTrend.direction[i - 1];
+            return {
+              time: (displayCandles[i].time / 1000) as any,
+              value: isChange ? undefined as any : value,
+              color: kalmanTrend.direction[i] ? upColor : dnColor,
+            };
+          });
+          kalmanTrendSeriesRef.current?.setData(trendData);
+        } else {
+          kalmanTrendSeriesRef.current?.setData([]);
+        }
+
+        // Build markers including Kalman signals
+        const kalmanMarkers: any[] = [];
+        if (kalmanTrend && kalmanTrendSettings?.enabled && kalmanTrendSettings?.showSignals) {
+          for (let i = 0; i < displayCandles.length; i++) {
+            if (kalmanTrend.buySignals[i]) {
+              kalmanMarkers.push({
+                time: (displayCandles[i].time / 1000) as any,
+                position: 'belowBar',
+                color: '#00c878',
+                shape: 'arrowUp',
+                text: 'BUY Δ' + kalmanTrend.delta[i].toFixed(2),
+                id: `kalman-buy-${i}`,
+              });
+            }
+            if (kalmanTrend.sellSignals[i]) {
+              kalmanMarkers.push({
+                time: (displayCandles[i].time / 1000) as any,
+                position: 'aboveBar',
+                color: '#ff5050',
+                shape: 'arrowDown',
+                text: 'SELL Δ' + kalmanTrend.delta[i].toFixed(2),
+                id: `kalman-sell-${i}`,
+              });
+            }
+          }
+        }
+
         const allMarkers = crossoverMarkers.length > 0
-          ? [...pivotMarkers, ...divergenceMarkers, ...crossoverMarkers, ...macdReversalMarkers, ...rsiReversalMarkers]
-          : [...pivotMarkers, ...divergenceMarkers, ...macdReversalMarkers, ...rsiReversalMarkers];
+          ? [...pivotMarkers, ...divergenceMarkers, ...crossoverMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers]
+          : [...pivotMarkers, ...divergenceMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers];
 
         candleSeriesRef.current?.setMarkers(allMarkers.sort((a, b) => a.time - b.time));
       });
@@ -1070,6 +1146,20 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         });
       }
 
+      // Kalman Trend incremental update
+      if (kalmanTrend && kalmanTrendSettings?.enabled) {
+        const lastIdx = kalmanTrend.trendLine.length - 1;
+        if (lastIdx >= 0) {
+          const upColor = '#1a6cca';
+          const dnColor = '#ca1aad';
+          kalmanTrendSeriesRef.current?.update({
+            time: (lastCandle.time / 1000) as any,
+            value: kalmanTrend.trendLine[lastIdx],
+            color: kalmanTrend.direction[lastIdx] ? upColor : dnColor,
+          });
+        }
+      }
+
     }
 
     lastCandleTimeRef.current = lastCandle.time;
@@ -1079,7 +1169,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     if (onPriceUpdate) {
       onPriceUpdate(lastCandle.close);
     }
-  }, [displayCandles, chartReady, onPriceUpdate, ema1, ema2, ema3, macdResult, rsi, emaSettings.ema1.enabled, emaSettings.ema2.enabled, emaSettings.ema3.enabled, stochasticSettings.showMultiVariant, stochasticSettings.showDivergence, stochasticSettings.variants, interval, allMacdCandles, coin, isExternalData, chartSettings]);
+  }, [displayCandles, chartReady, onPriceUpdate, ema1, ema2, ema3, macdResult, rsi, emaSettings.ema1.enabled, emaSettings.ema2.enabled, emaSettings.ema3.enabled, stochasticSettings.showMultiVariant, stochasticSettings.showDivergence, stochasticSettings.variants, interval, allMacdCandles, coin, isExternalData, chartSettings, kalmanTrend, kalmanTrendSettings]);
 
 
   // MACD multi-timeframe data update
@@ -1442,7 +1532,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     }
 
     // Create breakeven band if position exists and we have candles to display
-    if (position && displayCandles.length > 0) {
+    if (position && displayCandles.length > 0 && chartSettings?.showBreakeven !== false) {
       const breakevenPrice = calculateBreakevenPrice(
         position.entryPrice,
         position.side,
@@ -1498,7 +1588,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         breakevenBandSeriesRef.current = null;
       }
     };
-  }, [position, chartReady, chartSettings?.invertedMode, displayCandles, candles, decimals.price]);
+  }, [position, chartReady, chartSettings?.invertedMode, chartSettings?.showBreakeven, displayCandles, candles, decimals.price]);
 
   // Order price lines overlay
   useEffect(() => {
@@ -1588,6 +1678,8 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     slow: '#00FF7F',
   };
 
+  const [showIndicatorToggles, setShowIndicatorToggles] = useState(false);
+
   const variantLabels: Record<string, string> = {
     ultraFast: 'UF',
     fast: 'F',
@@ -1602,6 +1694,186 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           <div className="text-primary">Loading chart...</div>
         </div>
       )}
+      {/* Indicator toggle bar */}
+      <div className="absolute top-1 right-1 z-20 flex items-start gap-1">
+        <button
+          onClick={() => setShowIndicatorToggles(!showIndicatorToggles)}
+          className="px-1.5 py-0.5 text-[9px] font-mono rounded bg-bg-secondary border border-frame text-primary-muted hover:text-primary hover:bg-bg-primary transition-colors"
+          title="Toggle indicators"
+        >
+          {showIndicatorToggles ? '✕' : '⚙'}
+        </button>
+        {showIndicatorToggles && (
+          <div className="flex flex-wrap gap-0.5 max-w-[480px] bg-bg-secondary/90 backdrop-blur-sm border border-frame rounded p-1">
+            {/* EMA toggles */}
+            <button
+              onClick={() => updateEmaSettings({ ema1: { ...emaSettings.ema1, enabled: !emaSettings.ema1.enabled } })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                emaSettings.ema1.enabled
+                  ? 'bg-accent-blue/20 border-accent-blue text-accent-blue'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              EMA {emaSettings.ema1.period}
+            </button>
+            <button
+              onClick={() => updateEmaSettings({ ema2: { ...emaSettings.ema2, enabled: !emaSettings.ema2.enabled } })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                emaSettings.ema2.enabled
+                  ? 'bg-accent-rose/20 border-accent-rose text-accent-rose'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              EMA {emaSettings.ema2.period}
+            </button>
+            <button
+              onClick={() => updateEmaSettings({ ema3: { ...emaSettings.ema3, enabled: !emaSettings.ema3.enabled } })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                emaSettings.ema3.enabled
+                  ? 'border-green-500 text-green-500 bg-green-500/20'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              EMA {emaSettings.ema3.period}
+            </button>
+
+            <div className="w-px h-4 bg-frame self-center mx-0.5"></div>
+
+            {/* MACD toggle */}
+            <button
+              onClick={() => updateMacdSettings({ showMultiTimeframe: !macdSettings.showMultiTimeframe })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                macdSettings.showMultiTimeframe
+                  ? 'bg-purple-500/20 border-purple-500 text-purple-500'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              MACD
+            </button>
+
+            {/* RSI markers */}
+            <button
+              onClick={() => updateChartSettings({ showRsiMarkers: !(chartSettings?.showRsiMarkers !== false) })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                chartSettings?.showRsiMarkers !== false
+                  ? 'bg-orange-500/20 border-orange-500 text-orange-500'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              RSI
+            </button>
+
+            {/* MACD reversal markers */}
+            <button
+              onClick={() => updateChartSettings({ showMacdMarkers: !(chartSettings?.showMacdMarkers !== false) })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                chartSettings?.showMacdMarkers !== false
+                  ? 'bg-purple-400/20 border-purple-400 text-purple-400'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              M-Rev
+            </button>
+
+            <div className="w-px h-4 bg-frame self-center mx-0.5"></div>
+
+            {/* Divergence */}
+            <button
+              onClick={() => updateChartSettings({ showDivergenceMarkers: !(chartSettings?.showDivergenceMarkers !== false) })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                chartSettings?.showDivergenceMarkers !== false
+                  ? 'bg-yellow-500/20 border-yellow-500 text-yellow-500'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              Div
+            </button>
+
+            {/* H-Div (hidden divergence - toggles the stochastic divergence detection) */}
+            <button
+              onClick={() => updateStochasticSettings({ showDivergence: !stochasticSettings.showDivergence })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                stochasticSettings.showDivergence
+                  ? 'bg-amber-500/20 border-amber-500 text-amber-500'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              H-Div
+            </button>
+
+            {/* Pivot */}
+            <button
+              onClick={() => updateChartSettings({ showPivotMarkers: !(chartSettings?.showPivotMarkers) })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                chartSettings?.showPivotMarkers
+                  ? 'bg-cyan-500/20 border-cyan-500 text-cyan-500'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              Pivot
+            </button>
+
+            {/* EMA Crossover */}
+            <button
+              onClick={() => updateChartSettings({ showCrossoverMarkers: !(chartSettings?.showCrossoverMarkers !== false) })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                chartSettings?.showCrossoverMarkers !== false
+                  ? 'bg-sky-400/20 border-sky-400 text-sky-400'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              X-Over
+            </button>
+
+            {/* Breakeven */}
+            <button
+              onClick={() => updateChartSettings({ showBreakeven: !(chartSettings?.showBreakeven !== false) })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                chartSettings?.showBreakeven !== false
+                  ? 'bg-emerald-500/20 border-emerald-500 text-emerald-500'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              BE
+            </button>
+
+            {/* Kalman Trend */}
+            <button
+              onClick={() => updateKalmanTrendSettings({ enabled: !kalmanTrendSettings?.enabled })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                kalmanTrendSettings?.enabled
+                  ? 'bg-blue-600/20 border-blue-600 text-blue-400'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              Kalman
+            </button>
+
+            <div className="w-px h-4 bg-frame self-center mx-0.5"></div>
+
+            {/* Stochastic variants */}
+            {Object.entries(stochasticSettings.variants).map(([variantName, config]) => (
+              <button
+                key={variantName}
+                onClick={() => updateStochasticSettings({
+                  variants: {
+                    ...stochasticSettings.variants,
+                    [variantName]: { ...config, enabled: !config.enabled },
+                  },
+                })}
+                className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                  config.enabled
+                    ? 'bg-bg-primary border-current'
+                    : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+                }`}
+                style={config.enabled ? { borderColor: variantColorVars[variantName], color: variantColorVars[variantName] } : undefined}
+              >
+                ST {variantLabels[variantName]}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
       <div ref={chartContainerRef} className="flex-1 min-h-0" />
       <div className="mt-1 flex gap-3 text-[9px] items-center">
         <ChartLegend className="flex-shrink-0" />

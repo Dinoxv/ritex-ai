@@ -136,7 +136,7 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
     try {
       const candleStore = useCandleStore.getState();
       const topSymbolsStore = useTopSymbolsStore.getState();
-      const topSymbols = topSymbolsStore.symbols.slice(0, 20);
+      const topSymbols = topSymbolsStore.symbols.slice(0, 50);
 
       if (topSymbols.length === 0) {
         console.log('[GlobalPolling] fetchCandleData: no symbols loaded yet, skipping');

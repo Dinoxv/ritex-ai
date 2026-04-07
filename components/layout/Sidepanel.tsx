@@ -337,6 +337,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
         macd: boolean;
         rsi: boolean;
         vol: boolean;
+        kalman: boolean;
         channel: string | null;
         sr: 'support' | 'resistance' | null;
         srDistance: number | null;
@@ -372,6 +373,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
         if (result.volumeSpikes) timeframes.push(...result.volumeSpikes.map(v => v.timeframe));
         if (result.channels) timeframes.push(...result.channels.map(c => c.timeframe));
         if (result.supportResistanceLevels) timeframes.push(...result.supportResistanceLevels.map(sr => sr.timeframe));
+        if (result.kalmanTrends) timeframes.push(...result.kalmanTrends.map(k => k.timeframe));
 
         const uniqueTimeframes = [...new Set(timeframes)];
 
@@ -383,6 +385,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
               macd: false,
               rsi: false,
               vol: false,
+              kalman: false,
               channel: null,
               sr: null,
               srDistance: null,
@@ -432,6 +435,9 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
               tfData.srTouches = touches;
               tfData.srPrice = price;
             }
+          }
+          if (result.scanType === 'kalmanTrend' && result.kalmanTrends?.some(k => k.timeframe === tf)) {
+            tfData.kalman = true;
           }
         });
       });

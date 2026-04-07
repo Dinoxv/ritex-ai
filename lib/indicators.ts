@@ -1996,3 +1996,134 @@ export function calculateStochasticTrendlines(
     }))
   };
 }
+
+// ══════════════════════════════════════════════════════════════════════════════
+// Kalman Volume Trend + BUY/SELL Signals (RitchiVietnam)
+// ══════════════════════════════════════════════════════════════════════════════
+
+export interface KalmanTrendResult {
+  trendLine: number[];
+  direction: boolean[];
+  delta: number[];
+  volumeBar: number[];
+  buySignals: boolean[];
+  sellSignals: boolean[];
+  kalmanFilter: number[];
+}
+
+export function calculateKalmanTrend(
+  candles: FullCandleData[],
+  processNoise: number = 0.0005,
+  measurementNoise: number = 0.4,
+  bandMultiplier: number = 2.0,
+  volConfirm: boolean = true,
+  volThreshold: number = 0.3,
+): KalmanTrendResult {
+  const len = candles.length;
+  const trendLine: number[] = new Array(len).fill(0);
+  const direction: boolean[] = new Array(len).fill(false);
+  const delta: number[] = new Array(len).fill(0);
+  const volumeBar: number[] = new Array(len).fill(0);
+  const buySignals: boolean[] = new Array(len).fill(false);
+  const sellSignals: boolean[] = new Array(len).fill(false);
+  const kalmanFilter: number[] = new Array(len).fill(0);
+
+  if (len < 2) return { trendLine, direction, delta, volumeBar, buySignals, sellSignals, kalmanFilter };
+
+  const atrPeriod = Math.min(200, len - 1);
+  const atr200: number[] = new Array(len).fill(0);
+  {
+    const tr: number[] = [];
+    tr.push(candles[0].high - candles[0].low);
+    for (let i = 1; i < len; i++) {
+      tr.push(Math.max(
+        candles[i].high - candles[i].low,
+        Math.abs(candles[i].high - candles[i - 1].close),
+        Math.abs(candles[i].low - candles[i - 1].close),
+      ));
+    }
+    let sum = 0;
+    for (let i = 0; i < Math.min(atrPeriod, len); i++) sum += tr[i];
+    atr200[Math.min(atrPeriod, len) - 1] = sum / Math.min(atrPeriod, len);
+    for (let i = Math.min(atrPeriod, len); i < len; i++) {
+      atr200[i] = (atr200[i - 1] * (atrPeriod - 1) + tr[i]) / atrPeriod;
+    }
+    for (let i = 0; i < Math.min(atrPeriod, len) - 1; i++) {
+      atr200[i] = atr200[Math.min(atrPeriod, len) - 1];
+    }
+  }
+
+  const deltaSign: number[] = candles.map(c => c.close > c.open ? c.volume : -c.volume);
+  for (let i = 0; i < len; i++) {
+    const lookback = Math.min(100, i + 1);
+    let hiAbs = 0.1;
+    for (let j = i - lookback + 1; j <= i; j++) {
+      if (j >= 0) hiAbs = Math.max(hiAbs, Math.abs(deltaSign[j]));
+    }
+    delta[i] = (deltaSign[i] / hiAbs) * 2;
+  }
+
+  let x = candles[0].close;
+  let p = 1.0;
+  kalmanFilter[0] = x;
+
+  for (let i = 1; i < len; i++) {
+    p = p + processNoise;
+    const k = p / (p + measurementNoise);
+    x = x + k * (candles[i].close - x);
+    p = (1 - k) * p;
+    kalmanFilter[i] = x;
+  }
+
+  let dir = false;
+  direction[0] = false;
+  for (let i = 1; i < len; i++) {
+    const atr = atr200[i] * bandMultiplier;
+    const upKF = kalmanFilter[i] + atr;
+    const loKF = kalmanFilter[i] - atr;
+
+    if (candles[i].close > upKF && candles[i - 1].close < (kalmanFilter[i - 1] + atr200[i - 1] * bandMultiplier)) {
+      dir = true;
+    } else if (candles[i].close < loKF && candles[i - 1].close > (kalmanFilter[i - 1] - atr200[i - 1] * bandMultiplier)) {
+      dir = false;
+    }
+    direction[i] = dir;
+  }
+
+  for (let i = 0; i < len; i++) {
+    const atr = atr200[i] * bandMultiplier;
+    const kfTrend = direction[i] ? (kalmanFilter[i] - atr) : (kalmanFilter[i] + atr);
+    trendLine[i] = kfTrend;
+    const dirSign = direction[i] ? 1 : -1;
+    volumeBar[i] = kfTrend + atr200[i] * Math.abs(delta[i]) * dirSign;
+  }
+
+  let pendingBuy = false;
+  let pendingSell = false;
+
+  for (let i = 1; i < len; i++) {
+    const tChange = direction[i] !== direction[i - 1];
+    const rawBuy = tChange && direction[i];
+    const rawSell = tChange && !direction[i];
+
+    const volOkBuy = !volConfirm || delta[i] >= volThreshold;
+    const volOkSell = !volConfirm || delta[i] <= -volThreshold;
+
+    const buyNow = rawBuy && volOkBuy;
+    const sellNow = rawSell && volOkSell;
+
+    if (rawBuy && !volOkBuy) pendingBuy = true;
+    if (rawSell && !volOkSell) pendingSell = true;
+
+    const delayedBuy = pendingBuy && delta[i] >= volThreshold && direction[i];
+    const delayedSell = pendingSell && delta[i] <= -volThreshold && !direction[i];
+
+    if (delayedBuy || buyNow) pendingBuy = false;
+    if (delayedSell || sellNow) pendingSell = false;
+
+    buySignals[i] = buyNow || delayedBuy;
+    sellSignals[i] = sellNow || delayedSell;
+  }
+
+  return { trendLine, direction, delta, volumeBar, buySignals, sellSignals, kalmanFilter };
+}
