@@ -474,11 +474,25 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
             </div>
 
             <div className="text-xs text-primary-muted font-mono space-y-1">
-              <div className="flex justify-between">
+              <div className="flex justify-between items-center">
                 <span>Status:</span>
-                <span className={status.isRunning ? 'text-success' : 'text-primary-muted'}>
-                  {status.isRunning ? '● AUTO' : '○ MANUAL'}
-                </span>
+                <button
+                  onClick={() => {
+                    if (status.isRunning) {
+                      stopAutoScan();
+                    } else {
+                      startAutoScanWithDelay();
+                    }
+                  }}
+                  className={`px-2 py-0.5 rounded border text-[10px] font-bold cursor-pointer transition-all active:scale-95 ${
+                    status.isRunning
+                      ? 'text-success border-success bg-success/10 hover:bg-success/20'
+                      : 'text-primary-muted border-frame bg-bg-secondary hover:bg-primary/10'
+                  }`}
+                  title={status.isRunning ? 'Click to stop auto scan' : 'Click to start auto scan'}
+                >
+                  {status.isRunning ? '● AUTO ON' : '○ AUTO OFF'}
+                </button>
               </div>
               <div className="flex justify-between">
                 <span>Last scan:</span>
