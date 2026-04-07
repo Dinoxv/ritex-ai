@@ -486,7 +486,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
                   }}
                   className={`px-2 py-0.5 rounded border text-[10px] font-bold cursor-pointer transition-all active:scale-95 ${
                     status.isRunning
-                      ? 'text-success border-success bg-success/10 hover:bg-success/20'
+                      ? 'text-bullish border-bullish bg-bullish/10 hover:bg-bullish/20'
                       : 'text-primary-muted border-frame bg-bg-secondary hover:bg-primary/10'
                   }`}
                   title={status.isRunning ? 'Click to stop auto scan' : 'Click to start auto scan'}
