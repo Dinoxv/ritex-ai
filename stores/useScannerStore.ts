@@ -305,31 +305,108 @@ const SCAN_TYPE_LABELS: Record<string, string> = {
   kalmanTrend: 'Kalman Trend',
 };
 
+function formatPrice(price: number): string {
+  if (price >= 1000) return price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  if (price >= 1) return price.toFixed(4);
+  return price.toFixed(6);
+}
+
+function getTimeframe(result: ScanResult): string {
+  if (result.kalmanTrends?.[0]) return result.kalmanTrends[0].timeframe.toUpperCase();
+  if (result.stochastics?.[0]) return result.stochastics[0].timeframe.toUpperCase();
+  if (result.emaAlignments?.[0]) return result.emaAlignments[0].timeframe.toUpperCase();
+  if (result.macdReversals?.[0]) return result.macdReversals[0].timeframe.toUpperCase();
+  if (result.rsiReversals?.[0]) return result.rsiReversals[0].timeframe.toUpperCase();
+  if (result.volumeSpikes?.[0]) return result.volumeSpikes[0].timeframe.toUpperCase();
+  if (result.channels?.[0]) return result.channels[0].timeframe.toUpperCase();
+  if (result.supportResistanceLevels?.[0]) return result.supportResistanceLevels[0].timeframe.toUpperCase();
+  return '1M';
+}
+
+function getEntryPrice(result: ScanResult): number {
+  if (result.closePrices && result.closePrices.length > 0) {
+    return result.closePrices[result.closePrices.length - 1];
+  }
+  if (result.macdReversals?.[0]) return result.macdReversals[0].price;
+  if (result.rsiReversals?.[0]) return result.rsiReversals[0].price;
+  if (result.supportResistanceLevels?.[0]) return result.supportResistanceLevels[0].currentPrice;
+  if (result.channels?.[0]) return result.channels[0].currentPrice;
+  return 0;
+}
+
+function getVolumeDelta(result: ScanResult): string {
+  if (result.kalmanTrends?.[0]) {
+    const d = result.kalmanTrends[0].delta;
+    return (d >= 0 ? '+' : '') + d.toFixed(2);
+  }
+  if (result.volumeSpikes?.[0]) {
+    return '+' + result.volumeSpikes[0].volumeRatio.toFixed(2);
+  }
+  return '—';
+}
+
+function getStrategyName(result: ScanResult): string {
+  if (result.scanType === 'kalmanTrend') return 'Volume Trend Strategy [RitchiVietnam]';
+  return SCAN_TYPE_LABELS[result.scanType] || result.scanType;
+}
+
 async function sendScannerTelegramAlerts(
   results: ScanResult[],
   botToken: string,
   chatId: string,
 ) {
-  const lines: string[] = [`🔔 <b>Scanner Alert — ${results.length} signal(s)</b>`, ''];
-
   for (const r of results) {
-    const emoji = r.signalType === 'bullish' ? '🟢' : '🔴';
-    const label = SCAN_TYPE_LABELS[r.scanType] || r.scanType;
-    lines.push(`${emoji} <b>${r.symbol}</b> — ${label}`);
-    lines.push(`   ${r.description}`);
-  }
+    const isBuy = r.signalType === 'bullish';
+    const emoji = isBuy ? '🟢' : '🔴';
+    const arrow = isBuy ? '▲' : '▼';
+    const side = isBuy ? 'LONG' : 'SHORT';
+    const action = isBuy ? 'BUY' : 'SELL';
+    const tf = getTimeframe(r);
+    const entry = getEntryPrice(r);
+    const delta = getVolumeDelta(r);
+    const strategy = getStrategyName(r);
 
-  lines.push('');
-  lines.push(`🕐 ${new Date().toLocaleTimeString()}`);
+    const tpMultipliers = isBuy ? [1.018, 1.035, 1.055, 1.08] : [0.982, 0.965, 0.945, 0.92];
+    const slMultiplier = isBuy ? 0.98 : 1.02;
+    const tpPcts = isBuy ? ['+1.8%', '+3.5%', '+5.5%', '+8.0%'] : ['-1.8%', '-3.5%', '-5.5%', '-8.0%'];
+    const slPct = isBuy ? '-2.0%' : '+2.0%';
 
-  try {
-    await fetch('/api/telegram/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ botToken, chatId, message: lines.join('\n') }),
-    });
-    console.log(`[Scanner Telegram] Sent ${results.length} alert(s)`);
-  } catch (err) {
-    console.error('[Scanner Telegram] Failed to send:', err);
+    const tp1 = entry * tpMultipliers[0];
+    const tp2 = entry * tpMultipliers[1];
+    const tp3 = entry * tpMultipliers[2];
+    const tp4 = entry * tpMultipliers[3];
+    const sl = entry * slMultiplier;
+
+    const now = new Date();
+    const timestamp = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+
+    const lines = [
+      `${emoji} ${arrow} <b>${action} — ${r.symbol}USDT</b>`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `📊 Sàn: HYPERLIQUID  |  KH: ${tf}  |  Side: ${side}`,
+      `💰 Giá vào: ${formatPrice(entry)}`,
+      `📈 Volume Delta: ${delta}`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `📌 <b>Take Profit:</b>`,
+      `  🎯 TP1: ${formatPrice(tp1)} (${tpPcts[0]})`,
+      `  🎯 TP2: ${formatPrice(tp2)} (${tpPcts[1]})`,
+      `  🎯 TP3: ${formatPrice(tp3)} (${tpPcts[2]})`,
+      `  🎯 TP4: ${formatPrice(tp4)} (${tpPcts[3]})`,
+      `🛑 Stop Loss: ${formatPrice(sl)} (${slPct})`,
+      `━━━━━━━━━━━━━━━━━━━━━━`,
+      `🕐 ${timestamp}`,
+      `<i>${strategy}</i>`,
+    ];
+
+    try {
+      await fetch('/api/telegram/', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ botToken, chatId, message: lines.join('\n') }),
+      });
+      console.log(`[Scanner Telegram] Sent alert for ${r.symbol}`);
+    } catch (err) {
+      console.error(`[Scanner Telegram] Failed to send for ${r.symbol}:`, err);
+    }
   }
 }
