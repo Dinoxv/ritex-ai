@@ -164,6 +164,7 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         telegramBotToken: storedSettings.scanner?.telegramBotToken ?? DEFAULT_SETTINGS.scanner.telegramBotToken,
         telegramChatId: storedSettings.scanner?.telegramChatId ?? DEFAULT_SETTINGS.scanner.telegramChatId,
         telegramSignalFilter: storedSettings.scanner?.telegramSignalFilter ?? DEFAULT_SETTINGS.scanner.telegramSignalFilter,
+        telegramShowTpSl: storedSettings.scanner?.telegramShowTpSl ?? DEFAULT_SETTINGS.scanner.telegramShowTpSl,
         stochasticScanner: {
           enabled: storedSettings.scanner?.stochasticScanner?.enabled ?? DEFAULT_SETTINGS.scanner.stochasticScanner.enabled,
           oversoldThreshold: storedSettings.scanner?.stochasticScanner?.oversoldThreshold ?? DEFAULT_SETTINGS.scanner.stochasticScanner.oversoldThreshold,

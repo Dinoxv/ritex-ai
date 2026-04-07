@@ -182,7 +182,7 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
           : newResults.filter(r => r.signalType === settings.telegramSignalFilter);
 
         if (filteredResults.length > 0) {
-          sendScannerTelegramAlerts(filteredResults, settings.telegramBotToken, settings.telegramChatId).catch(err =>
+          sendScannerTelegramAlerts(filteredResults, settings.telegramBotToken, settings.telegramChatId, settings.telegramShowTpSl).catch(err =>
             console.error('[Scanner Telegram] Error sending alerts:', err)
           );
         }
@@ -354,6 +354,7 @@ async function sendScannerTelegramAlerts(
   results: ScanResult[],
   botToken: string,
   chatId: string,
+  showTpSl: boolean = false,
 ) {
   for (const r of results) {
     const isBuy = r.signalType === 'bullish';
@@ -366,17 +367,6 @@ async function sendScannerTelegramAlerts(
     const delta = getVolumeDelta(r);
     const strategy = getStrategyName(r);
 
-    const tpMultipliers = isBuy ? [1.018, 1.035, 1.055, 1.08] : [0.982, 0.965, 0.945, 0.92];
-    const slMultiplier = isBuy ? 0.98 : 1.02;
-    const tpPcts = isBuy ? ['+1.8%', '+3.5%', '+5.5%', '+8.0%'] : ['-1.8%', '-3.5%', '-5.5%', '-8.0%'];
-    const slPct = isBuy ? '-2.0%' : '+2.0%';
-
-    const tp1 = entry * tpMultipliers[0];
-    const tp2 = entry * tpMultipliers[1];
-    const tp3 = entry * tpMultipliers[2];
-    const tp4 = entry * tpMultipliers[3];
-    const sl = entry * slMultiplier;
-
     const now = new Date();
     const timestamp = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
 
@@ -387,16 +377,35 @@ async function sendScannerTelegramAlerts(
       `💰 Giá vào: ${formatPrice(entry)}`,
       `📈 Volume Delta: ${delta}`,
       `━━━━━━━━━━━━━━━━━━━━━━`,
-      `📌 <b>Take Profit:</b>`,
-      `  🎯 TP1: ${formatPrice(tp1)} (${tpPcts[0]})`,
-      `  🎯 TP2: ${formatPrice(tp2)} (${tpPcts[1]})`,
-      `  🎯 TP3: ${formatPrice(tp3)} (${tpPcts[2]})`,
-      `  🎯 TP4: ${formatPrice(tp4)} (${tpPcts[3]})`,
-      `🛑 Stop Loss: ${formatPrice(sl)} (${slPct})`,
-      `━━━━━━━━━━━━━━━━━━━━━━`,
+    ];
+
+    if (showTpSl && entry > 0) {
+      const tpMultipliers = isBuy ? [1.018, 1.035, 1.055, 1.08] : [0.982, 0.965, 0.945, 0.92];
+      const slMultiplier = isBuy ? 0.98 : 1.02;
+      const tpPcts = isBuy ? ['+1.8%', '+3.5%', '+5.5%', '+8.0%'] : ['-1.8%', '-3.5%', '-5.5%', '-8.0%'];
+      const slPct = isBuy ? '-2.0%' : '+2.0%';
+
+      const tp1 = entry * tpMultipliers[0];
+      const tp2 = entry * tpMultipliers[1];
+      const tp3 = entry * tpMultipliers[2];
+      const tp4 = entry * tpMultipliers[3];
+      const sl = entry * slMultiplier;
+
+      lines.push(
+        `📌 <b>Take Profit:</b>`,
+        `  🎯 TP1: ${formatPrice(tp1)} (${tpPcts[0]})`,
+        `  🎯 TP2: ${formatPrice(tp2)} (${tpPcts[1]})`,
+        `  🎯 TP3: ${formatPrice(tp3)} (${tpPcts[2]})`,
+        `  🎯 TP4: ${formatPrice(tp4)} (${tpPcts[3]})`,
+        `🛑 Stop Loss: ${formatPrice(sl)} (${slPct})`,
+        `━━━━━━━━━━━━━━━━━━━━━━`,
+      );
+    }
+
+    lines.push(
       `🕐 ${timestamp}`,
       `<i>${strategy}</i>`,
-    ];
+    );
 
     try {
       await fetch('/api/telegram/', {

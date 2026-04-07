@@ -152,6 +152,7 @@ export interface ScannerSettings {
   telegramBotToken: string;
   telegramChatId: string;
   telegramSignalFilter: 'all' | 'bullish' | 'bearish';
+  telegramShowTpSl: boolean;
   stochasticScanner: StochasticScannerConfig;
   emaAlignmentScanner: EmaAlignmentScannerConfig;
   channelScanner: ChannelScannerConfig;
@@ -294,6 +295,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     telegramBotToken: '',
     telegramChatId: '',
     telegramSignalFilter: 'all',
+    telegramShowTpSl: false,
     stochasticScanner: {
       enabled: false,
       oversoldThreshold: 20,

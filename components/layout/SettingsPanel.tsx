@@ -268,6 +268,18 @@ export default function SettingsPanel() {
                               </select>
                             </div>
 
+                            <div className="mt-2">
+                              <label className="flex items-center justify-between cursor-pointer">
+                                <span className="text-primary-muted text-xs font-mono">SHOW TP/SL IN MESSAGE</span>
+                                <input
+                                  type="checkbox"
+                                  checked={settings.scanner.telegramShowTpSl || false}
+                                  onChange={(e) => updateScannerSettings({ telegramShowTpSl: e.target.checked })}
+                                  className="w-4 h-4 accent-primary cursor-pointer"
+                                />
+                              </label>
+                            </div>
+
                             <div className="text-primary-muted font-mono text-[10px]">
                               Sends a Telegram message each time the scanner detects an entry signal matching your filter.
                             </div>
