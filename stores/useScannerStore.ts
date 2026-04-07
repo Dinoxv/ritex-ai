@@ -387,35 +387,18 @@ async function sendScannerTelegramAlerts(
 
     if (showTpSl && entry > 0) {
       const deltaRaw = getVolumeDeltaRaw(r);
-      // Clamp delta between 0.5 and 5.0 for reasonable TP/SL ranges
       const d = Math.max(0.5, Math.min(deltaRaw, 5.0));
-
-      // TP/SL % scales with volume delta strength
-      const tp1Pct = d * 1.5;   // e.g. delta 1.2 → 1.8%
-      const tp2Pct = d * 3.0;   // e.g. delta 1.2 → 3.6%
-      const tp3Pct = d * 5.0;   // e.g. delta 1.2 → 6.0%
-      const tp4Pct = d * 7.0;   // e.g. delta 1.2 → 8.4%
-      const slPct  = d * 1.5;   // e.g. delta 1.2 → 1.8%
+      const pct = d; // TP/SL % = Volume Delta value directly
 
       const sign = isBuy ? 1 : -1;
-      const tp1 = entry * (1 + sign * tp1Pct / 100);
-      const tp2 = entry * (1 + sign * tp2Pct / 100);
-      const tp3 = entry * (1 + sign * tp3Pct / 100);
-      const tp4 = entry * (1 + sign * tp4Pct / 100);
-      const sl  = entry * (1 - sign * slPct / 100);
+      const tp = entry * (1 + sign * pct / 100);
+      const sl = entry * (1 - sign * pct / 100);
 
-      const tp1Label = `${isBuy ? '+' : '-'}${tp1Pct.toFixed(1)}%`;
-      const tp2Label = `${isBuy ? '+' : '-'}${tp2Pct.toFixed(1)}%`;
-      const tp3Label = `${isBuy ? '+' : '-'}${tp3Pct.toFixed(1)}%`;
-      const tp4Label = `${isBuy ? '+' : '-'}${tp4Pct.toFixed(1)}%`;
-      const slLabel  = `${isBuy ? '-' : '+'}${slPct.toFixed(1)}%`;
+      const tpLabel = `${isBuy ? '+' : '-'}${pct.toFixed(2)}%`;
+      const slLabel = `${isBuy ? '-' : '+'}${pct.toFixed(2)}%`;
 
       lines.push(
-        `📌 <b>Take Profit:</b>`,
-        `  🎯 TP1: ${formatPrice(tp1)} (${tp1Label})`,
-        `  🎯 TP2: ${formatPrice(tp2)} (${tp2Label})`,
-        `  🎯 TP3: ${formatPrice(tp3)} (${tp3Label})`,
-        `  🎯 TP4: ${formatPrice(tp4)} (${tp4Label})`,
+        `📌 Take Profit: ${formatPrice(tp)} (${tpLabel})`,
         `🛑 Stop Loss: ${formatPrice(sl)} (${slLabel})`,
         `━━━━━━━━━━━━━━━━━━━━━━`,
       );
