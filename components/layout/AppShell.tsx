@@ -287,7 +287,7 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
   }, [coin, cancelAllOrders]);
 
   return (
-    <div className="flex flex-col h-screen bg-bg-primary text-primary font-mono">
+    <div className="flex flex-col h-dvh bg-bg-primary text-primary font-mono">
       {/* Top Header with Title, Navigation Icons, and Wallet Indicator */}
       <header className="border-b-2 border-border-frame flex items-center justify-between px-2 md:px-4 py-1.5 w-full max-w-full overflow-hidden">
         {/* Left: Title */}
@@ -384,13 +384,13 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
         {/* Mobile Layout - Single tab view (<768px) */}
         <div className="flex md:hidden flex-1 overflow-x-hidden overflow-y-hidden w-full h-full">
           {mobileActiveTab === 'scanner' && (
-            <div className="flex-1 h-full overflow-y-auto overflow-x-hidden w-full pb-14">
+            <div className="flex-1 h-full overflow-y-auto overflow-x-hidden w-full pb-14 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
               <Sidepanel selectedSymbol={selectedSymbol} mobileView="scanner" />
             </div>
           )}
 
           {mobileActiveTab === 'symbols' && (
-            <div className="flex-1 h-full overflow-y-auto overflow-x-hidden w-full pb-14">
+            <div className="flex-1 h-full overflow-y-auto overflow-x-hidden w-full pb-14 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
               <Sidepanel selectedSymbol={selectedSymbol} mobileView="symbols" />
             </div>
           )}
@@ -402,7 +402,7 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
           )}
 
           {mobileActiveTab === 'actions' && (
-            <div className="flex-1 h-full overflow-y-auto overflow-x-hidden w-full pb-14">
+            <div className="flex-1 h-full overflow-y-auto overflow-x-hidden w-full pb-14 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
               <RightTradingPanel
                 coin={coin}
                 position={position}
@@ -429,7 +429,7 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
           )}
 
           {mobileActiveTab === 'orders-positions' && (
-            <div className="flex-1 h-full overflow-y-auto overflow-x-hidden w-full pb-14">
+            <div className="flex-1 h-full overflow-y-auto overflow-x-hidden w-full pb-14 overscroll-contain" style={{ WebkitOverflowScrolling: 'touch' }}>
               <OpenOrdersList currentSymbol={coin} />
             </div>
           )}

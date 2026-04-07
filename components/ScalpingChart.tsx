@@ -817,43 +817,68 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   }, [interval]);
 
   // Infinite scroll: load older candles when user scrolls to left edge
+  // Also auto-fills viewport on initial load and when chart is small
   useEffect(() => {
     if (!chartRef.current || !chartReady || isExternalData) return;
 
     const chart = chartRef.current;
     const timeScale = chart.timeScale();
     let isLoadingRef = false;
+    let disposed = false;
 
-    const tryLoadOlder = () => {
-      if (isLoadingRef) return;
-
+    const needsMoreData = (): boolean => {
       try {
         const logicalRange = timeScale.getVisibleLogicalRange();
-        if (!logicalRange) return;
-
-        // When the left edge of visible area is near or past the first candle (index ~0)
-        if (logicalRange.from <= 10) {
-          isLoadingRef = true;
-          const { fetchOlderCandles } = useCandleStore.getState();
-          fetchOlderCandles(coin, interval).then((loaded) => {
-            setTimeout(() => {
-              isLoadingRef = false;
-              // Auto-continue: if still near edge after load, trigger again
-              if (loaded) tryLoadOlder();
-            }, loaded ? 300 : 3000);
-          });
-        }
-      } catch (e) {
-        // Chart may have been disposed
+        if (!logicalRange) return false;
+        // Load when left edge is near beginning of data
+        return logicalRange.from <= 20;
+      } catch {
+        return false;
       }
     };
 
-    timeScale.subscribeVisibleLogicalRangeChange(tryLoadOlder);
+    const loadLoop = async () => {
+      if (isLoadingRef || disposed) return;
+      if (!needsMoreData()) return;
+
+      isLoadingRef = true;
+      try {
+        const { fetchOlderCandles } = useCandleStore.getState();
+        const loaded = await fetchOlderCandles(coin, interval);
+        if (disposed) return;
+
+        if (loaded) {
+          // Continue loading until viewport is filled or no more data
+          setTimeout(() => {
+            isLoadingRef = false;
+            if (!disposed) loadLoop();
+          }, 200);
+        } else {
+          // No more data available, wait longer before retrying
+          setTimeout(() => { isLoadingRef = false; }, 5000);
+        }
+      } catch {
+        isLoadingRef = false;
+      }
+    };
+
+    // Trigger on scroll / zoom changes
+    const onRangeChange = () => {
+      if (!isLoadingRef && !disposed) loadLoop();
+    };
+    timeScale.subscribeVisibleLogicalRangeChange(onRangeChange);
+
+    // Auto-fill: check after initial data renders (give chart time to layout)
+    const initialFillTimer = setTimeout(() => {
+      if (!disposed) loadLoop();
+    }, 500);
 
     return () => {
+      disposed = true;
+      clearTimeout(initialFillTimer);
       try {
-        timeScale.unsubscribeVisibleLogicalRangeChange(tryLoadOlder);
-      } catch (e) {
+        timeScale.unsubscribeVisibleLogicalRangeChange(onRangeChange);
+      } catch {
         // Chart may have been disposed
       }
     };
@@ -1036,9 +1061,32 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     if (isNewCandle || isHistoryPrepended || isLengthChanged || lastCandleTimeRef.current === null) {
       const shouldPreservePosition = isHistoryPrepended && !isNewCandle;
 
+      // Capture current visible range before setData to preserve scroll position
+      let savedLogicalRange: { from: number; to: number } | null = null;
+      if (shouldPreservePosition && chartRef.current) {
+        try {
+          const lr = chartRef.current.timeScale().getVisibleLogicalRange();
+          if (lr) {
+            // Calculate offset: new candles prepended shifts indices
+            const prependedCount = displayCandles.length - (candlesLengthRef.current ?? displayCandles.length);
+            savedLogicalRange = {
+              from: lr.from + prependedCount,
+              to: lr.to + prependedCount,
+            };
+          }
+        } catch {}
+      }
+
       updateChartWithRAF(() => {
         candleSeriesRef.current?.setData(candleData);
         volumeSeriesRef.current?.setData(volumeData);
+
+        // Restore scroll position after history prepend
+        if (savedLogicalRange && chartRef.current) {
+          try {
+            chartRef.current.timeScale().setVisibleLogicalRange(savedLogicalRange as any);
+          } catch {}
+        }
 
         if (emaSettings.ema1.enabled && ema1.length > 0) {
           const ema1Data = ema1.map((value, i) => ({

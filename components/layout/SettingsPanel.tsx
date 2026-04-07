@@ -67,7 +67,7 @@ export default function SettingsPanel() {
         }
       `}</style>
 
-      <div className="terminal-border bg-bg-primary w-full md:w-[600px] h-full md:h-auto md:max-h-[80vh] flex flex-col animate-slide-in">
+      <div className="terminal-border bg-bg-primary w-full md:w-[600px] h-[100dvh] md:h-auto md:max-h-[80vh] flex flex-col animate-slide-in">
         {/* Header */}
         <div className="p-3 md:p-4 border-b border-frame flex justify-between items-center">
           <div className="flex items-center gap-2">
@@ -148,7 +148,10 @@ export default function SettingsPanel() {
         </div>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-3 md:p-6">
+        <div 
+          className="flex-1 overflow-y-auto p-3 md:p-6 overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 24px))' }}
+        >
           {activeTab === 'scanner' && (
             <div className="space-y-3">
               <div className="p-3 bg-bg-secondary border border-frame rounded">

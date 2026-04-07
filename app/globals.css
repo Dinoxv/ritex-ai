@@ -343,6 +343,10 @@ body {
   background: var(--background-primary);
   color: var(--primary);
   font-family: var(--font-binance), 'BinancePlex', Arial, Helvetica, sans-serif;
+  overflow: hidden;
+  position: fixed;
+  width: 100%;
+  height: 100%;
 }
 
 /* Position Animation Keyframes */
