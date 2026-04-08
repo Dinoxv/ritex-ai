@@ -7,6 +7,7 @@ import { useTopSymbolsStore } from './useTopSymbolsStore';
 import { useCandleStore } from './useCandleStore';
 import { useDexStore } from './useDexStore';
 import { useSidebarPricesStore } from './useSidebarPricesStore';
+import { useSettingsStore } from './useSettingsStore';
 
 interface GlobalPollingStore {
   service: HyperliquidService | null;
@@ -136,7 +137,9 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
     try {
       const candleStore = useCandleStore.getState();
       const topSymbolsStore = useTopSymbolsStore.getState();
-      const topSymbols = topSymbolsStore.symbols.slice(0, 50);
+      const settings = useSettingsStore.getState().settings;
+      const topCount = settings?.scanner?.topMarkets || 50;
+      const topSymbols = topSymbolsStore.symbols.slice(0, topCount);
 
       if (topSymbols.length === 0) {
         console.log('[GlobalPolling] fetchCandleData: no symbols loaded yet, skipping');

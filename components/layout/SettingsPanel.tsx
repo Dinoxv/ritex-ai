@@ -186,7 +186,7 @@ export default function SettingsPanel() {
                       <input
                         type="number"
                         min="5"
-                        max="100"
+                        max="500"
                         value={settings.scanner.topMarkets}
                         onChange={(e) => updateScannerSettings({ topMarkets: Number(e.target.value) })}
                         className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
