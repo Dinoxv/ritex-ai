@@ -85,7 +85,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   buyCloud: async (params: CloudOrderParams) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const { symbol, currentPrice, priceInterval, percentage } = params;
     const orderStore = useOrderStore.getState();
@@ -244,7 +244,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   sellCloud: async (params: CloudOrderParams) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const { symbol, currentPrice, priceInterval, percentage } = params;
     const orderStore = useOrderStore.getState();
@@ -402,7 +402,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   smLong: async (params: MarketOrderParams) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const { symbol, currentPrice, priceInterval, percentage } = params;
     const orderStore = useOrderStore.getState();
@@ -519,7 +519,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   smShort: async (params: MarketOrderParams) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const { symbol, currentPrice, priceInterval, percentage } = params;
     const orderStore = useOrderStore.getState();
@@ -636,7 +636,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   bigLong: async (params: MarketOrderParams) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const { symbol, currentPrice, priceInterval, percentage } = params;
     const orderStore = useOrderStore.getState();
@@ -753,7 +753,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   bigShort: async (params: MarketOrderParams) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const { symbol, currentPrice, priceInterval, percentage } = params;
     const orderStore = useOrderStore.getState();
@@ -872,7 +872,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
     const { service } = get();
     if (!service) {
       console.error('Service not initialized');
-      throw new Error('Service not initialized');
+      toast.error('Please connect wallet to trade'); return;
     }
 
     const { symbol, price, isBuy, percentage, currentPrice } = params;
@@ -994,7 +994,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   placeExitOrderAtPrice: async (params: ExitOrderAtPriceParams) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const { symbol, price, percentage, positionSide, positionSize, currentPrice } = params;
 
@@ -1096,7 +1096,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   closePosition: async (params: ClosePositionParams) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const { symbol, percentage } = params;
 
@@ -1150,7 +1150,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   moveStopLoss: async (params: MoveStopLossParams) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const { coin, percentage } = params;
     const orderStore = useOrderStore.getState();
@@ -1258,7 +1258,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   cancelEntryOrders: async (symbol: string) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const orderStore = useOrderStore.getState();
     const allOrders = orderStore.getAllOrders(symbol);
@@ -1302,7 +1302,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   cancelExitOrders: async (symbol: string) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const orderStore = useOrderStore.getState();
     const allOrders = orderStore.getAllOrders(symbol);
@@ -1346,7 +1346,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   cancelTPOrders: async (symbol: string) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const orderStore = useOrderStore.getState();
     const positionStore = usePositionStore.getState();
@@ -1409,7 +1409,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   cancelSLOrders: async (symbol: string) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const orderStore = useOrderStore.getState();
     const positionStore = usePositionStore.getState();
@@ -1472,7 +1472,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   cancelAllOrders: async (symbol: string) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const orderStore = useOrderStore.getState();
     const allOrders = orderStore.getAllOrders(symbol);
@@ -1515,7 +1515,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
   cancelOrder: async (coin: string, oid: string) => {
     const { service } = get();
-    if (!service) throw new Error('Service not initialized');
+    if (!service) { toast.error('Please connect wallet to trade'); return; }
 
     const orderStore = useOrderStore.getState();
     const allOrders = orderStore.getAllOrders(coin);
