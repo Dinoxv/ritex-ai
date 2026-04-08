@@ -20,13 +20,15 @@ function MonthlyCalendarView({ onDayClick }: MonthlyCalendarViewProps) {
   const loading = useUserFillsStore((state) => state.loading);
   const error = useUserFillsStore((state) => state.error);
   const fetchMonthFills = useUserFillsStore((state) => state.fetchMonthFills);
+  const service = useUserFillsStore((state) => state.service);
   const goToPreviousMonth = useUserFillsStore((state) => state.goToPreviousMonth);
   const goToNextMonth = useUserFillsStore((state) => state.goToNextMonth);
   const goToThisMonth = useUserFillsStore((state) => state.goToThisMonth);
 
   useEffect(() => {
+    if (!service) return;
     fetchMonthFills();
-  }, [selectedMonth, fetchMonthFills]);
+  }, [selectedMonth, fetchMonthFills, service]);
 
   const isCurrentMonth = useMemo(() => {
     const today = new Date();

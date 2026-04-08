@@ -20,13 +20,15 @@ function TodaysTradesView() {
   const selectedDate = useUserFillsStore((state) => state.selectedDate);
   const setSelectedDate = useUserFillsStore((state) => state.setSelectedDate);
   const fetchSelectedDateFills = useUserFillsStore((state) => state.fetchSelectedDateFills);
+  const service = useUserFillsStore((state) => state.service);
   const goToPreviousDay = useUserFillsStore((state) => state.goToPreviousDay);
   const goToNextDay = useUserFillsStore((state) => state.goToNextDay);
   const goToToday = useUserFillsStore((state) => state.goToToday);
 
   useEffect(() => {
+    if (!service) return;
     fetchSelectedDateFills();
-  }, [selectedDate, fetchSelectedDateFills]);
+  }, [selectedDate, fetchSelectedDateFills, service]);
 
   const isToday = useMemo(() => {
     const today = new Date();

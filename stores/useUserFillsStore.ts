@@ -182,7 +182,7 @@ export const useUserFillsStore = create<UserFillsStore>((set, get) => ({
   fetchTodaysFills: async () => {
     const { service } = get();
     if (!service) {
-      set({ error: 'Service not initialized' });
+      // Service not yet initialized, will retry when ready
       return;
     }
 
@@ -207,7 +207,7 @@ export const useUserFillsStore = create<UserFillsStore>((set, get) => ({
   fetchFillsByTime: async (startTime: number, endTime?: number) => {
     const { service } = get();
     if (!service) {
-      set({ error: 'Service not initialized' });
+      // Service not yet initialized, will retry when ready
       return;
     }
 
@@ -231,7 +231,7 @@ export const useUserFillsStore = create<UserFillsStore>((set, get) => ({
   fetchSelectedDateFills: async () => {
     const { service, selectedDate } = get();
     if (!service) {
-      set({ error: 'Service not initialized' });
+      // Service not yet initialized, will retry when ready
       return;
     }
 
@@ -274,7 +274,7 @@ export const useUserFillsStore = create<UserFillsStore>((set, get) => ({
   fetchMonthFills: async () => {
     const { service, selectedMonth } = get();
     if (!service) {
-      set({ error: 'Service not initialized' });
+      // Service not yet initialized, will retry when ready
       return;
     }
 
