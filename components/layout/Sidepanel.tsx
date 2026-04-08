@@ -558,7 +558,6 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
       {(mobileView === 'all' || mobileView === 'symbols') && (
         <div className="flex-1 flex flex-col overflow-hidden gap-3">
           {/* Symbols Section */}
-          {sortedSymbols.length > 0 && (
           <div className="flex-1 flex flex-col overflow-hidden">
             <div className="terminal-border p-2 mb-2">
               <div className="flex items-center justify-between">
@@ -574,6 +573,15 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
               </div>
               <DexSelector />
             </div>
+
+            {sortedSymbols.length === 0 && !isLoadingTopSymbols && (
+              <div className="terminal-border p-4 text-center">
+                <span className="text-primary-muted text-xs font-mono">No active tokens in this DEX</span>
+              </div>
+            )}
+
+            {sortedSymbols.length > 0 && (
+            <>
 
             {/* Add Symbols Dropdown */}
             <div className="flex-shrink-0 mb-2">
@@ -697,8 +705,9 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
                 </div>
               )}
             </div>
-          </div>
+          </>
         )}
+          </div>
         </div>
       )}
     </div>
