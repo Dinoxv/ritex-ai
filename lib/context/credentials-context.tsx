@@ -29,7 +29,14 @@ export function CredentialsProvider({ children }: { children: ReactNode }) {
   const [isLoaded, setIsLoaded] = useState(false);
 
   useEffect(() => {
-    loadCredentials();
+    loadCredentials().catch(() => {
+      setIsLoaded(true);
+    });
+    // Safety timeout: if credentials loading hangs, force loaded state
+    const timeout = setTimeout(() => {
+      setIsLoaded(true);
+    }, 3000);
+    return () => clearTimeout(timeout);
   }, []);
 
   const getDeviceKey = (): string => {
