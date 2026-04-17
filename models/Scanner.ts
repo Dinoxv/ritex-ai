@@ -104,6 +104,7 @@ export interface ScanResult {
   description: string;
   scanType: ScanType;
   closePrices?: number[];
+  realtimeVolumeTrigger?: boolean;  // true when realtime volume engine detected a spike
 }
 
 export interface ScannerStatus {

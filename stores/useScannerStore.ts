@@ -7,6 +7,7 @@ import { useTopSymbolsStore } from './useTopSymbolsStore';
 import { playNotificationSound } from '@/lib/sound-utils';
 import { useAIStrategyStore } from './useAIStrategyStore';
 import type { IndicatorSnapshot } from '@/lib/ai/types';
+import { useRealtimeVolumeStore } from './useRealtimeVolumeStore';
 
 interface ScannerStore {
   results: ScanResult[];
@@ -82,6 +83,7 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
       }
 
       const newResults: ScanResult[] = [];
+      const { hasTrigger } = useRealtimeVolumeStore.getState();
 
       if (settings.stochasticScanner.enabled) {
         const stochResults = await scannerService.scanMultipleSymbols(symbols, {
@@ -154,6 +156,13 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
           config: settings.kalmanTrendScanner,
         });
         newResults.push(...kalmanResults);
+      }
+
+      // Augment results with realtime volume trigger signal
+      for (const result of newResults) {
+        if (hasTrigger(result.symbol)) {
+          result.realtimeVolumeTrigger = true;
+        }
       }
 
       const newSymbols = new Set(newResults.map((r: ScanResult) => r.symbol));
