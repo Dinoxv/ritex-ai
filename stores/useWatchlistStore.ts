@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { HyperliquidService } from '@/lib/services/hyperliquid.service';
+import type { ExchangeTradingService } from '@/lib/services/types';
 import type { WatchedWallet, WalletData, WalletStatistics, WalletChangeEvent } from '@/models/WatchedWallet';
 import { groupFillsByPosition } from '@/lib/trade-grouping-utils';
 import {
@@ -13,11 +13,11 @@ import {
 interface WatchlistStore {
   watchedWallets: WatchedWallet[];
   walletData: Map<string, WalletData>;
-  service: HyperliquidService | null;
+  service: ExchangeTradingService | null;
   pollingInterval: NodeJS.Timeout | null;
   isInitialized: boolean;
 
-  setService: (service: HyperliquidService) => void;
+  setService: (service: ExchangeTradingService) => void;
   addWallet: (address: string, nickname?: string) => void;
   removeWallet: (address: string) => void;
   updateNickname: (address: string, nickname: string) => void;

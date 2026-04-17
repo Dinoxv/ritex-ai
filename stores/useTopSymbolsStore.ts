@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { HyperliquidService } from '@/lib/services/hyperliquid.service';
+import type { ExchangeTradingService } from '@/lib/services/types';
 import { useDexStore } from './useDexStore';
 
 export interface SymbolWithVolume {
@@ -11,8 +11,8 @@ interface TopSymbolsStore {
   symbols: SymbolWithVolume[];
   isLoading: boolean;
   error: string | null;
-  service: HyperliquidService | null;
-  setService: (service: HyperliquidService) => void;
+  service: ExchangeTradingService | null;
+  setService: (service: ExchangeTradingService) => void;
   fetchTopSymbols: () => Promise<void>;
   startAutoRefresh: () => void;
   stopAutoRefresh: () => void;
@@ -25,7 +25,7 @@ export const useTopSymbolsStore = create<TopSymbolsStore>((set, get) => ({
   error: null,
   service: null,
 
-  setService: (service: HyperliquidService) => {
+  setService: (service: ExchangeTradingService) => {
     set({ service });
   },
 

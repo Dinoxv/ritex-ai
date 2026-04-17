@@ -1,8 +1,10 @@
 import type { ExchangeWebSocketService } from './exchange-websocket.interface';
 import { HyperliquidWebSocketService } from './hyperliquid-websocket.service';
+import { BinanceWebSocketService } from './binance-websocket.service';
 
 class WebSocketServiceManager {
   private static instance: ExchangeWebSocketService | null = null;
+  private static instanceType: 'hyperliquid' | 'binance' | 'bybit' | null = null;
   private static activeSubscriptions = 0;
   private static disconnectTimeout: NodeJS.Timeout | null = null;
 
@@ -12,13 +14,23 @@ class WebSocketServiceManager {
       this.disconnectTimeout = null;
     }
 
+    if (this.instance && this.instanceType && this.instanceType !== type) {
+      this.instance.disconnect();
+      this.instance = null;
+      this.instanceType = null;
+      this.activeSubscriptions = 0;
+    }
+
     if (!this.instance) {
       switch (type) {
         case 'hyperliquid':
           this.instance = new HyperliquidWebSocketService(isTestnet);
+          this.instanceType = type;
           break;
         case 'binance':
-          throw new Error('Binance WebSocket service not yet implemented');
+          this.instance = new BinanceWebSocketService(isTestnet);
+          this.instanceType = type;
+          break;
         case 'bybit':
           throw new Error('Bybit WebSocket service not yet implemented');
         default:
@@ -63,6 +75,7 @@ class WebSocketServiceManager {
     if (this.instance) {
       this.instance.disconnect();
       this.instance = null;
+      this.instanceType = null;
     }
     this.activeSubscriptions = 0;
   }

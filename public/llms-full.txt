@@ -255,7 +255,7 @@ ritex-ai/
 │   ├── context/
 │   │   └── credentials-context.tsx  # Auth context provider
 │   ├── hooks/
-│   │   ├── use-hyperliquid-service.ts  # Service hook
+│   │   ├── use-exchange-service.ts     # Service hook
 │   │   ├── use-is-own-wallet.ts    # Own wallet detection
 │   │   └── use-address-from-url.ts # URL address extraction
 │   ├── services/
@@ -266,7 +266,7 @@ ritex-ai/
 │   │   └── scanner.service.ts      # Signal scanner logic
 │   ├── utils/
 │   │   ├── order-helpers.ts        # Order building utilities
-│   │   ├── order-mapper.ts         # Order type mapping
+│   │   ├── exchange-order-mapper.ts # Order type mapping
 │   │   └── crypto.ts               # Crypto utilities
 │   └── websocket/
 │       ├── hyperliquid-websocket.service.ts  # WebSocket implementation

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useHyperliquidService } from '@/lib/hooks/use-hyperliquid-service';
+import { useExchangeService } from '@/lib/hooks/use-exchange-service';
 import { useAddressFromUrl } from '@/lib/hooks/use-address-from-url';
 import { usePositionStore } from '@/stores/usePositionStore';
 import { useSymbolMetaStore } from '@/stores/useSymbolMetaStore';
@@ -14,10 +14,11 @@ import { useScannerStore } from '@/stores/useScannerStore';
 import { useSymbolVolatilityStore } from '@/stores/useSymbolVolatilityStore';
 import { useGlobalPollingStore } from '@/stores/useGlobalPollingStore';
 import { useSymbolCandlesStore } from '@/stores/useSymbolCandlesStore';
+import type { ExchangeTradingService } from '@/lib/services/types';
 
 export function ServiceProvider({ children }: { children: React.ReactNode }) {
   const addressFromUrl = useAddressFromUrl();
-  const service = useHyperliquidService(addressFromUrl || undefined);
+  const service = useExchangeService(addressFromUrl || undefined);
   const setPositionService = usePositionStore((state) => state.setService);
   const fetchAndStoreAllOpenPositions = usePositionStore((state) => state.fetchAndStoreAllOpenPositions);
   const setMetaService = useSymbolMetaStore((state) => state.setService);
@@ -39,17 +40,19 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    setPositionService(service);
-    setMetaService(service);
-    setOrderService(service);
-    setCandleService(service);
-    setTradingService(service);
-    setTopSymbolsService(service);
-    setUserFillsService(service);
-    setScannerService(service);
-    setVolatilityService(service);
-    setGlobalPollingService(service);
-    setSymbolCandlesService(service);
+    const exchangeService = service as ExchangeTradingService;
+
+    setPositionService(exchangeService);
+    setMetaService(exchangeService);
+    setOrderService(exchangeService);
+    setCandleService(exchangeService);
+    setTradingService(exchangeService);
+    setTopSymbolsService(exchangeService);
+    setUserFillsService(exchangeService);
+    setScannerService(exchangeService);
+    setVolatilityService(exchangeService);
+    setGlobalPollingService(exchangeService);
+    setSymbolCandlesService(exchangeService);
 
     fetchMetadata();
     fetchAndStoreAllOpenPositions();

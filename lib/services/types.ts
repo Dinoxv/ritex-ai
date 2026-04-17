@@ -15,7 +15,7 @@ import type {
   SpotMetaAndAssetCtxsResponse,
   AllPerpMetasResponse,
 } from '@nktkas/hyperliquid';
-import type { CandleData, TimeInterval } from '@/types';
+import type { CandleData, TimeInterval, UserFill } from '@/types';
 import type { SymbolMetadata } from './metadata-cache.service';
 
 // Type aliases mapping old names to new library types
@@ -121,7 +121,8 @@ export interface MetaAndAssetCtxs {
   assetCtxs: AssetCtx[];
 }
 
-export interface IHyperliquidService {
+export interface ExchangeTradingService {
+  getExchangeKey(): string;
   getCandles(params: CandleParams): Promise<TransformedCandle[]>;
   getRecentTrades(params: TradesParams): Promise<WsTrade[]>;
 
@@ -132,6 +133,7 @@ export interface IHyperliquidService {
   placeMarketSell(coin: string, size: string, price: string, metadata: SymbolMetadata): Promise<OrderResponse>;
   placeLimitOrder(params: OrderParams, metadata: SymbolMetadata): Promise<OrderResponse>;
   placeBatchLimitOrders(orders: OrderParams[], metadata: SymbolMetadata): Promise<OrderResponse>;
+  placeBatchMixedOrders(orders: Array<Record<string, unknown>>): Promise<OrderResponse>;
   placeStopLoss(params: StopLossParams, metadata: SymbolMetadata): Promise<OrderResponse>;
   placeTakeProfit(params: TakeProfitParams, metadata: SymbolMetadata): Promise<OrderResponse>;
   placeTriggerMarketOrder(params: TriggerMarketOrderParams, metadata: SymbolMetadata): Promise<OrderResponse>;
@@ -140,6 +142,7 @@ export interface IHyperliquidService {
   getOpenPositions(user?: string): Promise<AssetPosition[]>;
   getAccountBalance(user?: string): Promise<AccountBalance>;
   getOpenOrders(user?: string): Promise<FrontendOrder[]>;
+  getUserFillsByTime(startTime: number, endTime?: number, user?: string): Promise<UserFill[]>;
   cancelOrder(coin: string, orderId: number, metadata: SymbolMetadata): Promise<CancelResponse>;
   cancelAllOrders(coin: string, metadata: SymbolMetadata): Promise<CancelResponse>;
   cancelEntryOrders(coin: string, metadata: SymbolMetadata): Promise<CancelResponse>;
@@ -158,14 +161,19 @@ export interface IHyperliquidService {
   formatSize(size: number, coin: string): Promise<string>;
   getMeta(): Promise<PerpsMeta>;
   getAllMids(): Promise<AllMids>;
+  getMidPrice(coin: string): Promise<string>;
   getMetaAndAssetCtxs(dex?: string): Promise<MetaAndAssetCtxs>;
   getPerpDexs(): Promise<PerpDexsResponse>;
   getAllPerpMetas(): Promise<PerpsMeta[]>;
   getSpotMeta(): Promise<SpotMeta>;
   getSpotMetaAndAssetCtxs(): Promise<SpotMetaAndAssetCtxs>;
+  resolveSymbolMetadata(coin: string): Promise<SymbolMetadata>;
   getMetadataCache(coin: string): Promise<SymbolMetadata>;
   formatPriceCached(price: number, metadata: SymbolMetadata): string;
   formatSizeCached(size: number, metadata: SymbolMetadata): string;
+  ensureMinNotional(size: number, price: number, metadata: SymbolMetadata, minNotional?: number): { size: string; wasBumped: boolean };
   getAccountBalanceCached(user?: string): Promise<AccountBalance>;
   invalidateAccountCache(): void;
 }
+
+export interface IHyperliquidService extends ExchangeTradingService {}

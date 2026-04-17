@@ -2,14 +2,15 @@
 
 import { useState } from 'react';
 import { usePositionStore } from '@/stores/usePositionStore';
-import { useHyperliquidService } from '@/lib/hooks/use-hyperliquid-service';
+import { useExchangeService } from '@/lib/hooks/use-exchange-service';
 import { useAddressFromUrl } from '@/lib/hooks/use-address-from-url';
+import { getRawPositionSignedSize, getRawPositionSymbol } from '@/lib/utils/exchange-normalizers';
 
 export default function QuickCloseButtons() {
   const [isClosing, setIsClosing] = useState(false);
   const positions = usePositionStore((state) => state.positions);
   const addressFromUrl = useAddressFromUrl();
-  const service = useHyperliquidService(addressFromUrl || undefined);
+  const service = useExchangeService(addressFromUrl || undefined);
 
   const profitablePositions = Object.entries(positions)
     .filter(([_, pos]) => pos && pos.pnl > 0)
@@ -31,14 +32,14 @@ export default function QuickCloseButtons() {
         service.getMetadataCache(symbol)
       ]);
 
-      const position = positions.find(p => p.position.coin === symbol);
+      const position = positions.find((rawPosition) => getRawPositionSymbol(rawPosition) === symbol);
       if (!position) {
         alert(`No position found for ${symbol}`);
         return;
       }
 
       const currentPrice = parseFloat(midPrice);
-      const isLong = parseFloat(position.position.szi) > 0;
+      const isLong = getRawPositionSignedSize(position) > 0;
       const slippage = 0.005;
       const closePrice = isLong
         ? service.formatPriceCached(currentPrice * (1 - slippage), metadata)

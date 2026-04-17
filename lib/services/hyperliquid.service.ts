@@ -90,6 +90,35 @@ export class HyperliquidService implements IHyperliquidService {
     }
   }
 
+  getExchangeKey(): string {
+    return `hyperliquid:${this.isTestnet ? 'testnet' : 'mainnet'}`;
+  }
+
+  async resolveSymbolMetadata(coin: string): Promise<SymbolMetadata> {
+    const isHip3 = coin.includes(':');
+    const dexName = isHip3 ? coin.split(':')[0] : undefined;
+
+    const [meta, book] = await Promise.all([
+      isHip3 ? this.getMetaAndAssetCtxs(dexName).then((result) => result.meta) : this.getMeta(),
+      this.publicClient.l2Book({ coin }),
+    ]);
+
+    const coinIndex = meta.universe.findIndex((universeCoin) => universeCoin.name === coin);
+    if (coinIndex === -1) {
+      throw new Error(`Coin ${coin} not found`);
+    }
+
+    const asset = meta.universe[coinIndex];
+    const tickSize = this.calculateTickSizeFromBook(book);
+
+    return {
+      coinIndex,
+      tickSize,
+      sizeDecimals: asset.szDecimals,
+      timestamp: Date.now(),
+    };
+  }
+
   async getCandles(params: CandleParams): Promise<TransformedCandle[]> {
     const req: any = {
       coin: params.coin,
@@ -379,6 +408,10 @@ export class HyperliquidService implements IHyperliquidService {
 
   private async getTickSize(coin: string): Promise<number> {
     const book = await this.publicClient.l2Book({ coin });
+    return this.calculateTickSizeFromBook(book);
+  }
+
+  private calculateTickSizeFromBook(book: any): number {
     if (!book) return 0.01;
     const bids = book.levels[0];
 
@@ -397,9 +430,7 @@ export class HyperliquidService implements IHyperliquidService {
 
     if (diff === 0) return 0.01;
 
-    const isCloseTo = (value: number, target: number): boolean => {
-      return Math.abs(value - target) < target * 0.1;
-    };
+    const isCloseTo = (value: number, target: number): boolean => Math.abs(value - target) < target * 0.1;
 
     if (diff >= 10 || isCloseTo(diff, 10)) return 10;
     if (diff >= 5 || isCloseTo(diff, 5)) return 5;

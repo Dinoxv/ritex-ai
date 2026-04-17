@@ -11,7 +11,7 @@ interface RequireCredentialsProps {
 }
 
 export function RequireCredentials({ children }: RequireCredentialsProps) {
-  const { hasCredentials, isLoaded, credentials } = useCredentials();
+  const { hasHyperliquidCredentials, isLoaded, credentials } = useCredentials();
   const addressFromUrl = useAddressFromUrl();
   const router = useRouter();
   const pathname = usePathname();
@@ -20,14 +20,14 @@ export function RequireCredentials({ children }: RequireCredentialsProps) {
     if (!isLoaded) return;
     if (pathname === '/') return;
 
-    if (!hasCredentials && !addressFromUrl) {
+    if (!hasHyperliquidCredentials && !addressFromUrl) {
       return;
     }
 
-    if (hasCredentials && !addressFromUrl && credentials?.walletAddress) {
+    if (hasHyperliquidCredentials && !addressFromUrl && credentials?.walletAddress) {
       router.replace(`/${credentials.walletAddress}/trades`);
     }
-  }, [isLoaded, hasCredentials, addressFromUrl, credentials?.walletAddress, router, pathname]);
+  }, [isLoaded, hasHyperliquidCredentials, addressFromUrl, credentials?.walletAddress, router, pathname]);
 
   if (!isLoaded) {
     return (
@@ -48,7 +48,7 @@ export function RequireCredentials({ children }: RequireCredentialsProps) {
     return <>{children}</>;
   }
 
-  if (!hasCredentials) {
+  if (!hasHyperliquidCredentials) {
     return (
       <div className="flex items-center justify-center min-h-screen bg-gray-950 p-6">
         <div className="max-w-2xl w-full">

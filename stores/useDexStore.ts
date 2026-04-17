@@ -1,23 +1,26 @@
 import { create } from 'zustand';
-import { HyperliquidService } from '@/lib/services/hyperliquid.service';
-import type { PerpDexInfo } from '@/lib/services/types';
+import type { ExchangeTradingService, PerpDexInfo } from '@/lib/services/types';
 
 export type MarketType = 'perp' | 'spot';
+export type ExchangeType = 'hyperliquid' | 'binance';
 
 interface DexStore {
+  selectedExchange: ExchangeType;
   dexes: PerpDexInfo[];
   selectedDex: string | undefined; // undefined = main exchange, string = HIP-3 dex name
   marketType: MarketType;
   isLoading: boolean;
   error: string | null;
-  service: HyperliquidService | null;
-  setService: (service: HyperliquidService) => void;
+  service: ExchangeTradingService | null;
+  setSelectedExchange: (exchange: ExchangeType) => void;
+  setService: (service: ExchangeTradingService) => void;
   setSelectedDex: (dex: string | undefined) => void;
   setMarketType: (type: MarketType) => void;
   fetchDexes: () => Promise<void>;
 }
 
 export const useDexStore = create<DexStore>((set, get) => ({
+  selectedExchange: 'hyperliquid',
   dexes: [],
   selectedDex: undefined,
   marketType: 'perp',
@@ -25,7 +28,16 @@ export const useDexStore = create<DexStore>((set, get) => ({
   error: null,
   service: null,
 
-  setService: (service: HyperliquidService) => {
+  setSelectedExchange: (exchange: ExchangeType) => {
+    set({
+      selectedExchange: exchange,
+      selectedDex: undefined,
+      marketType: 'perp',
+      dexes: exchange === 'hyperliquid' ? get().dexes : [],
+    });
+  },
+
+  setService: (service: ExchangeTradingService) => {
     set({ service });
   },
 
@@ -38,8 +50,13 @@ export const useDexStore = create<DexStore>((set, get) => ({
   },
 
   fetchDexes: async () => {
-    const { service } = get();
+    const { service, selectedExchange } = get();
     if (!service) return;
+
+    if (selectedExchange !== 'hyperliquid') {
+      set({ dexes: [], isLoading: false, error: null });
+      return;
+    }
 
     set({ isLoading: true, error: null });
     try {

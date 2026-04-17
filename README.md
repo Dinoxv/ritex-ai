@@ -207,6 +207,71 @@ npm start
 pm2 start ecosystem.config.js
 ```
 
+### Smoke test đa sàn (QA production/testnet)
+
+File mẫu biến môi trường:
+
+```bash
+cp .env.smoke.example .env.smoke
+```
+
+Profile mặc định (public checks + private checks ở chế độ skip nếu thiếu credential):
+
+```bash
+bash scripts/smoke-public.sh
+```
+
+Profile private bắt buộc env (fail sớm nếu thiếu biến):
+
+```bash
+bash scripts/smoke-private.sh
+```
+
+### Tích hợp PM2 deploy hook
+
+Ví dụ script hậu deploy để build + smoke private + reload PM2:
+
+```bash
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd /root/hyperscalper
+npm ci
+npm run build
+bash scripts/smoke-private.sh
+pm2 reload ecosystem.config.js --only hyperscalper-frontend
+```
+
+Khuyến nghị: nếu smoke trả exit code khác 0 thì dừng deploy.
+
+### Tích hợp cron health check
+
+Ví dụ chạy mỗi 15 phút, ghi log và giữ exit code để alert:
+
+```bash
+*/15 * * * * cd /root/hyperscalper && bash scripts/smoke-public.sh >> /var/log/hyperscalper-smoke.log 2>&1
+```
+
+Ví dụ profile private chạy theo lịch thưa hơn:
+
+```bash
+0 */6 * * * cd /root/hyperscalper && bash scripts/smoke-private.sh >> /var/log/hyperscalper-smoke-private.log 2>&1
+```
+
+Script smoke có summary dạng bảng và exit code chi tiết theo từng flow, phù hợp để tích hợp hệ thống giám sát.
+
+### Troubleshooting smoke exit codes
+
+| Exit code | Nguyên nhân | Cách xử lý nhanh |
+|---|---|---|
+| `11` | Lỗi flow credentials storage | Kiểm tra logic tách key credentials trong localStorage (`hyperliquid_credentials`, `binance_credentials`, `hyperscalper_credentials`). |
+| `21` | Thiếu env bắt buộc cho profile private | Kiểm tra `.env.smoke` đã có đủ `SMOKE_HYPER_WALLET_ADDRESS`, `SMOKE_BINANCE_API_KEY`, `SMOKE_BINANCE_API_SECRET` (và `SMOKE_HYPER_PRIVATE_KEY` nếu bật live close). |
+| `31` | Hyperliquid public checks fail | Kiểm tra kết nối mạng/API Hyperliquid, `SMOKE_HYPER_TESTNET`, symbol (`SMOKE_HYPER_SYMBOL`). |
+| `32` | Hyperliquid private checks fail | Kiểm tra wallet address/key, quyền giao dịch, trạng thái vị thế/lệnh testnet. |
+| `41` | Binance public checks fail | Kiểm tra kết nối tới Binance Futures endpoint, `SMOKE_BINANCE_TESTNET`, symbol (`SMOKE_BINANCE_SYMBOL`). |
+| `42` | Binance private checks fail | Kiểm tra API key/secret, quyền Futures (read/trade), IP whitelist và trạng thái tài khoản testnet. |
+| `99` | Lỗi không phân loại | Kiểm tra log summary trong output script để xác định flow fail đầu tiên, sau đó rerun bằng profile tương ứng. |
+
 ---
 
 ## 9. Cấu trúc dự án

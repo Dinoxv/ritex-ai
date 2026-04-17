@@ -4,10 +4,10 @@ import type { ExchangeWebSocketService } from '@/lib/websocket/exchange-websocke
 import { useWebSocketStatusStore } from '@/stores/useWebSocketStatusStore';
 import { formatCandle } from '@/lib/format-utils';
 import { MAX_CANDLES } from '@/lib/constants';
-import { HyperliquidService } from '@/lib/services/hyperliquid.service';
+import type { ExchangeTradingService, TransformedCandle } from '@/lib/services/types';
 import { downsampleCandles } from '@/lib/candle-utils';
-import type { TransformedCandle } from '@/lib/services/types';
 import { INTERVAL_TO_MS } from '@/lib/time-utils';
+import { useDexStore } from './useDexStore';
 
 interface CandleStore {
   candles: Record<string, CandleData[]>;
@@ -16,10 +16,10 @@ interface CandleStore {
   errors: Record<string, string | null>;
   subscriptions: Record<string, { subscriptionId: string; cleanup: () => void; refCount: number }>;
   wsService: ExchangeWebSocketService | null;
-  service: HyperliquidService | null;
+  service: ExchangeTradingService | null;
   activeSymbol: string | null;
 
-  setService: (service: HyperliquidService) => void;
+  setService: (service: ExchangeTradingService) => void;
   setActiveSymbol: (coin: string | null) => void;
   fetchCandles: (coin: string, interval: TimeInterval, startTime: number, endTime: number) => Promise<void>;
   fetchOlderCandles: (coin: string, interval: TimeInterval) => Promise<boolean>;
@@ -43,7 +43,7 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
   service: null,
   activeSymbol: null,
 
-  setService: (service: HyperliquidService) => {
+  setService: (service: ExchangeTradingService) => {
     set({ service });
   },
 
@@ -164,7 +164,8 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
 
     const initWebSocket = async () => {
       const { useWebSocketService } = await import('@/lib/websocket/websocket-singleton');
-      const { service, trackSubscription } = useWebSocketService('hyperliquid');
+      const exchange = useDexStore.getState().selectedExchange;
+      const { service, trackSubscription } = useWebSocketService(exchange);
 
       const cleanup = trackSubscription();
 

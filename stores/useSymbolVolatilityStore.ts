@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { HyperliquidService } from '@/lib/services/hyperliquid.service';
+import type { ExchangeTradingService } from '@/lib/services/types';
 
 interface VolatilityData {
   blocks: number;
@@ -12,9 +12,9 @@ interface VolatilityData {
 interface SymbolVolatilityStore {
   volatility: Record<string, VolatilityData>;
   subscribedSymbols: Set<string>;
-  service: HyperliquidService | null;
+  service: ExchangeTradingService | null;
 
-  setService: (service: HyperliquidService) => void;
+  setService: (service: ExchangeTradingService) => void;
   subscribe: (symbols: string[]) => void;
   unsubscribe: (symbols: string[]) => void;
   getVolatility: (symbol: string) => VolatilityData | null;
@@ -44,7 +44,7 @@ export const useSymbolVolatilityStore = create<SymbolVolatilityStore>((set, get)
   subscribedSymbols: new Set(),
   service: null,
 
-  setService: (service: HyperliquidService) => {
+  setService: (service: ExchangeTradingService) => {
     set({ service });
   },
 

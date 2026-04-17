@@ -1,4 +1,4 @@
-import type { HyperliquidService } from './hyperliquid.service';
+import type { ExchangeTradingService } from './types';
 import type { TimeInterval } from '@/types';
 import type {
   StochasticValue,
@@ -100,7 +100,7 @@ export interface KalmanTrendScanParams {
 }
 
 export class ScannerService {
-  constructor(private hyperliquidService: HyperliquidService) {}
+  constructor(private hyperliquidService: ExchangeTradingService) {}
 
   private getIntervalMinutes(interval: TimeInterval): number {
     const intervalMap: Record<TimeInterval, number> = {

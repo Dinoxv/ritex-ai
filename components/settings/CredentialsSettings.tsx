@@ -7,30 +7,97 @@ interface CredentialsSettingsProps {
   initialWalletAddress?: string | null;
 }
 
+type LastAction = {
+  label: string;
+  at: number;
+};
+
+const formatTimeAgo = (timestamp: number, now: number): string => {
+  const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
+
+  if (seconds < 60) {
+    return `${seconds}s ago`;
+  }
+
+  const minutes = Math.floor(seconds / 60);
+  if (minutes < 60) {
+    return `${minutes}m ago`;
+  }
+
+  const hours = Math.floor(minutes / 60);
+  return `${hours}h ago`;
+};
+
 export function CredentialsSettings({ initialWalletAddress }: CredentialsSettingsProps = {}) {
-  const { credentials, saveCredentials, clearCredentials, updateNetwork } = useCredentials();
+  const {
+    credentials,
+    saveCredentials,
+    clearCredentials,
+    clearHyperliquidCredentials,
+    clearBinanceCredentials,
+    updateNetwork,
+    updateBinanceCredentials,
+    hasHyperliquidCredentials,
+    hasBinanceCredentials,
+    migrationInfo,
+  } = useCredentials();
   const [privateKey, setPrivateKey] = useState('');
   const [walletAddress, setWalletAddress] = useState('');
+  const [binanceApiKey, setBinanceApiKey] = useState('');
+  const [binanceApiSecret, setBinanceApiSecret] = useState('');
   const [isTestnet, setIsTestnet] = useState(false);
   const [showKey, setShowKey] = useState(false);
-  const [status, setStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
-  const [errorMessage, setErrorMessage] = useState('');
+  const [hyperStatus, setHyperStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [binanceStatus, setBinanceStatus] = useState<'idle' | 'saving' | 'success' | 'error'>('idle');
+  const [hyperErrorMessage, setHyperErrorMessage] = useState('');
+  const [binanceErrorMessage, setBinanceErrorMessage] = useState('');
   const [walletAddressError, setWalletAddressError] = useState('');
+  const [hyperInfoMessage, setHyperInfoMessage] = useState('');
+  const [binanceInfoMessage, setBinanceInfoMessage] = useState('');
+  const [hyperLastAction, setHyperLastAction] = useState<LastAction | null>(null);
+  const [binanceLastAction, setBinanceLastAction] = useState<LastAction | null>(null);
+  const [nowTs, setNowTs] = useState(() => Date.now());
 
   useEffect(() => {
     if (credentials) {
       setPrivateKey(credentials.privateKey);
       setWalletAddress(credentials.walletAddress);
+      setBinanceApiKey(credentials.binanceApiKey || '');
+      setBinanceApiSecret(credentials.binanceApiSecret || '');
       setIsTestnet(credentials.isTestnet);
     } else if (initialWalletAddress) {
       setWalletAddress(initialWalletAddress);
     }
   }, [credentials, initialWalletAddress]);
 
-  const handleSave = async () => {
+  useEffect(() => {
+    if (!migrationInfo?.migrated) {
+      return;
+    }
+
+    if (migrationInfo.hyperliquidMigrated) {
+      setHyperInfoMessage('Da migrate Hyperliquid credentials tu legacy key sang hyperliquid_credentials.');
+      setHyperLastAction({ label: 'migrated', at: Date.now() });
+    }
+
+    if (migrationInfo.binanceMigrated) {
+      setBinanceInfoMessage('Da migrate Binance credentials tu legacy key sang binance_credentials.');
+      setBinanceLastAction({ label: 'migrated', at: Date.now() });
+    }
+  }, [migrationInfo]);
+
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      setNowTs(Date.now());
+    }, 1000);
+
+    return () => window.clearInterval(timer);
+  }, []);
+
+  const handleSaveHyperliquid = async () => {
     try {
-      setStatus('saving');
-      setErrorMessage('');
+      setHyperStatus('saving');
+      setHyperErrorMessage('');
 
       if (!privateKey) {
         throw new Error('Private key is required');
@@ -48,12 +115,37 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
         throw new Error('Wallet address cannot be a private key. Please enter a valid wallet address.');
       }
 
-      await saveCredentials(privateKey, walletAddress, isTestnet);
-      setStatus('success');
-      setTimeout(() => setStatus('idle'), 2000);
+      await saveCredentials(privateKey, walletAddress, isTestnet, undefined, {
+        binanceApiKey,
+        binanceApiSecret,
+      });
+      setHyperStatus('success');
+      setHyperInfoMessage('Da luu Hyperliquid credentials vao localStorage key: hyperliquid_credentials.');
+      setHyperLastAction({ label: 'saved', at: Date.now() });
+      setTimeout(() => setHyperStatus('idle'), 2000);
     } catch (error) {
-      setStatus('error');
-      setErrorMessage(error instanceof Error ? error.message : 'Failed to save credentials');
+      setHyperStatus('error');
+      setHyperErrorMessage(error instanceof Error ? error.message : 'Failed to save Hyperliquid credentials');
+    }
+  };
+
+  const handleSaveBinance = async () => {
+    try {
+      setBinanceStatus('saving');
+      setBinanceErrorMessage('');
+
+      if (!binanceApiKey.trim() || !binanceApiSecret.trim()) {
+        throw new Error('Binance API Key và API Secret là bắt buộc');
+      }
+
+      await updateBinanceCredentials(binanceApiKey.trim(), binanceApiSecret.trim());
+      setBinanceStatus('success');
+      setBinanceInfoMessage('Da luu Binance credentials vao localStorage key: binance_credentials.');
+      setBinanceLastAction({ label: 'saved', at: Date.now() });
+      setTimeout(() => setBinanceStatus('idle'), 2000);
+    } catch (error) {
+      setBinanceStatus('error');
+      setBinanceErrorMessage(error instanceof Error ? error.message : 'Failed to save Binance credentials');
     }
   };
 
@@ -62,9 +154,47 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
       clearCredentials();
       setPrivateKey('');
       setWalletAddress('');
+      setBinanceApiKey('');
+      setBinanceApiSecret('');
       setIsTestnet(false);
-      setStatus('idle');
+      setHyperStatus('idle');
+      setBinanceStatus('idle');
+      setHyperErrorMessage('');
+      setBinanceErrorMessage('');
+      setHyperInfoMessage('Da xoa Hyperliquid credentials (hyperliquid_credentials).');
+      setBinanceInfoMessage('Da xoa Binance credentials (binance_credentials).');
+      setHyperLastAction({ label: 'cleared', at: Date.now() });
+      setBinanceLastAction({ label: 'cleared', at: Date.now() });
     }
+  };
+
+  const handleClearHyperliquid = async () => {
+    if (!confirm('Clear only Hyperliquid credentials?')) {
+      return;
+    }
+
+    await clearHyperliquidCredentials();
+    setPrivateKey('');
+    setWalletAddress('');
+    setWalletAddressError('');
+    setHyperStatus('idle');
+    setHyperErrorMessage('');
+    setHyperInfoMessage('Da xoa Hyperliquid credentials (hyperliquid_credentials).');
+    setHyperLastAction({ label: 'cleared', at: Date.now() });
+  };
+
+  const handleClearBinance = async () => {
+    if (!confirm('Clear only Binance credentials?')) {
+      return;
+    }
+
+    await clearBinanceCredentials();
+    setBinanceApiKey('');
+    setBinanceApiSecret('');
+    setBinanceStatus('idle');
+    setBinanceErrorMessage('');
+    setBinanceInfoMessage('Da xoa Binance credentials (binance_credentials).');
+    setBinanceLastAction({ label: 'cleared', at: Date.now() });
   };
 
   const handleNetworkChange = async (testnet: boolean) => {
@@ -72,11 +202,12 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
     if (credentials) {
       try {
         await updateNetwork(testnet);
-        setStatus('success');
-        setTimeout(() => setStatus('idle'), 2000);
+        setHyperStatus('success');
+        setHyperLastAction({ label: 'network updated', at: Date.now() });
+        setTimeout(() => setHyperStatus('idle'), 2000);
       } catch (error) {
-        setStatus('error');
-        setErrorMessage('Failed to update network');
+        setHyperStatus('error');
+        setHyperErrorMessage('Failed to update network');
       }
     }
   };
@@ -96,9 +227,9 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
   return (
     <div className="space-y-6 p-6 bg-gray-900 rounded-lg">
       <div>
-        <h2 className="text-2xl font-bold text-white mb-2">Hyperliquid Credentials</h2>
+        <h2 className="text-2xl font-bold text-white mb-2">Exchange Credentials</h2>
         <p className="text-sm text-gray-400">
-          Your credentials are encrypted and stored locally in your browser.
+          Credentials are encrypted and stored locally. Hyperliquid và Binance được tách riêng để tránh nhầm lẫn.
         </p>
       </div>
 
@@ -117,7 +248,19 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 border border-gray-700 rounded-lg p-4 bg-gray-800/40">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-white">Hyperliquid Credentials</h3>
+          {hyperLastAction && (
+            <span className="text-xs px-2.5 py-1 rounded-full border border-blue-700/60 text-blue-300 bg-blue-900/20 whitespace-nowrap">
+              {hyperLastAction.label} {formatTimeAgo(hyperLastAction.at, nowTs)}
+            </span>
+          )}
+        </div>
+        <div>
+          <p className="text-xs text-gray-400">Dành cho giao dịch Hyperliquid (Private Key + Wallet).</p>
+        </div>
+
         <div>
           <label className="block text-sm font-medium text-gray-300 mb-2">
             Network
@@ -193,36 +336,128 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
             </div>
           )}
         </div>
+
+        {hyperErrorMessage && (
+          <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-3">
+            <p className="text-sm text-red-400">{hyperErrorMessage}</p>
+          </div>
+        )}
+
+        {hyperInfoMessage && (
+          <div className="bg-blue-900/20 border border-blue-700/50 rounded-lg p-3">
+            <p className="text-sm text-blue-300">{hyperInfoMessage}</p>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={handleSaveHyperliquid}
+            disabled={hyperStatus === 'saving' || !privateKey || !walletAddress || !!walletAddressError}
+            className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-medium transition-colors"
+          >
+            {hyperStatus === 'saving' ? 'Saving...' : hyperStatus === 'success' ? 'Saved!' : 'Save Hyperliquid'}
+          </button>
+          {hasHyperliquidCredentials && (
+            <button
+              onClick={handleClearHyperliquid}
+              className="px-6 py-3 bg-red-700 hover:bg-red-800 text-white rounded-lg font-medium transition-colors"
+            >
+              Clear Hyperliquid Only
+            </button>
+          )}
+        </div>
       </div>
 
-      {errorMessage && (
-        <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-3">
-          <p className="text-sm text-red-400">{errorMessage}</p>
+      <div className="space-y-4 border border-gray-700 rounded-lg p-4 bg-gray-800/40">
+        <div className="flex items-center justify-between gap-3">
+          <h3 className="text-lg font-semibold text-white">Binance Futures Credentials</h3>
+          {binanceLastAction && (
+            <span className="text-xs px-2.5 py-1 rounded-full border border-emerald-700/60 text-emerald-300 bg-emerald-900/20 whitespace-nowrap">
+              {binanceLastAction.label} {formatTimeAgo(binanceLastAction.at, nowTs)}
+            </span>
+          )}
         </div>
-      )}
+        <div>
+          <p className="text-xs text-gray-400">Dành cho Binance USDT-M Futures (API Key + Secret).</p>
+        </div>
+
+        <div>
+          <label htmlFor="binanceApiKey" className="block text-sm font-medium text-gray-300 mb-2">
+            Binance API Key (USDT-M Futures)
+          </label>
+          <input
+            id="binanceApiKey"
+            type="text"
+            value={binanceApiKey}
+            onChange={(e) => setBinanceApiKey(e.target.value)}
+            placeholder="Binance API Key"
+            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+          />
+        </div>
+
+        <div>
+          <label htmlFor="binanceApiSecret" className="block text-sm font-medium text-gray-300 mb-2">
+            Binance API Secret (USDT-M Futures)
+          </label>
+          <input
+            id="binanceApiSecret"
+            type="password"
+            value={binanceApiSecret}
+            onChange={(e) => setBinanceApiSecret(e.target.value)}
+            placeholder="Binance API Secret"
+            className="w-full px-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-mono text-sm"
+          />
+        </div>
+
+        {binanceErrorMessage && (
+          <div className="bg-red-900/20 border border-red-700/50 rounded-lg p-3">
+            <p className="text-sm text-red-400">{binanceErrorMessage}</p>
+          </div>
+        )}
+
+        {binanceInfoMessage && (
+          <div className="bg-emerald-900/20 border border-emerald-700/50 rounded-lg p-3">
+            <p className="text-sm text-emerald-300">{binanceInfoMessage}</p>
+          </div>
+        )}
+
+        <div className="flex gap-3">
+          <button
+            onClick={handleSaveBinance}
+            disabled={binanceStatus === 'saving' || !binanceApiKey.trim() || !binanceApiSecret.trim()}
+            className="flex-1 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-medium transition-colors"
+          >
+            {binanceStatus === 'saving' ? 'Saving...' : binanceStatus === 'success' ? 'Saved!' : 'Save Binance'}
+          </button>
+          {hasBinanceCredentials && (
+            <button
+              onClick={handleClearBinance}
+              className="px-6 py-3 bg-red-700 hover:bg-red-800 text-white rounded-lg font-medium transition-colors"
+            >
+              Clear Binance Only
+            </button>
+          )}
+        </div>
+      </div>
 
       <div className="flex gap-3">
-        <button
-          onClick={handleSave}
-          disabled={status === 'saving' || !privateKey || !walletAddress || !!walletAddressError}
-          className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-medium transition-colors"
-        >
-          {status === 'saving' ? 'Saving...' : status === 'success' ? 'Saved!' : 'Save Credentials'}
-        </button>
-        {credentials && (
+        {(hasHyperliquidCredentials || hasBinanceCredentials) && (
           <button
             onClick={handleClear}
             className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-lg font-medium transition-colors"
           >
-            Clear
+            Clear All Credentials
           </button>
         )}
       </div>
 
-      {credentials && (
+      {(hasHyperliquidCredentials || hasBinanceCredentials) && (
         <div className="bg-green-900/20 border border-green-700/50 rounded-lg p-3">
           <p className="text-sm text-green-400">
-            ✓ Credentials configured for {credentials.isTestnet ? 'Testnet' : 'Mainnet'}
+            ✓ Hyperliquid: {hasHyperliquidCredentials ? 'Configured' : 'Not configured'} ({credentials?.isTestnet ? 'Testnet' : 'Mainnet'})
+          </p>
+          <p className="text-sm text-green-400 mt-1">
+            ✓ Binance: {hasBinanceCredentials ? 'Configured' : 'Not configured'}
           </p>
         </div>
       )}

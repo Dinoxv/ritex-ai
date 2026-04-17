@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import type { UserFill } from '@/types';
-import type { HyperliquidService } from '@/lib/services/hyperliquid.service';
+import type { ExchangeTradingService } from '@/lib/services/types';
 import { groupFillsByPosition } from '@/lib/trade-grouping-utils';
 
 export interface DailyPnlSummary {
@@ -21,13 +21,13 @@ interface UserFillsStore {
   fills: UserFill[];
   loading: boolean;
   error: string | null;
-  service: HyperliquidService | null;
+  service: ExchangeTradingService | null;
   selectedDate: Date;
   selectedMonth: Date;
   monthlyFills: UserFill[];
   dailySummaries: DailyPnlSummary[];
 
-  setService: (service: HyperliquidService) => void;
+  setService: (service: ExchangeTradingService) => void;
   setSelectedDate: (date: Date) => void;
   fetchTodaysFills: () => Promise<void>;
   fetchFillsByTime: (startTime: number, endTime?: number) => Promise<void>;

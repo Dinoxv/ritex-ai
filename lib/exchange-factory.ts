@@ -1,5 +1,6 @@
 import type { ExchangeProvider, ExchangeConfig } from './exchange-provider.interface';
 import { HyperliquidProvider } from './hyperliquid-provider';
+import { BinanceProvider } from './binance-provider';
 
 export class ExchangeFactory {
   static createProvider(config: ExchangeConfig): ExchangeProvider {
@@ -8,7 +9,7 @@ export class ExchangeFactory {
         return new HyperliquidProvider(config.isTestnet || false);
 
       case 'binance':
-        throw new Error('Binance provider not yet implemented');
+        return new BinanceProvider(config.isTestnet || false);
 
       case 'bybit':
         throw new Error('Bybit provider not yet implemented');

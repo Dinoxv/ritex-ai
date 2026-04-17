@@ -1,5 +1,6 @@
 import type { ExchangeWebSocketService, WebSocketConfig } from './exchange-websocket.interface';
 import { HyperliquidWebSocketService } from './hyperliquid-websocket.service';
+import { BinanceWebSocketService } from './binance-websocket.service';
 
 export class WebSocketFactory {
   static createService(config: WebSocketConfig): ExchangeWebSocketService {
@@ -8,7 +9,7 @@ export class WebSocketFactory {
         return new HyperliquidWebSocketService(config.isTestnet || false);
 
       case 'binance':
-        throw new Error('Binance WebSocket service not yet implemented');
+        return new BinanceWebSocketService(config.isTestnet || false);
 
       case 'bybit':
         throw new Error('Bybit WebSocket service not yet implemented');

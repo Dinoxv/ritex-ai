@@ -279,7 +279,7 @@ updateOrdersFromGlobalPoll: (allOrders) => {
   // Map to internal format
   const mappedOrders = {};
   Object.keys(ordersByCoin).forEach(coin => {
-    mappedOrders[coin] = mapHyperliquidOrders(ordersByCoin[coin]);
+    mappedOrders[coin] = mapExchangeOrders(ordersByCoin[coin]);
   });
 
   // MERGE with optimistic orders instead of replacing

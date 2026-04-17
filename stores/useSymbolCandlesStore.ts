@@ -1,12 +1,12 @@
 import { create } from 'zustand';
-import type { HyperliquidService } from '@/lib/services/hyperliquid.service';
+import type { ExchangeTradingService } from '@/lib/services/types';
 import { downsampleCandles } from '@/lib/candle-utils';
 import { useCandleStore } from './useCandleStore';
 
 interface SymbolCandlesStore {
   closePrices: Record<string, number[]>;
-  service: HyperliquidService | null;
-  setService: (service: HyperliquidService) => void;
+  service: ExchangeTradingService | null;
+  setService: (service: ExchangeTradingService) => void;
   fetchClosePrices: (symbols: string[]) => Promise<void>;
   getClosePrices: (symbol: string) => number[] | null;
 }
@@ -15,7 +15,7 @@ export const useSymbolCandlesStore = create<SymbolCandlesStore>((set, get) => ({
   closePrices: {},
   service: null,
 
-  setService: (service: HyperliquidService) => {
+  setService: (service: ExchangeTradingService) => {
     set({ service });
   },
 

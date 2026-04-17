@@ -6,7 +6,9 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
-    "lint": "eslint"
+    "lint": "eslint",
+    "smoke:multi-exchange": "tsx scripts/smoke-multi-exchange.ts",
+    "smoke:multi-exchange:private": "SMOKE_REQUIRE_PRIVATE=true tsx scripts/smoke-multi-exchange.ts"
   },
   "dependencies": {
     "@formkit/auto-animate": "^0.9.0",
@@ -34,6 +36,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.0.0",
     "tailwindcss": "^4",
+    "tsx": "^4.21.0",
     "typescript": "^5"
   }
 }

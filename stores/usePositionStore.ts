@@ -1,26 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Position } from '@/models/Position';
-import { HyperliquidService } from '@/lib/services/hyperliquid.service';
-
-function mapHyperliquidPosition(rawPosition: any): Position {
-  const szi = parseFloat(rawPosition.position.szi);
-  const entryPrice = parseFloat(rawPosition.position.entryPx || '0');
-  const unrealizedPnl = parseFloat(rawPosition.position.unrealizedPnl || '0');
-  const positionValue = parseFloat(rawPosition.position.positionValue || '0');
-  const leverage = parseFloat(rawPosition.position.leverage?.value || '1');
-
-  return {
-    symbol: rawPosition.position.coin,
-    side: szi > 0 ? 'long' : 'short',
-    size: Math.abs(szi),
-    entryPrice,
-    currentPrice: positionValue !== 0 ? Math.abs(positionValue) / Math.abs(szi) : entryPrice,
-    pnl: unrealizedPnl,
-    pnlPercentage: positionValue !== 0 ? (unrealizedPnl / Math.abs(positionValue)) * 100 : 0,
-    leverage,
-  };
-}
+import type { ExchangeTradingService } from '@/lib/services/types';
+import { getRawPositionSymbol, normalizeExchangePosition } from '@/lib/utils/exchange-normalizers';
 
 interface PositionStore {
   positions: Record<string, Position | null>;
@@ -29,9 +11,9 @@ interface PositionStore {
   pollingIntervals: Record<string, NodeJS.Timeout>;
   batchPollingInterval: NodeJS.Timeout | null;
   batchPollingCoins: string[];
-  service: HyperliquidService | null;
+  service: ExchangeTradingService | null;
 
-  setService: (service: HyperliquidService) => void;
+  setService: (service: ExchangeTradingService) => void;
   fetchPosition: (coin: string) => Promise<void>;
   fetchAllPositions: (coins?: string[]) => Promise<void>;
   fetchAndStoreAllOpenPositions: () => Promise<string[]>;
@@ -56,7 +38,7 @@ export const usePositionStore = create<PositionStore>()(
       batchPollingCoins: [],
       service: null,
 
-      setService: (service: HyperliquidService) => {
+      setService: (service: ExchangeTradingService) => {
         set({ service });
       },
 
@@ -74,9 +56,9 @@ export const usePositionStore = create<PositionStore>()(
 
         try {
           const allPositions = await service.getOpenPositions();
-          const rawPosition = allPositions.find(p => p.position.coin === coin);
+          const rawPosition = allPositions.find((position) => getRawPositionSymbol(position) === coin);
 
-          const position = rawPosition ? mapHyperliquidPosition(rawPosition) : null;
+          const position = rawPosition ? normalizeExchangePosition(rawPosition) : null;
 
           set((state) => ({
             positions: { ...state.positions, [coin]: position },
@@ -118,8 +100,8 @@ export const usePositionStore = create<PositionStore>()(
           const positionLoadingState: Record<string, boolean> = {};
 
           targetCoins.forEach(coin => {
-            const rawPosition = allPositions.find((p: any) => p.position.coin === coin);
-            positionMap[coin] = rawPosition ? mapHyperliquidPosition(rawPosition) : null;
+            const rawPosition = allPositions.find((position: any) => getRawPositionSymbol(position) === coin);
+            positionMap[coin] = rawPosition ? normalizeExchangePosition(rawPosition) : null;
             positionLoadingState[coin] = false;
           });
 
@@ -152,7 +134,7 @@ export const usePositionStore = create<PositionStore>()(
           const symbols: string[] = [];
 
           allPositions.forEach((rawPosition: any) => {
-            const position = mapHyperliquidPosition(rawPosition);
+            const position = normalizeExchangePosition(rawPosition);
             positionMap[position.symbol] = position;
             symbols.push(position.symbol);
           });
@@ -194,7 +176,7 @@ export const usePositionStore = create<PositionStore>()(
         const positionMap: Record<string, Position | null> = {};
 
         allPositions.forEach((rawPosition: any) => {
-          const position = mapHyperliquidPosition(rawPosition);
+          const position = normalizeExchangePosition(rawPosition);
           positionMap[position.symbol] = position;
         });
 

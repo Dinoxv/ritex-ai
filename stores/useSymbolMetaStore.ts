@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { HyperliquidService } from '@/lib/services/hyperliquid.service';
+import type { ExchangeTradingService } from '@/lib/services/types';
 
 export interface SymbolMeta {
   name: string;
@@ -11,8 +11,8 @@ interface SymbolMetaStore {
   metadata: Record<string, SymbolMeta>;
   loading: boolean;
   error: string | null;
-  service: HyperliquidService | null;
-  setService: (service: HyperliquidService) => void;
+  service: ExchangeTradingService | null;
+  setService: (service: ExchangeTradingService) => void;
   fetchMetadata: () => Promise<void>;
   getDecimals: (symbol: string) => { price: number; size: number };
 }
@@ -26,7 +26,7 @@ export const useSymbolMetaStore = create<SymbolMetaStore>((set, get) => ({
   error: null,
   service: null,
 
-  setService: (service: HyperliquidService) => {
+  setService: (service: ExchangeTradingService) => {
     set({ service });
   },
 

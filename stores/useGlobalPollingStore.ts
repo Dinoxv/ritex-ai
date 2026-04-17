@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { HyperliquidService } from '@/lib/services/hyperliquid.service';
+import type { ExchangeTradingService } from '@/lib/services/types';
 import { useOrderStore } from './useOrderStore';
 import { usePositionStore } from './usePositionStore';
 import { useSymbolVolatilityStore } from './useSymbolVolatilityStore';
@@ -10,7 +10,7 @@ import { useSidebarPricesStore } from './useSidebarPricesStore';
 import { useSettingsStore } from './useSettingsStore';
 
 interface GlobalPollingStore {
-  service: HyperliquidService | null;
+  service: ExchangeTradingService | null;
   fastPollingInterval: NodeJS.Timeout | null;
   slowPollingInterval: NodeJS.Timeout | null;
   candlePollingInterval: NodeJS.Timeout | null;
@@ -20,7 +20,7 @@ interface GlobalPollingStore {
   lastCandlePollTime: number | null;
   isFirstCandleFetch: boolean;
 
-  setService: (service: HyperliquidService) => void;
+  setService: (service: ExchangeTradingService) => void;
   startGlobalPolling: () => void;
   stopGlobalPolling: () => void;
   fetchFastData: () => Promise<void>;
@@ -39,7 +39,7 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
   lastCandlePollTime: null,
   isFirstCandleFetch: true,
 
-  setService: (service: HyperliquidService) => {
+  setService: (service: ExchangeTradingService) => {
     console.log('[GlobalPolling] setService called, starting global polling');
     set({ service });
     useDexStore.getState().setService(service);

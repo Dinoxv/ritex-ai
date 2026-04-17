@@ -1,9 +1,15 @@
 import { create } from 'zustand';
-import { HyperliquidService } from '@/lib/services/hyperliquid.service';
+import type { ExchangeTradingService } from '@/lib/services/types';
 import { useOrderStore } from './useOrderStore';
 import { usePositionStore } from './usePositionStore';
 import { useSettingsStore } from './useSettingsStore';
 import toast from 'react-hot-toast';
+import {
+  getRawPositionEntryPrice,
+  getRawPositionSignedSize,
+  getRawPositionSymbol,
+  normalizeExchangeOrders,
+} from '@/lib/utils/exchange-normalizers';
 
 const ORDER_COUNT = 5;
 const TAKE_PROFIT_PERCENT = 2;
@@ -51,11 +57,11 @@ interface ExitOrderAtPriceParams {
 }
 
 interface TradingStore {
-  service: HyperliquidService | null;
+  service: ExchangeTradingService | null;
   isExecuting: Record<string, boolean>;
   errors: Record<string, string | null>;
 
-  setService: (service: HyperliquidService) => void;
+  setService: (service: ExchangeTradingService) => void;
   buyCloud: (params: CloudOrderParams) => Promise<void>;
   sellCloud: (params: CloudOrderParams) => Promise<void>;
   smLong: (params: MarketOrderParams) => Promise<void>;
@@ -79,7 +85,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
   isExecuting: {},
   errors: {},
 
-  setService: (service: HyperliquidService) => {
+  setService: (service: ExchangeTradingService) => {
     set({ service });
   },
 
@@ -1112,17 +1118,17 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         service.getMetadataCache(symbol)
       ]);
 
-      const position = positions.find(p => p.position.coin === symbol);
+      const position = positions.find((rawPosition) => getRawPositionSymbol(rawPosition) === symbol);
 
       if (!position) {
         throw new Error(`No open position for ${symbol}`);
       }
 
-      const fullSize = Math.abs(parseFloat(position.position.szi));
+      const fullSize = Math.abs(getRawPositionSignedSize(position));
       const sizeToClose = percentage === 100 ? undefined : ((fullSize * percentage) / 100).toString();
 
       const currentPrice = parseFloat(midPrice);
-      const isLong = parseFloat(position.position.szi) > 0;
+      const isLong = getRawPositionSignedSize(position) > 0;
       const slippage = 0.005;
       const closePrice = isLong
         ? service.formatPriceCached(currentPrice * (1 - slippage), metadata)
@@ -1169,14 +1175,14 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         service.getMetadataCache(coin)
       ]);
 
-      const assetPosition = positions.find(p => p.position.coin === coin);
+      const assetPosition = positions.find((rawPosition) => getRawPositionSymbol(rawPosition) === coin);
 
       if (!assetPosition) {
         throw new Error(`No open position found for ${coin}`);
       }
 
-      const szi = parseFloat(assetPosition.position.szi);
-      const entryPrice = parseFloat(assetPosition.position.entryPx || '0');
+      const szi = getRawPositionSignedSize(assetPosition);
+      const entryPrice = getRawPositionEntryPrice(assetPosition);
       const currentPrice = parseFloat(midPrice);
       const side: 'long' | 'short' = szi > 0 ? 'long' : 'short';
       const size = Math.abs(szi);
@@ -1188,15 +1194,13 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         newStopLossPrice = entryPrice - (entryPrice - currentPrice) * (percentage / 100);
       }
 
-      const allOrders = await service.getOpenOrders();
-      const stopLossOrders = allOrders.filter((order: any) => {
+      const allOrders = normalizeExchangeOrders(await service.getOpenOrders());
+      const stopLossOrders = allOrders.filter((order) => {
         if (order.coin !== coin) return false;
-        if (!order.isTrigger || !order.isPositionTpsl) return false;
-        const ot = order.orderType?.toLowerCase() || '';
-        return ot.includes('stop market') || order.reduceOnly;
+        return order.orderType === 'stop';
       });
 
-      stopLossOrders.forEach((order: any) => {
+      stopLossOrders.forEach((order) => {
         orderStore.markPendingCancellation(coin, order.oid);
       });
 
@@ -1217,7 +1221,7 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
 
       if (stopLossOrders.length > 0) {
         for (const slOrder of stopLossOrders) {
-          await service.cancelOrder(coin, slOrder.oid, metadata);
+          await service.cancelOrder(coin, Number(slOrder.oid), metadata);
           orderStore.confirmCancellation(coin, String(slOrder.oid));
         }
       }

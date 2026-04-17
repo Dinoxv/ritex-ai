@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ScanResult, ScannerStatus } from '@/models/Scanner';
-import type { HyperliquidService } from '@/lib/services/hyperliquid.service';
 import { ScannerService } from '@/lib/services/scanner.service';
+import type { ExchangeTradingService } from '@/lib/services/types';
 import { useSettingsStore } from './useSettingsStore';
 import { useTopSymbolsStore } from './useTopSymbolsStore';
 import { playNotificationSound } from '@/lib/sound-utils';
@@ -13,9 +13,9 @@ interface ScannerStore {
   status: ScannerStatus;
   intervalId: NodeJS.Timeout | null;
   previousSymbols: Set<string>;
-  service: HyperliquidService | null;
+  service: ExchangeTradingService | null;
   scannerService: ScannerService | null;
-  setService: (service: HyperliquidService) => void;
+  setService: (service: ExchangeTradingService) => void;
   runScan: () => Promise<void>;
   startAutoScan: () => void;
   startAutoScanWithDelay: () => void;
@@ -36,7 +36,7 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
   service: null,
   scannerService: null,
 
-  setService: (service: HyperliquidService) => {
+  setService: (service: ExchangeTradingService) => {
     set({
       service,
       scannerService: new ScannerService(service)

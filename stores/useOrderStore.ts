@@ -1,8 +1,8 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
 import { Order } from '@/models/Order';
-import { HyperliquidService } from '@/lib/services/hyperliquid.service';
-import { mapHyperliquidOrders } from '@/lib/utils/order-mapper';
+import type { ExchangeTradingService } from '@/lib/services/types';
+import { mapExchangeOrders } from '@/lib/utils/exchange-order-mapper';
 
 interface OrderStore {
   orders: Record<string, Order[]>;
@@ -11,9 +11,9 @@ interface OrderStore {
   loading: Record<string, boolean>;
   errors: Record<string, string | null>;
   pollingIntervals: Record<string, NodeJS.Timeout>;
-  service: HyperliquidService | null;
+  service: ExchangeTradingService | null;
 
-  setService: (service: HyperliquidService) => void;
+  setService: (service: ExchangeTradingService) => void;
   fetchOrders: (coin: string) => Promise<void>;
   subscribeToOrders: (coin: string) => void;
   unsubscribeFromOrders: (coin: string) => void;
@@ -40,7 +40,7 @@ export const useOrderStore = create<OrderStore>()(
       pollingIntervals: {},
       service: null,
 
-      setService: (service: HyperliquidService) => {
+      setService: (service: ExchangeTradingService) => {
         set({ service });
       },
 
@@ -58,7 +58,7 @@ export const useOrderStore = create<OrderStore>()(
         try {
           const allOrders = await service.getOpenOrders();
           const coinOrders = allOrders.filter((order: any) => order.coin === coin);
-          const mappedOrders = mapHyperliquidOrders(coinOrders);
+          const mappedOrders = mapExchangeOrders(coinOrders);
 
           set((state) => ({
             orders: { ...state.orders, [coin]: mappedOrders },
@@ -100,7 +100,7 @@ export const useOrderStore = create<OrderStore>()(
 
         const mappedOrders: Record<string, Order[]> = {};
         Object.keys(ordersByCoin).forEach(coin => {
-          mappedOrders[coin] = mapHyperliquidOrders(ordersByCoin[coin]);
+          mappedOrders[coin] = mapExchangeOrders(ordersByCoin[coin]);
         });
 
         const newOptimisticOrders = { ...optimisticOrders };

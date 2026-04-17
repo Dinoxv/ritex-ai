@@ -1,14 +1,15 @@
 import { create } from 'zustand';
 import type { ExchangeWebSocketService } from '@/lib/websocket/exchange-websocket.interface';
-import { HyperliquidWebSocketService } from '@/lib/websocket/hyperliquid-websocket.service';
 import { useWebSocketStatusStore } from '@/stores/useWebSocketStatusStore';
+import { useDexStore } from './useDexStore';
+import { useWebSocketService } from '@/lib/websocket/websocket-singleton';
 
 interface SidebarPricesStore {
   prices: Record<string, number>;
   externalPrices: Record<string, number>;
   isSubscribed: boolean;
   subscriptionId: string | null;
-  wsService: ExchangeWebSocketService;
+  wsService: ExchangeWebSocketService | null;
 
   subscribe: () => void;
   unsubscribe: () => void;
@@ -21,14 +22,17 @@ export const useSidebarPricesStore = create<SidebarPricesStore>((set, get) => ({
   externalPrices: {},
   isSubscribed: false,
   subscriptionId: null,
-  wsService: new HyperliquidWebSocketService(false),
+  wsService: null,
 
   subscribe: () => {
-    const { isSubscribed, wsService } = get();
+    const { isSubscribed } = get();
 
     if (isSubscribed) {
       return;
     }
+
+    const exchange = useDexStore.getState().selectedExchange;
+    const { service: wsService } = useWebSocketService(exchange);
 
     const subscriptionId = wsService.subscribeToAllMids((mids) => {
       // Merge WS mids with external (HIP-3 DEX) prices — WS doesn't include HIP-3 tokens
@@ -37,13 +41,18 @@ export const useSidebarPricesStore = create<SidebarPricesStore>((set, get) => ({
     });
 
     useWebSocketStatusStore.getState().setStreamSubscriptionCount('prices', 1);
-    set({ isSubscribed: true, subscriptionId });
+    set({ isSubscribed: true, subscriptionId, wsService });
   },
 
   unsubscribe: () => {
     const { subscriptionId, wsService, isSubscribed } = get();
 
     if (!isSubscribed || !subscriptionId) {
+      return;
+    }
+
+    if (!wsService) {
+      set({ isSubscribed: false, subscriptionId: null, prices: {} });
       return;
     }
 

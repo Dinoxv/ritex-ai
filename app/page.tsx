@@ -9,7 +9,7 @@ import { useLanguageStore } from '@/stores/useLanguageStore';
 
 export default function LandingPage() {
   const router = useRouter();
-  const { credentials, isLoaded } = useCredentials();
+  const { credentials, isLoaded, hasHyperliquidCredentials } = useCredentials();
   const { t } = useLanguageStore();
   const [showCredentials, setShowCredentials] = useState(false);
   const [scrollY, setScrollY] = useState(0);
@@ -44,10 +44,10 @@ export default function LandingPage() {
   }, []);
 
   useEffect(() => {
-    if (isLoaded && credentials?.walletAddress) {
+    if (isLoaded && hasHyperliquidCredentials && credentials?.walletAddress) {
       router.replace(`/${credentials.walletAddress}/trades`);
     }
-  }, [router, credentials?.walletAddress, isLoaded]);
+  }, [router, credentials?.walletAddress, hasHyperliquidCredentials, isLoaded]);
 
   if (!isLoaded) {
     return (
@@ -60,7 +60,7 @@ export default function LandingPage() {
     );
   }
 
-  if (credentials?.walletAddress) {
+  if (hasHyperliquidCredentials && credentials?.walletAddress) {
     return null;
   }
 
