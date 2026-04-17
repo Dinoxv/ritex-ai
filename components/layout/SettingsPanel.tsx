@@ -7,11 +7,12 @@ import { CredentialsSettings } from '@/components/settings/CredentialsSettings';
 import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
 
 export default function SettingsPanel() {
-  const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateKalmanTrendSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings, updateAISettings } = useSettingsStore();
+  const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateKalmanTrendSettings, updateSieuXuHuongSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings, updateAISettings } = useSettingsStore();
   const [isStochasticExpanded, setIsStochasticExpanded] = useState(false);
   const [isEmaExpanded, setIsEmaExpanded] = useState(false);
   const [isMacdExpanded, setIsMacdExpanded] = useState(false);
   const [isKalmanExpanded, setIsKalmanExpanded] = useState(false);
+  const [isRitchiExpanded, setIsRitchiExpanded] = useState(false);
   const [isScannerStochExpanded, setIsScannerStochExpanded] = useState(false);
   const [isScannerEmaExpanded, setIsScannerEmaExpanded] = useState(false);
   const [isScannerDivExpanded, setIsScannerDivExpanded] = useState(false);
@@ -1559,6 +1560,151 @@ export default function SettingsPanel() {
                                 step="0.1"
                                 value={settings.indicators.kalmanTrend.volThreshold}
                                 onChange={(e) => updateKalmanTrendSettings({ volThreshold: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Ritchi Trend */}
+              <div className="border border-frame rounded overflow-hidden">
+                <button
+                  onClick={() => setIsRitchiExpanded(!isRitchiExpanded)}
+                  className="w-full flex items-center justify-between p-3 bg-bg-secondary hover:bg-bg-primary transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-primary font-mono text-xs font-bold">█ RITCHI TREND</span>
+                  </div>
+                  <span className="text-primary text-base">{isRitchiExpanded ? '▼' : '▶'}</span>
+                </button>
+
+                {isRitchiExpanded && (
+                  <div className="p-4 space-y-3 bg-bg-primary">
+                    {/* Enable Toggle */}
+                    <div className="p-3 bg-bg-secondary border border-frame rounded">
+                      <label className="flex items-center justify-between cursor-pointer">
+                        <span className="text-primary font-mono text-xs font-bold">ENABLED</span>
+                        <input
+                          type="checkbox"
+                          checked={settings.indicators.sieuXuHuong.enabled}
+                          onChange={(e) => updateSieuXuHuongSettings({ enabled: e.target.checked })}
+                          className="w-4 h-4 accent-primary cursor-pointer"
+                        />
+                      </label>
+                    </div>
+
+                    {settings.indicators.sieuXuHuong.enabled && (
+                      <div className="space-y-3">
+                        {/* Show Signals */}
+                        <div className="p-3 bg-bg-secondary border border-frame rounded">
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-primary-muted font-mono text-xs">SHOW BUY/SELL SIGNALS</span>
+                            <input
+                              type="checkbox"
+                              checked={settings.indicators.sieuXuHuong.showSignals}
+                              onChange={(e) => updateSieuXuHuongSettings({ showSignals: e.target.checked })}
+                              className="w-4 h-4 accent-primary cursor-pointer"
+                            />
+                          </label>
+                        </div>
+
+                        {/* Pivot & SMA Parameters */}
+                        <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
+                          <div className="text-primary font-mono text-xs font-bold mb-2">PIVOT & SMA</div>
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">PIVOT LENGTH</label>
+                              <input
+                                type="number"
+                                min="1"
+                                max="20"
+                                step="1"
+                                value={settings.indicators.sieuXuHuong.pivLen}
+                                onChange={(e) => updateSieuXuHuongSettings({ pivLen: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">SMA MIN</label>
+                              <input
+                                type="number"
+                                min="2"
+                                max="20"
+                                step="1"
+                                value={settings.indicators.sieuXuHuong.smaMin}
+                                onChange={(e) => updateSieuXuHuongSettings({ smaMin: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">SMA MAX</label>
+                              <input
+                                type="number"
+                                min="10"
+                                max="200"
+                                step="1"
+                                value={settings.indicators.sieuXuHuong.smaMax}
+                                onChange={(e) => updateSieuXuHuongSettings({ smaMax: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">SMA MULTIPLIER</label>
+                              <input
+                                type="number"
+                                min="0.1"
+                                max="5.0"
+                                step="0.1"
+                                value={settings.indicators.sieuXuHuong.smaMult}
+                                onChange={(e) => updateSieuXuHuongSettings({ smaMult: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                          </div>
+                        </div>
+
+                        {/* Trend & Risk Parameters */}
+                        <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
+                          <div className="text-primary font-mono text-xs font-bold mb-2">TREND & RISK</div>
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">TREND LENGTH (COLOR)</label>
+                              <input
+                                type="number"
+                                min="10"
+                                max="500"
+                                step="10"
+                                value={settings.indicators.sieuXuHuong.trendLen}
+                                onChange={(e) => updateSieuXuHuongSettings({ trendLen: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">ATR MULT (SL)</label>
+                              <input
+                                type="number"
+                                min="0.5"
+                                max="10.0"
+                                step="0.1"
+                                value={settings.indicators.sieuXuHuong.atrMult}
+                                onChange={(e) => updateSieuXuHuongSettings({ atrMult: Number(e.target.value) })}
+                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                              />
+                            </div>
+                            <div>
+                              <label className="text-primary-muted font-mono block mb-1">TP MULTIPLIER</label>
+                              <input
+                                type="number"
+                                min="0.5"
+                                max="10.0"
+                                step="0.1"
+                                value={settings.indicators.sieuXuHuong.tpMult}
+                                onChange={(e) => updateSieuXuHuongSettings({ tpMult: Number(e.target.value) })}
                                 className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                               />
                             </div>

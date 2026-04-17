@@ -1218,36 +1218,36 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           }
         }
 
-        // Siêu Xu Hướng signal markers
-        const sxhMarkers: any[] = [];
+        // Ritchi Trend signal markers
+        const ritchiMarkers: any[] = [];
         if (sieuXuHuong && sieuXuHuongSettings?.enabled && sieuXuHuongSettings?.showSignals) {
           for (let i = 0; i < displayCandles.length; i++) {
             if (sieuXuHuong.buySignals[i]) {
-              sxhMarkers.push({
+              ritchiMarkers.push({
                 time: (displayCandles[i].time / 1000) as any,
                 position: 'belowBar',
                 color: '#00ff88',
                 shape: 'arrowUp',
-                text: 'SXH▲',
-                id: `sxh-buy-${i}`,
+                text: 'RT▲',
+                id: `rt-buy-${i}`,
               });
             }
             if (sieuXuHuong.sellSignals[i]) {
-              sxhMarkers.push({
+              ritchiMarkers.push({
                 time: (displayCandles[i].time / 1000) as any,
                 position: 'aboveBar',
                 color: '#ff4444',
                 shape: 'arrowDown',
-                text: 'SXH▼',
-                id: `sxh-sell-${i}`,
+                text: 'RT▼',
+                id: `rt-sell-${i}`,
               });
             }
           }
         }
 
         const allMarkers = crossoverMarkers.length > 0
-          ? [...pivotMarkers, ...divergenceMarkers, ...crossoverMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers, ...sxhMarkers]
-          : [...pivotMarkers, ...divergenceMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers, ...sxhMarkers];
+          ? [...pivotMarkers, ...divergenceMarkers, ...crossoverMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers, ...ritchiMarkers]
+          : [...pivotMarkers, ...divergenceMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers, ...ritchiMarkers];
 
         candleSeriesRef.current?.setMarkers(allMarkers.sort((a, b) => a.time - b.time));
       });
@@ -1998,7 +1998,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
               Kalman
             </button>
 
-            {/* Siêu Xu Hướng */}
+            {/* Ritchi Trend */}
             <button
               onClick={() => updateSieuXuHuongSettings({ enabled: !sieuXuHuongSettings?.enabled })}
               className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
@@ -2007,7 +2007,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
                   : 'bg-bg-primary border-frame text-primary-muted opacity-50'
               }`}
             >
-              SXH
+              Ritchi
             </button>
 
             <div className="w-px h-4 bg-frame self-center mx-0.5"></div>
