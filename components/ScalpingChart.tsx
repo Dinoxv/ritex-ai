@@ -20,6 +20,7 @@ import {
   calculateMACDMemoized,
   calculateStochasticMemoized,
   calculateKalmanTrend,
+  calculateSieuXuHuong,
   detectPivots,
   detectStochasticPivots,
   detectDivergence,
@@ -235,6 +236,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   const resistanceLineSeriesRef = useRef<any[]>([]);
   const kalmanTrendSeriesRef = useRef<any>(null);
   const kalmanVolBarSeriesRef = useRef<any>(null);
+  const sieuXuHuongSeriesRef = useRef<any>(null);
   const positionLineRef = useRef<any>(null);
   const breakevenBandSeriesRef = useRef<any>(null);
   const orderLinesRef = useRef<any[]>([]);
@@ -260,11 +262,13 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   const stochasticSettings = useSettingsStore((state) => state.settings.indicators.stochastic);
   const macdSettings = useSettingsStore((state) => state.settings.indicators.macd);
   const kalmanTrendSettings = useSettingsStore((state) => state.settings.indicators.kalmanTrend);
+  const sieuXuHuongSettings = useSettingsStore((state) => state.settings.indicators.sieuXuHuong);
   const chartSettings = useSettingsStore((state) => state.settings.chart);
   const updateEmaSettings = useSettingsStore((state) => state.updateEmaSettings);
   const updateStochasticSettings = useSettingsStore((state) => state.updateStochasticSettings);
   const updateMacdSettings = useSettingsStore((state) => state.updateMacdSettings);
   const updateKalmanTrendSettings = useSettingsStore((state) => state.updateKalmanTrendSettings);
+  const updateSieuXuHuongSettings = useSettingsStore((state) => state.updateSieuXuHuongSettings);
   const updateChartSettings = useSettingsStore((state) => state.updateChartSettings);
 
   const displayCandles = useMemo(
@@ -379,6 +383,15 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           priceLineVisible: false,
         });
         kalmanTrendSeriesRef.current = kalmanTrendSeries;
+
+        // Siêu Xu Hướng series
+        const sieuXuHuongSeries = chart.addLineSeries({
+          color: '#ff9800',
+          lineWidth: 2,
+          lastValueVisible: false,
+          priceLineVisible: false,
+        });
+        sieuXuHuongSeriesRef.current = sieuXuHuongSeries;
 
         // Stochastic series for variants
         const variantColors: Record<string, string> = {
@@ -596,6 +609,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         ema2SeriesRef.current = null;
         ema3SeriesRef.current = null;
         kalmanTrendSeriesRef.current = null;
+        sieuXuHuongSeriesRef.current = null;
 
         stochSeriesRefsRef.current = {};
       }
@@ -924,6 +938,20 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     );
   }, [displayCandles, kalmanTrendSettings?.enabled, kalmanTrendSettings?.processNoise, kalmanTrendSettings?.measurementNoise, kalmanTrendSettings?.bandMultiplier, kalmanTrendSettings?.volConfirm, kalmanTrendSettings?.volThreshold]);
 
+  const sieuXuHuong = useMemo(() => {
+    if (!sieuXuHuongSettings?.enabled || displayCandles.length < 20) return null;
+    return calculateSieuXuHuong(
+      displayCandles,
+      sieuXuHuongSettings.pivLen,
+      sieuXuHuongSettings.smaMin,
+      sieuXuHuongSettings.smaMax,
+      sieuXuHuongSettings.smaMult,
+      sieuXuHuongSettings.trendLen,
+      sieuXuHuongSettings.atrMult,
+      sieuXuHuongSettings.tpMult,
+    );
+  }, [displayCandles, sieuXuHuongSettings?.enabled, sieuXuHuongSettings?.pivLen, sieuXuHuongSettings?.smaMin, sieuXuHuongSettings?.smaMax, sieuXuHuongSettings?.smaMult, sieuXuHuongSettings?.trendLen, sieuXuHuongSettings?.atrMult, sieuXuHuongSettings?.tpMult]);
+
   const simpleStochastic = useMemo(() => {
     if (!simplifiedView) return null;
     return calculateStochasticMemoized(displayCandles, 14, 3, 3);
@@ -1136,6 +1164,33 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           kalmanTrendSeriesRef.current?.setData([]);
         }
 
+        // Siêu Xu Hướng data
+        if (sieuXuHuong && sieuXuHuongSettings?.enabled) {
+          // Color gradient: bullish young=#00ff88 → old=#006633, bearish young=#ff4444 → old=#662222
+          const trendData = sieuXuHuong.trendLine.map((value, i) => {
+            const age = sieuXuHuong.trendAge[i];
+            const isBull = sieuXuHuong.direction[i];
+            let r: number, g: number, b: number;
+            if (isBull) {
+              r = Math.round(0 + age * 0);
+              g = Math.round(255 - age * 153);
+              b = Math.round(136 - age * 85);
+            } else {
+              r = Math.round(255 - age * 153);
+              g = Math.round(68 - age * 34);
+              b = Math.round(68 - age * 34);
+            }
+            return {
+              time: (displayCandles[i].time / 1000) as any,
+              value,
+              color: `rgb(${r},${g},${b})`,
+            };
+          });
+          sieuXuHuongSeriesRef.current?.setData(trendData);
+        } else {
+          sieuXuHuongSeriesRef.current?.setData([]);
+        }
+
         // Build markers including Kalman signals
         const kalmanMarkers: any[] = [];
         if (kalmanTrend && kalmanTrendSettings?.enabled && kalmanTrendSettings?.showSignals) {
@@ -1163,9 +1218,36 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           }
         }
 
+        // Siêu Xu Hướng signal markers
+        const sxhMarkers: any[] = [];
+        if (sieuXuHuong && sieuXuHuongSettings?.enabled && sieuXuHuongSettings?.showSignals) {
+          for (let i = 0; i < displayCandles.length; i++) {
+            if (sieuXuHuong.buySignals[i]) {
+              sxhMarkers.push({
+                time: (displayCandles[i].time / 1000) as any,
+                position: 'belowBar',
+                color: '#00ff88',
+                shape: 'arrowUp',
+                text: 'SXH▲',
+                id: `sxh-buy-${i}`,
+              });
+            }
+            if (sieuXuHuong.sellSignals[i]) {
+              sxhMarkers.push({
+                time: (displayCandles[i].time / 1000) as any,
+                position: 'aboveBar',
+                color: '#ff4444',
+                shape: 'arrowDown',
+                text: 'SXH▼',
+                id: `sxh-sell-${i}`,
+              });
+            }
+          }
+        }
+
         const allMarkers = crossoverMarkers.length > 0
-          ? [...pivotMarkers, ...divergenceMarkers, ...crossoverMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers]
-          : [...pivotMarkers, ...divergenceMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers];
+          ? [...pivotMarkers, ...divergenceMarkers, ...crossoverMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers, ...sxhMarkers]
+          : [...pivotMarkers, ...divergenceMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers, ...sxhMarkers];
 
         candleSeriesRef.current?.setMarkers(allMarkers.sort((a, b) => a.time - b.time));
       });
@@ -1208,6 +1290,25 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         }
       }
 
+      if (sieuXuHuong && sieuXuHuongSettings?.enabled) {
+        const lastIdx = sieuXuHuong.trendLine.length - 1;
+        if (lastIdx >= 0) {
+          const age = sieuXuHuong.trendAge[lastIdx];
+          const isBull = sieuXuHuong.direction[lastIdx];
+          let r: number, g: number, b: number;
+          if (isBull) {
+            r = Math.round(0); g = Math.round(255 - age * 153); b = Math.round(136 - age * 85);
+          } else {
+            r = Math.round(255 - age * 153); g = Math.round(68 - age * 34); b = Math.round(68 - age * 34);
+          }
+          sieuXuHuongSeriesRef.current?.update({
+            time: (lastCandle.time / 1000) as any,
+            value: sieuXuHuong.trendLine[lastIdx],
+            color: `rgb(${r},${g},${b})`,
+          });
+        }
+      }
+
     }
 
     lastCandleTimeRef.current = lastCandle.time;
@@ -1217,7 +1318,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     if (onPriceUpdate) {
       onPriceUpdate(lastCandle.close);
     }
-  }, [displayCandles, chartReady, onPriceUpdate, ema1, ema2, ema3, macdResult, rsi, emaSettings.ema1.enabled, emaSettings.ema2.enabled, emaSettings.ema3.enabled, stochasticSettings.showMultiVariant, stochasticSettings.showDivergence, stochasticSettings.variants, interval, allMacdCandles, coin, isExternalData, chartSettings, kalmanTrend, kalmanTrendSettings]);
+  }, [displayCandles, chartReady, onPriceUpdate, ema1, ema2, ema3, macdResult, rsi, emaSettings.ema1.enabled, emaSettings.ema2.enabled, emaSettings.ema3.enabled, stochasticSettings.showMultiVariant, stochasticSettings.showDivergence, stochasticSettings.variants, interval, allMacdCandles, coin, isExternalData, chartSettings, kalmanTrend, kalmanTrendSettings, sieuXuHuong, sieuXuHuongSettings]);
 
 
   // MACD multi-timeframe data update
@@ -1895,6 +1996,18 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
               }`}
             >
               Kalman
+            </button>
+
+            {/* Siêu Xu Hướng */}
+            <button
+              onClick={() => updateSieuXuHuongSettings({ enabled: !sieuXuHuongSettings?.enabled })}
+              className={`px-1.5 py-0.5 text-[8px] font-mono rounded border transition-colors ${
+                sieuXuHuongSettings?.enabled
+                  ? 'bg-orange-500/20 border-orange-500 text-orange-400'
+                  : 'bg-bg-primary border-frame text-primary-muted opacity-50'
+              }`}
+            >
+              SXH
             </button>
 
             <div className="w-px h-4 bg-frame self-center mx-0.5"></div>

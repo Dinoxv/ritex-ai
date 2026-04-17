@@ -57,11 +57,24 @@ export interface KalmanTrendSettings {
   showSignals: boolean;
 }
 
+export interface SieuXuHuongSettings {
+  enabled: boolean;
+  pivLen: number;
+  smaMin: number;
+  smaMax: number;
+  smaMult: number;
+  trendLen: number;
+  atrMult: number;
+  tpMult: number;
+  showSignals: boolean;
+}
+
 export interface IndicatorSettings {
   stochastic: StochasticSettings;
   ema: EmaSettings;
   macd: MacdSettings;
   kalmanTrend: KalmanTrendSettings;
+  sieuXuHuong: SieuXuHuongSettings;
 }
 
 export interface StochasticScannerConfig {
@@ -282,6 +295,17 @@ export const DEFAULT_SETTINGS: AppSettings = {
       bandMultiplier: 2.0,
       volConfirm: true,
       volThreshold: 0.3,
+      showSignals: true,
+    },
+    sieuXuHuong: {
+      enabled: false,
+      pivLen: 5,
+      smaMin: 5,
+      smaMax: 50,
+      smaMult: 1.0,
+      trendLen: 100,
+      atrMult: 2.0,
+      tpMult: 3.0,
       showSignals: true,
     },
   },

@@ -2127,3 +2127,167 @@ export function calculateKalmanTrend(
 
   return { trendLine, direction, delta, volumeBar, buySignals, sellSignals, kalmanFilter };
 }
+
+
+// ===== Siêu Xu Hướng - Super Trend Trading System [Ritchi] =====
+
+export interface SieuXuHuongResult {
+  trendLine: number[];      // Dynamic SMA / pivot level used as trend line
+  direction: boolean[];     // true = bullish, false = bearish
+  trendAge: number[];       // 0..1 normalized age of current trend (for color gradient)
+  buySignals: boolean[];    // Long entry signals
+  sellSignals: boolean[];   // Short entry signals
+  stopLoss: number[];       // SL levels at signal bars
+  takeProfit: number[];     // TP levels at signal bars
+}
+
+export function calculateSieuXuHuong(
+  candles: FullCandleData[],
+  pivLen: number = 5,
+  smaMin: number = 5,
+  smaMax: number = 50,
+  smaMult: number = 1.0,
+  trendLen: number = 100,
+  atrMult: number = 2.0,
+  tpMult: number = 3.0,
+): SieuXuHuongResult {
+  const len = candles.length;
+  const trendLine: number[] = new Array(len).fill(0);
+  const direction: boolean[] = new Array(len).fill(false);
+  const trendAge: number[] = new Array(len).fill(0);
+  const buySignals: boolean[] = new Array(len).fill(false);
+  const sellSignals: boolean[] = new Array(len).fill(false);
+  const stopLoss: number[] = new Array(len).fill(0);
+  const takeProfit: number[] = new Array(len).fill(0);
+
+  if (len < pivLen * 2 + 1) {
+    return { trendLine, direction, trendAge, buySignals, sellSignals, stopLoss, takeProfit };
+  }
+
+  // Calculate ATR(50)
+  const atrPeriod = 50;
+  const tr: number[] = new Array(len).fill(0);
+  tr[0] = candles[0].high - candles[0].low;
+  for (let i = 1; i < len; i++) {
+    tr[i] = Math.max(
+      candles[i].high - candles[i].low,
+      Math.abs(candles[i].high - candles[i - 1].close),
+      Math.abs(candles[i].low - candles[i - 1].close),
+    );
+  }
+  const atr50: number[] = new Array(len).fill(0);
+  {
+    let sum = 0;
+    const effPeriod = Math.min(atrPeriod, len);
+    for (let i = 0; i < effPeriod; i++) sum += tr[i];
+    atr50[effPeriod - 1] = sum / effPeriod;
+    for (let i = effPeriod; i < len; i++) {
+      atr50[i] = (atr50[i - 1] * (atrPeriod - 1) + tr[i]) / atrPeriod;
+    }
+    for (let i = 0; i < effPeriod - 1; i++) {
+      atr50[i] = atr50[effPeriod - 1];
+    }
+  }
+
+  // Detect pivot lows: bar[i - pivLen] is a pivot low if it's the lowest low in [i - 2*pivLen .. i]
+  const pivotLow: number[] = new Array(len).fill(NaN);
+  for (let i = pivLen * 2; i < len; i++) {
+    const pivotIdx = i - pivLen;
+    let isLowest = true;
+    const pivotVal = candles[pivotIdx].low;
+    for (let j = i - pivLen * 2; j <= i; j++) {
+      if (j !== pivotIdx && candles[j].low < pivotVal) {
+        isLowest = false;
+        break;
+      }
+    }
+    if (isLowest) {
+      pivotLow[i] = pivotVal; // confirmed at bar i (pivLen bars after the actual low)
+    }
+  }
+
+  // Track the most recent pivot low value
+  let lastPivot = candles[0].low;
+  const pivotLevel: number[] = new Array(len).fill(0);
+  for (let i = 0; i < len; i++) {
+    if (!isNaN(pivotLow[i])) {
+      lastPivot = pivotLow[i];
+    }
+    pivotLevel[i] = lastPivot;
+  }
+
+  // Dynamic SMA resistance band: sma(high, smaLen) + atr50 * smaMult
+  // smaLen starts at smaMin during uptrend, increments toward smaMax during downtrend
+  let dir = false; // start bearish
+  let smaLen = smaMin;
+  let trendStart = 0;
+
+  for (let i = 0; i < len; i++) {
+    // Calculate SMA of highs with current smaLen
+    const lookback = Math.min(smaLen, i + 1);
+    let smaHigh = 0;
+    for (let j = i - lookback + 1; j <= i; j++) {
+      smaHigh += candles[j].high;
+    }
+    smaHigh /= lookback;
+    const smaResistance = smaHigh + atr50[i] * smaMult;
+
+    // Trend direction logic (PineScript crossover/crossunder)
+    const prevDir = dir;
+
+    if (i > 0) {
+      // Crossunder close below pivot → bearish
+      if (candles[i].close < pivotLevel[i] && candles[i - 1].close >= pivotLevel[i - 1]) {
+        dir = false;
+        smaLen = smaMin;
+        trendStart = i;
+      }
+      // Crossover close above SMA resistance → bullish
+      else if (candles[i].close > smaResistance && candles[i - 1].close <= ((() => {
+        // Calculate previous bar's SMA resistance for crossover comparison
+        const prevLookback = Math.min(smaLen, i);
+        let prevSmaHigh = 0;
+        for (let j = i - prevLookback; j < i; j++) {
+          prevSmaHigh += candles[j].high;
+        }
+        prevSmaHigh /= prevLookback;
+        return prevSmaHigh + atr50[i - 1] * smaMult;
+      })())) {
+        dir = true;
+        smaLen = smaMin;
+        trendStart = i;
+      }
+    }
+
+    // During downtrend, increment SMA length toward smaMax
+    if (!dir && smaLen < smaMax) {
+      smaLen = Math.min(smaLen + 1, smaMax);
+    }
+
+    direction[i] = dir;
+
+    // Trend line: bullish = pivot level (support), bearish = SMA resistance
+    trendLine[i] = dir ? pivotLevel[i] : smaResistance;
+
+    // Trend age (0 = young, 1 = old) for color gradient
+    const age = Math.min((i - trendStart) / trendLen, 1.0);
+    trendAge[i] = age;
+
+    // Signals: direction change
+    if (i > 0) {
+      if (dir && !prevDir) {
+        // Long signal
+        buySignals[i] = true;
+        stopLoss[i] = candles[i].close - atr50[i] * atrMult;
+        takeProfit[i] = candles[i].close + atr50[i] * tpMult;
+      } else if (!dir && prevDir) {
+        // Short signal
+        sellSignals[i] = true;
+        stopLoss[i] = candles[i].close + atr50[i] * atrMult;
+        takeProfit[i] = candles[i].close - atr50[i] * tpMult;
+      }
+    }
+  }
+
+  return { trendLine, direction, trendAge, buySignals, sellSignals, stopLoss, takeProfit };
+}

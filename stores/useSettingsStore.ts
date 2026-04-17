@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, KalmanTrendSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings, AIStrategyConfig } from '@/models/Settings';
+import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, KalmanTrendSettings, SieuXuHuongSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings, AIStrategyConfig } from '@/models/Settings';
 
 type TabType = 'scanner' | 'indicators' | 'orders' | 'ui' | 'credentials' | 'ai';
 type MobileTabType = 'scanner' | 'symbols' | 'chart' | 'actions' | 'orders-positions';
@@ -21,6 +21,7 @@ interface SettingsStore {
   updateEmaSettings: (settings: Partial<EmaSettings>) => void;
   updateMacdSettings: (settings: Partial<MacdSettings>) => void;
   updateKalmanTrendSettings: (settings: Partial<KalmanTrendSettings>) => void;
+  updateSieuXuHuongSettings: (settings: Partial<SieuXuHuongSettings>) => void;
   updateScannerSettings: (settings: Partial<ScannerSettings>) => void;
   updateOrderSettings: (settings: Partial<OrderSettings>) => void;
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
@@ -152,6 +153,17 @@ const mergeSettings = (storedSettings: any): AppSettings => {
           volConfirm: storedSettings.indicators?.kalmanTrend?.volConfirm ?? DEFAULT_SETTINGS.indicators.kalmanTrend.volConfirm,
           volThreshold: storedSettings.indicators?.kalmanTrend?.volThreshold ?? DEFAULT_SETTINGS.indicators.kalmanTrend.volThreshold,
           showSignals: storedSettings.indicators?.kalmanTrend?.showSignals ?? DEFAULT_SETTINGS.indicators.kalmanTrend.showSignals,
+        },
+        sieuXuHuong: {
+          enabled: storedSettings.indicators?.sieuXuHuong?.enabled ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.enabled,
+          pivLen: storedSettings.indicators?.sieuXuHuong?.pivLen ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.pivLen,
+          smaMin: storedSettings.indicators?.sieuXuHuong?.smaMin ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.smaMin,
+          smaMax: storedSettings.indicators?.sieuXuHuong?.smaMax ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.smaMax,
+          smaMult: storedSettings.indicators?.sieuXuHuong?.smaMult ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.smaMult,
+          trendLen: storedSettings.indicators?.sieuXuHuong?.trendLen ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.trendLen,
+          atrMult: storedSettings.indicators?.sieuXuHuong?.atrMult ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.atrMult,
+          tpMult: storedSettings.indicators?.sieuXuHuong?.tpMult ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.tpMult,
+          showSignals: storedSettings.indicators?.sieuXuHuong?.showSignals ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.showSignals,
         },
       },
       scanner: {
@@ -334,6 +346,19 @@ export const useSettingsStore = create<SettingsStore>()(
               ...state.settings.indicators,
               kalmanTrend: {
                 ...state.settings.indicators.kalmanTrend,
+                ...updates,
+              },
+            },
+          },
+        })),
+      updateSieuXuHuongSettings: (updates) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            indicators: {
+              ...state.settings.indicators,
+              sieuXuHuong: {
+                ...state.settings.indicators.sieuXuHuong,
                 ...updates,
               },
             },
