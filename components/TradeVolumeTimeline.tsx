@@ -3,6 +3,7 @@
 import { useEffect, useRef, memo } from 'react';
 import type { Trade } from '@/types';
 import { getThemeColors } from '@/lib/theme-utils';
+import { formatChartTimeInVietnam } from '@/lib/time-utils';
 
 interface TradeVolumeTimelineProps {
   coin: string;
@@ -82,6 +83,10 @@ function TradeVolumeTimeline({ coin, trades }: TradeVolumeTimelineProps) {
         const chart = createChart(chartContainerRef.current, {
           width: chartContainerRef.current.clientWidth,
           height: chartContainerRef.current.clientHeight,
+          localization: {
+            locale: 'en-GB',
+            timeFormatter: (time: unknown) => formatChartTimeInVietnam(time, { includeDate: true, includeSeconds: true }),
+          },
           layout: {
             background: { color: colors.backgroundPrimary },
             textColor: colors.primaryMuted,
@@ -93,6 +98,7 @@ function TradeVolumeTimeline({ coin, trades }: TradeVolumeTimelineProps) {
           timeScale: {
             timeVisible: true,
             secondsVisible: true,
+            tickMarkFormatter: (time: unknown) => formatChartTimeInVietnam(time, { includeSeconds: true }),
           },
           rightPriceScale: {
             scaleMargins: {

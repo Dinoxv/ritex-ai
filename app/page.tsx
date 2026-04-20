@@ -378,6 +378,25 @@ export default function LandingPage() {
                 <a href="https://ritexai.com" target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 text-gray-400 hover:text-primary transition-colors font-mono text-xs md:text-sm">
                   <span>RITEX AI</span>
                 </a>
+
+                <div className="mt-4 flex items-center justify-center gap-2 text-gray-400 font-mono text-xs md:text-sm">
+                  <img
+                    src="/Ritchi-icon.png"
+                    alt="Ritchi logo"
+                    className="h-4 w-4 rounded-full"
+                  />
+                  <span>
+                    Bản quyền thuộc về{' '}
+                    <a
+                      href="https://ritchi.guru"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="text-primary underline hover:text-primary-bright transition-colors"
+                    >
+                      Ritchi.guru
+                    </a>
+                  </span>
+                </div>
               </div>
             </div>
           </footer>
@@ -385,6 +404,29 @@ export default function LandingPage() {
       </div>
 
       {/* Beta warning bar */}
+      <div className="fixed right-3 md:right-4 bottom-12 md:bottom-16 z-50">
+        <div className="backdrop-blur-xl bg-white/10 border border-white/20 rounded-full px-3 py-1.5 shadow-lg">
+          <div className="flex items-center gap-2 text-[10px] md:text-xs text-gray-200 font-mono">
+            <img
+              src="/Ritchi-icon.png"
+              alt="Ritchi logo"
+              className="h-4 w-4 rounded-full"
+            />
+            <span>
+              Bản quyền thuộc về{' '}
+              <a
+                href="https://ritchi.guru"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary underline hover:text-primary-bright transition-colors"
+              >
+                Ritchi.guru
+              </a>
+            </span>
+          </div>
+        </div>
+      </div>
+
       <div className="fixed bottom-0 left-0 right-0 z-40 backdrop-blur-xl bg-yellow-900/30 border-t-2 border-yellow-500/50">
         <div className="max-w-7xl mx-auto px-3 md:px-4 py-2 md:py-3">
           <div className="flex items-center justify-center gap-2 md:gap-3 text-center">

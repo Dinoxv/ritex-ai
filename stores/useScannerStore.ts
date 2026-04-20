@@ -8,6 +8,7 @@ import { playNotificationSound } from '@/lib/sound-utils';
 import { useAIStrategyStore } from './useAIStrategyStore';
 import type { IndicatorSnapshot } from '@/lib/ai/types';
 import { useRealtimeVolumeStore } from './useRealtimeVolumeStore';
+import { formatVietnamTimestamp } from '@/lib/time-utils';
 
 interface ScannerStore {
   results: ScanResult[];
@@ -383,7 +384,7 @@ async function sendScannerTelegramAlerts(
     const strategy = getStrategyName(r);
 
     const now = new Date();
-    const timestamp = now.toISOString().replace('T', ' ').substring(0, 19) + ' UTC';
+    const timestamp = formatVietnamTimestamp(now);
 
     const lines = [
       `${emoji} ${arrow} <b>${action} — ${r.symbol}USDT</b>`,

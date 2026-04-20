@@ -9,6 +9,7 @@ import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useSymbolMetaStore } from '@/stores/useSymbolMetaStore';
 import { useChartSyncStore } from '@/stores/useChartSyncStore';
 import { getThemeColors } from '@/lib/theme-utils';
+import { formatChartTimeInVietnam } from '@/lib/time-utils';
 import { useDebouncedCallback, useThrottledCallback } from '@/lib/performance-utils';
 import ChartLegend from '@/components/ChartLegend';
 import {
@@ -302,6 +303,10 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         const chart = createChart(chartContainerRef.current, {
           width: chartContainerRef.current.clientWidth,
           height: chartContainerRef.current.clientHeight || 600,
+          localization: {
+            locale: 'en-GB',
+            timeFormatter: (time: unknown) => formatChartTimeInVietnam(time, { includeDate: true }),
+          },
           layout: {
             background: { color: colors.backgroundPrimary },
             textColor: colors.primaryMuted,
@@ -313,6 +318,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           timeScale: {
             timeVisible: true,
             secondsVisible: false,
+            tickMarkFormatter: (time: unknown) => formatChartTimeInVietnam(time),
             rightOffset: 12,
             barSpacing: 6,
             fixLeftEdge: false,

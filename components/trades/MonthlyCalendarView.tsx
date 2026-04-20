@@ -8,6 +8,7 @@ import MiniPnlChart from '@/components/trades/MiniPnlChart';
 import MonthlyCumulativePnlChart from '@/components/trades/MonthlyCumulativePnlChart';
 import MonthlyStatistics from '@/components/trades/MonthlyStatistics';
 import SymbolPnlDonut from '@/components/trades/SymbolPnlDonut';
+import { formatDateKeyInTimeZone } from '@/lib/time-utils';
 
 interface MonthlyCalendarViewProps {
   onDayClick: (date: Date) => void;
@@ -74,7 +75,7 @@ function MonthlyCalendarView({ onDayClick }: MonthlyCalendarViewProps) {
 
     for (let day = 1; day <= daysInMonth; day++) {
       const date = new Date(year, month, day);
-      const dateKey = date.toISOString().split('T')[0];
+      const dateKey = formatDateKeyInTimeZone(date);
       const summary = summaryMap.get(dateKey) || null;
       days.push({ date, summary });
     }

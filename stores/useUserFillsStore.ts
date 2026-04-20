@@ -2,6 +2,7 @@ import { create } from 'zustand';
 import type { UserFill } from '@/types';
 import type { ExchangeTradingService } from '@/lib/services/types';
 import { groupFillsByPosition } from '@/lib/trade-grouping-utils';
+import { formatDateKeyInTimeZone } from '@/lib/time-utils';
 
 export interface DailyPnlSummary {
   date: string;
@@ -91,7 +92,7 @@ const calculateDailySummaries = (fills: UserFill[]): DailyPnlSummary[] => {
 
   fills.forEach(fill => {
     const fillDate = new Date(fill.time);
-    const dateKey = fillDate.toISOString().split('T')[0];
+    const dateKey = formatDateKeyInTimeZone(fillDate);
 
     if (!fillsByDate.has(dateKey)) {
       fillsByDate.set(dateKey, []);
