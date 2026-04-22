@@ -85,8 +85,18 @@ export interface KalmanTrendValue {
   delta: number;
 }
 
+export interface RitchiTrendValue {
+  direction: 'bullish' | 'bearish';
+  timeframe: TimeInterval;
+  buySignal: boolean;
+  sellSignal: boolean;
+  price: number;
+  stopLoss: number;
+  takeProfit: number;
+}
+
 export type SignalType = 'bullish' | 'bearish';
-export type ScanType = 'stochastic' | 'emaAlignment' | 'channel' | 'divergence' | 'macdReversal' | 'rsiReversal' | 'volumeSpike' | 'supportResistance' | 'kalmanTrend';
+export type ScanType = 'stochastic' | 'emaAlignment' | 'channel' | 'divergence' | 'macdReversal' | 'rsiReversal' | 'volumeSpike' | 'supportResistance' | 'kalmanTrend' | 'ritchiTrend';
 
 export interface ScanResult {
   symbol: string;
@@ -99,6 +109,7 @@ export interface ScanResult {
   volumeSpikes?: VolumeValue[];
   supportResistanceLevels?: SupportResistanceValue[];
   kalmanTrends?: KalmanTrendValue[];
+  ritchiTrends?: RitchiTrendValue[];
   matchedAt: number;
   signalType: SignalType;
   description: string;
@@ -112,4 +123,10 @@ export interface ScannerStatus {
   isScanning: boolean;
   lastScanTime: number | null;
   error: string | null;
+  progress?: {
+    stage: 'preparing' | 'fetching-candles' | 'scanning' | 'finalizing';
+    completed: number;
+    total: number;
+    message?: string;
+  };
 }

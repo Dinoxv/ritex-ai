@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ScanResult, ScannerStatus } from '@/models/Scanner';
+import type { ScanResult, ScannerStatus, ScanType } from '@/models/Scanner';
 import { ScannerService } from '@/lib/services/scanner.service';
 import type { ExchangeTradingService } from '@/lib/services/types';
 import { useSettingsStore } from './useSettingsStore';
@@ -10,9 +10,92 @@ import type { IndicatorSnapshot } from '@/lib/ai/types';
 import { useRealtimeVolumeStore } from './useRealtimeVolumeStore';
 import { formatVietnamTimestamp } from '@/lib/time-utils';
 
+const scannerLogger = {
+  info: (message: string, ...args: unknown[]) => console.log('[ScannerStore][INFO]', message, ...args),
+  warn: (message: string, ...args: unknown[]) => console.warn('[ScannerStore][WARN]', message, ...args),
+  error: (message: string, ...args: unknown[]) => console.error('[ScannerStore][ERROR]', message, ...args),
+};
+
+type ScannerTypeMetrics = {
+  runs: number;
+  totalDurationMs: number;
+  averageDurationMs: number;
+  totalSignals: number;
+  lastDurationMs: number;
+};
+
+type ScannerMetrics = {
+  totalRuns: number;
+  failedRuns: number;
+  totalDurationMs: number;
+  averageDurationMs: number;
+  lastDurationMs: number | null;
+  lastRunAt: number | null;
+  byType: Partial<Record<ScanType, ScannerTypeMetrics>>;
+};
+
+const createDefaultScannerMetrics = (): ScannerMetrics => ({
+  totalRuns: 0,
+  failedRuns: 0,
+  totalDurationMs: 0,
+  averageDurationMs: 0,
+  lastDurationMs: null,
+  lastRunAt: null,
+  byType: {},
+});
+
+const updateScannerMetrics = (
+  current: ScannerMetrics,
+  runDurationMs: number,
+  failed: boolean,
+  byTypeDurations: Partial<Record<ScanType, number>>,
+  byTypeSignals: Partial<Record<ScanType, number>>
+): ScannerMetrics => {
+  const totalRuns = current.totalRuns + 1;
+  const failedRuns = current.failedRuns + (failed ? 1 : 0);
+  const totalDurationMs = current.totalDurationMs + runDurationMs;
+
+  const nextByType: Partial<Record<ScanType, ScannerTypeMetrics>> = { ...current.byType };
+  const scanTypes = Object.keys(byTypeDurations) as ScanType[];
+
+  for (const scanType of scanTypes) {
+    const duration = byTypeDurations[scanType] ?? 0;
+    const signals = byTypeSignals[scanType] ?? 0;
+    const prev = nextByType[scanType] ?? {
+      runs: 0,
+      totalDurationMs: 0,
+      averageDurationMs: 0,
+      totalSignals: 0,
+      lastDurationMs: 0,
+    };
+
+    const runs = prev.runs + 1;
+    const typeTotalDuration = prev.totalDurationMs + duration;
+
+    nextByType[scanType] = {
+      runs,
+      totalDurationMs: typeTotalDuration,
+      averageDurationMs: typeTotalDuration / runs,
+      totalSignals: prev.totalSignals + signals,
+      lastDurationMs: duration,
+    };
+  }
+
+  return {
+    totalRuns,
+    failedRuns,
+    totalDurationMs,
+    averageDurationMs: totalDurationMs / totalRuns,
+    lastDurationMs: runDurationMs,
+    lastRunAt: Date.now(),
+    byType: nextByType,
+  };
+};
+
 interface ScannerStore {
   results: ScanResult[];
   status: ScannerStatus;
+  scannerMetrics: ScannerMetrics;
   intervalId: NodeJS.Timeout | null;
   previousSymbols: Set<string>;
   service: ExchangeTradingService | null;
@@ -33,6 +116,7 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
     lastScanTime: null,
     error: null,
   },
+  scannerMetrics: createDefaultScannerMetrics(),
   intervalId: null,
   previousSymbols: new Set(),
   service: null,
@@ -48,9 +132,12 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
   runScan: async () => {
     const { status, scannerService } = get();
     if (status.isScanning) return;
+    const runStartedAt = Date.now();
+    const scanTypeDurations: Partial<Record<ScanType, number>> = {};
+    const scanTypeSignals: Partial<Record<ScanType, number>> = {};
 
     if (!scannerService) {
-      console.warn('Scanner service not initialized');
+      scannerLogger.warn('Scanner service not initialized');
       return;
     }
 
@@ -59,6 +146,12 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
         ...status,
         isScanning: true,
         error: null,
+        progress: {
+          stage: 'preparing',
+          completed: 0,
+          total: 1,
+          message: 'Preparing scanner run',
+        },
       },
     });
 
@@ -78,85 +171,199 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
             isScanning: false,
             lastScanTime: Date.now(),
             error: 'No symbols available to scan',
+            progress: undefined,
           },
         });
         return;
       }
 
+      // ✨ NEW: Ensure candles are available for all symbols before scanning
+      scannerLogger.info(`Ensuring candles for ${symbols.length} symbols...`);
+      await scannerService.ensureCandlesForSymbols(symbols, settings, (progress) => {
+        set({
+          status: {
+            ...get().status,
+            progress: {
+              stage: 'fetching-candles',
+              completed: progress.completed,
+              total: progress.total,
+              message: progress.message,
+            },
+          },
+        });
+      });
+      scannerLogger.info('Candles ready, starting scan...');
+
       const newResults: ScanResult[] = [];
       const { hasTrigger } = useRealtimeVolumeStore.getState();
+      const enabledScannerCount = [
+        settings.stochasticScanner.enabled,
+        settings.volumeSpikeScanner.enabled,
+        settings.emaAlignmentScanner.enabled,
+        settings.macdReversalScanner.enabled,
+        settings.rsiReversalScanner.enabled,
+        settings.channelScanner.enabled,
+        settings.divergenceScanner.enabled,
+        !!settings.supportResistanceScanner?.enabled,
+        !!settings.kalmanTrendScanner?.enabled,
+        !!settings.ritchiTrendScanner?.enabled,
+      ].filter(Boolean).length;
+      const totalScannerSteps = Math.max(enabledScannerCount, 1);
+      let completedScannerSteps = 0;
+
+      const markScannerProgress = (scannerLabel: string) => {
+        set({
+          status: {
+            ...get().status,
+            progress: {
+              stage: 'scanning',
+              completed: completedScannerSteps,
+              total: totalScannerSteps,
+              message: `Running ${scannerLabel} scanner`,
+            },
+          },
+        });
+      };
 
       if (settings.stochasticScanner.enabled) {
+        markScannerProgress('Stochastic');
+        const stepStartedAt = Date.now();
         const stochResults = await scannerService.scanMultipleSymbols(symbols, {
           timeframes: settings.stochasticScanner.timeframes,
           config: settings.stochasticScanner,
           variants: indicatorSettings.stochastic.variants,
         });
         newResults.push(...stochResults);
+        scanTypeDurations.stochastic = Date.now() - stepStartedAt;
+        scanTypeSignals.stochastic = stochResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('Stochastic');
       }
 
       if (settings.volumeSpikeScanner.enabled) {
+        markScannerProgress('Volume Spike');
+        const stepStartedAt = Date.now();
         const volumeResults = await scannerService.scanMultipleSymbolsForVolume(symbols, {
           timeframes: settings.volumeSpikeScanner.timeframes,
           config: settings.volumeSpikeScanner,
         });
         newResults.push(...volumeResults);
+        scanTypeDurations.volumeSpike = Date.now() - stepStartedAt;
+        scanTypeSignals.volumeSpike = volumeResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('Volume Spike');
       }
 
       if (settings.emaAlignmentScanner.enabled) {
+        markScannerProgress('EMA Alignment');
+        const stepStartedAt = Date.now();
         const emaResults = await scannerService.scanMultipleSymbolsForEmaAlignment(symbols, {
           timeframes: settings.emaAlignmentScanner.timeframes,
           config: settings.emaAlignmentScanner,
         });
         newResults.push(...emaResults);
+        scanTypeDurations.emaAlignment = Date.now() - stepStartedAt;
+        scanTypeSignals.emaAlignment = emaResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('EMA Alignment');
       }
 
       if (settings.macdReversalScanner.enabled) {
+        markScannerProgress('MACD Reversal');
+        const stepStartedAt = Date.now();
         const macdResults = await scannerService.scanMultipleSymbolsForMacdReversal(symbols, {
           timeframes: settings.macdReversalScanner.timeframes,
           config: settings.macdReversalScanner,
         });
         newResults.push(...macdResults);
+        scanTypeDurations.macdReversal = Date.now() - stepStartedAt;
+        scanTypeSignals.macdReversal = macdResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('MACD Reversal');
       }
 
       if (settings.rsiReversalScanner.enabled) {
+        markScannerProgress('RSI Reversal');
+        const stepStartedAt = Date.now();
         const rsiResults = await scannerService.scanMultipleSymbolsForRsiReversal(symbols, {
           timeframes: settings.rsiReversalScanner.timeframes,
           config: settings.rsiReversalScanner,
         });
         newResults.push(...rsiResults);
+        scanTypeDurations.rsiReversal = Date.now() - stepStartedAt;
+        scanTypeSignals.rsiReversal = rsiResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('RSI Reversal');
       }
 
       if (settings.channelScanner.enabled) {
+        markScannerProgress('Channel');
+        const stepStartedAt = Date.now();
         const channelResults = await scannerService.scanMultipleSymbolsForChannel(symbols, {
           timeframes: settings.channelScanner.timeframes,
           config: settings.channelScanner,
         });
         newResults.push(...channelResults);
+        scanTypeDurations.channel = Date.now() - stepStartedAt;
+        scanTypeSignals.channel = channelResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('Channel');
       }
 
       if (settings.divergenceScanner.enabled) {
+        markScannerProgress('Divergence');
+        const stepStartedAt = Date.now();
         const divergenceResults = await scannerService.scanMultipleSymbolsForDivergence(symbols, {
           timeframes: settings.divergenceScanner.timeframes,
           config: settings.divergenceScanner,
         });
         newResults.push(...divergenceResults);
+        scanTypeDurations.divergence = Date.now() - stepStartedAt;
+        scanTypeSignals.divergence = divergenceResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('Divergence');
       }
 
       if (settings.supportResistanceScanner?.enabled) {
+        markScannerProgress('Support/Resistance');
+        const stepStartedAt = Date.now();
         const supportResistanceResults = await scannerService.scanMultipleSymbolsForSupportResistance(symbols, {
           timeframes: settings.supportResistanceScanner.timeframes,
           config: settings.supportResistanceScanner,
         });
         newResults.push(...supportResistanceResults);
+        scanTypeDurations.supportResistance = Date.now() - stepStartedAt;
+        scanTypeSignals.supportResistance = supportResistanceResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('Support/Resistance');
       }
 
       if (settings.kalmanTrendScanner?.enabled) {
+        markScannerProgress('Kalman Trend');
+        const stepStartedAt = Date.now();
         const kalmanResults = await scannerService.scanMultipleSymbolsForKalmanTrend(symbols, {
           timeframes: settings.kalmanTrendScanner.timeframes,
           config: settings.kalmanTrendScanner,
         });
         newResults.push(...kalmanResults);
+        scanTypeDurations.kalmanTrend = Date.now() - stepStartedAt;
+        scanTypeSignals.kalmanTrend = kalmanResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('Kalman Trend');
+      }
+
+      if (settings.ritchiTrendScanner?.enabled) {
+        markScannerProgress('Ritchi Trend');
+        const stepStartedAt = Date.now();
+        const ritchiResults = await scannerService.scanMultipleSymbolsForRitchiTrend(symbols, {
+          timeframes: settings.ritchiTrendScanner.timeframes,
+          config: settings.ritchiTrendScanner,
+        });
+        newResults.push(...ritchiResults);
+        scanTypeDurations.ritchiTrend = Date.now() - stepStartedAt;
+        scanTypeSignals.ritchiTrend = ritchiResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('Ritchi Trend');
       }
 
       // Augment results with realtime volume trigger signal
@@ -170,14 +377,14 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
 
       if (newResults.length > 0 && settings.playSound) {
         const firstResult = newResults[0];
-        console.log(`[Scanner] Scan completed with ${newResults.length} result(s): ${newResults.map(r => r.symbol).join(', ')} - Playing sound`);
+        scannerLogger.info(`Scan completed with ${newResults.length} result(s): ${newResults.map(r => r.symbol).join(', ')} - Playing sound`);
         playNotificationSound(firstResult.signalType).catch(err =>
-          console.error('Error playing sound:', err)
+          scannerLogger.error('Error playing sound:', err)
         );
       } else if (settings.playSound) {
-        console.log('[Scanner] Scan completed with no results - skipping sound');
+        scannerLogger.info('Scan completed with no results - skipping sound');
       } else {
-        console.log('[Scanner] Sound disabled in settings');
+        scannerLogger.info('Sound disabled in settings');
       }
 
       // Scanner Telegram Alerts
@@ -193,21 +400,42 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
 
         if (filteredResults.length > 0) {
           sendScannerTelegramAlerts(filteredResults, settings.telegramBotToken, settings.telegramChatId, settings.telegramShowTpSl).catch(err =>
-            console.error('[Scanner Telegram] Error sending alerts:', err)
+            scannerLogger.error('[Scanner Telegram] Error sending alerts:', err)
           );
         }
       }
 
       set({
+        status: {
+          ...get().status,
+          progress: {
+            stage: 'finalizing',
+            completed: 1,
+            total: 1,
+            message: 'Finalizing scanner results',
+          },
+        },
+      });
+
+      const runDurationMs = Date.now() - runStartedAt;
+      set((state) => ({
         results: newResults,
         previousSymbols: newSymbols,
         status: {
-          ...get().status,
+          ...state.status,
           isScanning: false,
           lastScanTime: Date.now(),
           error: null,
+          progress: undefined,
         },
-      });
+        scannerMetrics: updateScannerMetrics(
+          state.scannerMetrics,
+          runDurationMs,
+          false,
+          scanTypeDurations,
+          scanTypeSignals
+        ),
+      }));
 
       // AI Strategy: analyze first signal if AI is enabled
       const aiSettings = useSettingsStore.getState().settings.ai;
@@ -227,14 +455,23 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
         useAIStrategyStore.getState().analyzeSignal(snapshot);
       }
     } catch (error) {
-      console.error('Scanner error:', error);
-      set({
+      scannerLogger.error('Scanner error:', error);
+      const runDurationMs = Date.now() - runStartedAt;
+      set((state) => ({
         status: {
-          ...get().status,
+          ...state.status,
           isScanning: false,
           error: error instanceof Error ? error.message : 'Unknown error',
+          progress: undefined,
         },
-      });
+        scannerMetrics: updateScannerMetrics(
+          state.scannerMetrics,
+          runDurationMs,
+          true,
+          scanTypeDurations,
+          scanTypeSignals
+        ),
+      }));
     }
   },
 
@@ -313,6 +550,7 @@ const SCAN_TYPE_LABELS: Record<string, string> = {
   volumeSpike: 'Volume Spike',
   supportResistance: 'S/R Level',
   kalmanTrend: 'Kalman Trend',
+  ritchiTrend: 'Ritchi Trend',
 };
 
 function formatPrice(price: number): string {
@@ -323,6 +561,7 @@ function formatPrice(price: number): string {
 
 function getTimeframe(result: ScanResult): string {
   if (result.kalmanTrends?.[0]) return result.kalmanTrends[0].timeframe.toUpperCase();
+  if (result.ritchiTrends?.[0]) return result.ritchiTrends[0].timeframe.toUpperCase();
   if (result.stochastics?.[0]) return result.stochastics[0].timeframe.toUpperCase();
   if (result.emaAlignments?.[0]) return result.emaAlignments[0].timeframe.toUpperCase();
   if (result.macdReversals?.[0]) return result.macdReversals[0].timeframe.toUpperCase();
@@ -337,6 +576,7 @@ function getEntryPrice(result: ScanResult): number {
   if (result.closePrices && result.closePrices.length > 0) {
     return result.closePrices[result.closePrices.length - 1];
   }
+  if (result.ritchiTrends?.[0]) return result.ritchiTrends[0].price;
   if (result.macdReversals?.[0]) return result.macdReversals[0].price;
   if (result.rsiReversals?.[0]) return result.rsiReversals[0].price;
   if (result.supportResistanceLevels?.[0]) return result.supportResistanceLevels[0].currentPrice;
@@ -363,6 +603,7 @@ function getVolumeDelta(result: ScanResult): string {
 
 function getStrategyName(result: ScanResult): string {
   if (result.scanType === 'kalmanTrend') return 'Volume Trend Strategy [RitchiVietnam]';
+  if (result.scanType === 'ritchiTrend') return 'Siêu Xu Hướng [Ritchi]';
   return SCAN_TYPE_LABELS[result.scanType] || result.scanType;
 }
 

@@ -10,7 +10,8 @@ import type {
   ChannelValue,
   DivergenceValue,
   SupportResistanceValue,
-  KalmanTrendValue
+  KalmanTrendValue,
+  RitchiTrendValue
 } from '@/models/Scanner';
 import type {
   StochasticScannerConfig,
@@ -22,7 +23,9 @@ import type {
   ChannelScannerConfig,
   DivergenceScannerConfig,
   SupportResistanceScannerConfig,
-  KalmanTrendScannerConfig
+  KalmanTrendScannerConfig,
+  RitchiTrendScannerConfig,
+  ScannerSettings
 } from '@/models/Settings';
 import type { TransformedCandle } from './types';
 import {
@@ -38,11 +41,13 @@ import {
   calculateTrendlines,
   calculateATR,
   calculateKalmanTrend,
+  calculateSieuXuHuong,
   type DivergenceOptions
 } from '@/lib/indicators';
 import { aggregate1mTo5m } from '@/lib/candle-aggregator';
 import { downsampleCandles } from '@/lib/candle-utils';
 import { useCandleStore } from '@/stores/useCandleStore';
+import { useDexStore } from '@/stores/useDexStore';
 
 export interface StochasticScanParams {
   symbol: string;
@@ -99,8 +104,271 @@ export interface KalmanTrendScanParams {
   config: KalmanTrendScannerConfig;
 }
 
+export interface RitchiTrendScanParams {
+  symbol: string;
+  timeframes: TimeInterval[];
+  config: RitchiTrendScannerConfig;
+}
+
+interface CandleFetchProgress {
+  stage: 'fetching-candles';
+  completed: number;
+  total: number;
+  message?: string;
+}
+
 export class ScannerService {
+  private candleFetchInFlight = new Map<string, Promise<void>>();
+  private readonly scanConcurrencyLimit = 8;
+
   constructor(private hyperliquidService: ExchangeTradingService) {}
+
+  private logInfo(message: string, ...args: unknown[]) {
+    console.log('[ScannerService][INFO]', message, ...args);
+  }
+
+  private logWarn(message: string, ...args: unknown[]) {
+    console.warn('[ScannerService][WARN]', message, ...args);
+  }
+
+  private logError(message: string, ...args: unknown[]) {
+    console.error('[ScannerService][ERROR]', message, ...args);
+  }
+
+  private getCandleFetchBatchSize(): number {
+    const selectedExchange = useDexStore.getState().selectedExchange;
+    return selectedExchange === 'binance' ? 20 : 10;
+  }
+
+  private async sleep(ms: number): Promise<void> {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
+  private async fetchCandlesWithRetry(
+    symbol: string,
+    startTime: number,
+    endTime: number,
+    maxRetries = 3
+  ): Promise<void> {
+    const candleStore = useCandleStore.getState();
+    let attempt = 0;
+
+    while (attempt <= maxRetries) {
+      try {
+        await candleStore.fetchCandles(symbol, '1m', startTime, endTime);
+        return;
+      } catch (error) {
+        attempt += 1;
+        const isFinalAttempt = attempt > maxRetries;
+
+        if (isFinalAttempt) {
+          throw error;
+        }
+
+        const backoffMs = Math.min(400 * (2 ** (attempt - 1)), 4000);
+        this.logWarn(
+          `Retrying candle fetch for ${symbol} (attempt ${attempt}/${maxRetries}, wait ${backoffMs}ms)`
+        );
+        await this.sleep(backoffMs);
+      }
+    }
+  }
+
+  private updateRequiredCandlesForTimeframes(
+    currentRequired: number,
+    lookbackCandles: number,
+    timeframes: ('1m' | '5m')[]
+  ): number {
+    let required = currentRequired;
+    if (timeframes.includes('1m')) {
+      required = Math.max(required, lookbackCandles);
+    }
+    if (timeframes.includes('5m')) {
+      required = Math.max(required, lookbackCandles * 5);
+    }
+    return required;
+  }
+
+  private getRequired1mCandles(settings: ScannerSettings): number {
+    let requiredCandles = 0;
+
+    if (settings.stochasticScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        150,
+        settings.stochasticScanner.timeframes
+      );
+    }
+
+    if (settings.volumeSpikeScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        150,
+        settings.volumeSpikeScanner.timeframes
+      );
+    }
+
+    if (settings.emaAlignmentScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        Math.max(150, settings.emaAlignmentScanner.lookbackBars),
+        settings.emaAlignmentScanner.timeframes
+      );
+    }
+
+    if (settings.macdReversalScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        Math.max(150, settings.macdReversalScanner.minCandles),
+        settings.macdReversalScanner.timeframes
+      );
+    }
+
+    if (settings.rsiReversalScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        Math.max(150, settings.rsiReversalScanner.minCandles),
+        settings.rsiReversalScanner.timeframes
+      );
+    }
+
+    if (settings.channelScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        settings.channelScanner.lookbackBars,
+        settings.channelScanner.timeframes
+      );
+    }
+
+    if (settings.divergenceScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        150,
+        settings.divergenceScanner.timeframes
+      );
+    }
+
+    if (settings.supportResistanceScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        150,
+        settings.supportResistanceScanner.timeframes
+      );
+    }
+
+    if (settings.kalmanTrendScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        150,
+        settings.kalmanTrendScanner.timeframes
+      );
+    }
+
+    if (settings.ritchiTrendScanner.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        150,
+        settings.ritchiTrendScanner.timeframes
+      );
+    }
+
+    return Math.max(requiredCandles, 150);
+  }
+
+  /**
+   * Ensure candles are available for scanning
+   * Fetches missing candles before running scans
+   */
+  async ensureCandlesForSymbols(
+    symbols: string[],
+    settings: ScannerSettings,
+    onProgress?: (progress: CandleFetchProgress) => void
+  ): Promise<void> {
+    const candleStore = useCandleStore.getState();
+    const uniqueSymbols = Array.from(new Set(symbols));
+    const requiredCandles = this.getRequired1mCandles(settings);
+    const missingSymbols: string[] = [];
+    const existingInFlightPromises: Promise<void>[] = [];
+
+    // Check which symbols don't have candles
+    for (const symbol of uniqueSymbols) {
+      const candles = candleStore.getCandlesSync(symbol, '1m');
+      if (candles && candles.length >= requiredCandles) {
+        continue;
+      }
+
+      const inFlight = this.candleFetchInFlight.get(symbol);
+      if (inFlight) {
+        existingInFlightPromises.push(inFlight);
+        continue;
+      }
+
+      if (!candles || candles.length < requiredCandles) {
+        missingSymbols.push(symbol);
+      }
+    }
+
+    if (missingSymbols.length === 0 && existingInFlightPromises.length === 0) {
+      onProgress?.({ stage: 'fetching-candles', completed: 0, total: 0, message: 'Candles already ready' });
+      return; // All symbols have candles
+    }
+
+    const totalWorkItems = missingSymbols.length + existingInFlightPromises.length;
+    let completedItems = 0;
+
+    if (missingSymbols.length > 0) {
+      this.logInfo(
+        `Fetching candles for ${missingSymbols.length} symbols (required 1m candles: ${requiredCandles})`,
+        missingSymbols.slice(0, 5)
+      );
+    }
+
+    // Fetch candles for missing symbols in parallel (limit concurrency to avoid overload)
+    const BATCH_SIZE = this.getCandleFetchBatchSize();
+    const endTime = Date.now();
+    const startTime = endTime - (1500 * 60 * 1000); // 1500 minutes (1m candles)
+
+    for (let i = 0; i < missingSymbols.length; i += BATCH_SIZE) {
+      const batch = missingSymbols.slice(i, i + BATCH_SIZE);
+      const batchPromises = batch.map(symbol => {
+        const fetchPromise = this
+          .fetchCandlesWithRetry(symbol, startTime, endTime)
+          .catch(err => {
+            this.logWarn(`Failed to fetch candles for ${symbol}:`, err.message);
+          })
+          .finally(() => {
+            this.candleFetchInFlight.delete(symbol);
+            completedItems += 1;
+            onProgress?.({
+              stage: 'fetching-candles',
+              completed: completedItems,
+              total: totalWorkItems,
+              message: `Fetched candles ${completedItems}/${totalWorkItems}`,
+            });
+          });
+
+        this.candleFetchInFlight.set(symbol, fetchPromise);
+        return fetchPromise;
+      });
+
+      await Promise.all(batchPromises);
+    }
+
+    if (existingInFlightPromises.length > 0) {
+      await Promise.allSettled(existingInFlightPromises);
+      completedItems += existingInFlightPromises.length;
+      onProgress?.({
+        stage: 'fetching-candles',
+        completed: completedItems,
+        total: totalWorkItems,
+        message: `Synced in-flight fetches ${completedItems}/${totalWorkItems}`,
+      });
+    }
+
+    if (missingSymbols.length > 0) {
+      this.logInfo(`Candles fetching completed for ${missingSymbols.length} symbols`);
+    }
+  }
 
   private getIntervalMinutes(interval: TimeInterval): number {
     const intervalMap: Record<TimeInterval, number> = {
@@ -142,7 +410,11 @@ export class ScannerService {
         return null;
       }
       const recentCandles = candles1m.slice(-baseCandleCount);
-      return aggregate1mTo5m(recentCandles);
+      const aggregatedCandles = aggregate1mTo5m(recentCandles);
+      if (!aggregatedCandles || aggregatedCandles.length < lookbackCandles) {
+        return null;
+      }
+      return aggregatedCandles.slice(-lookbackCandles);
     }
 
     return null;
@@ -868,136 +1140,72 @@ export class ScannerService {
     symbols: string[],
     params: Omit<StochasticScanParams, 'symbol'>
   ): Promise<ScanResult[]> {
-    const results = await Promise.allSettled(
-      symbols.map(symbol =>
-        this.scanStochastic({ ...params, symbol })
-      )
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanStochastic({ ...scanParams, symbol })
     );
-
-    return results
-      .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
-        result.status === 'fulfilled' && result.value !== null
-      )
-      .map(result => result.value as ScanResult);
   }
 
   async scanMultipleSymbolsForVolume(
     symbols: string[],
     params: Omit<VolumeScanParams, 'symbol'>
   ): Promise<ScanResult[]> {
-    const results = await Promise.allSettled(
-      symbols.map(symbol =>
-        this.scanVolumeSpike({ ...params, symbol })
-      )
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanVolumeSpike({ ...scanParams, symbol })
     );
-
-    return results
-      .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
-        result.status === 'fulfilled' && result.value !== null
-      )
-      .map(result => result.value as ScanResult);
   }
 
   async scanMultipleSymbolsForEmaAlignment(
     symbols: string[],
     params: Omit<EmaAlignmentScanParams, 'symbol'>
   ): Promise<ScanResult[]> {
-    const results = await Promise.allSettled(
-      symbols.map(symbol =>
-        this.scanEmaAlignment({ ...params, symbol })
-      )
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanEmaAlignment({ ...scanParams, symbol })
     );
-
-    return results
-      .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
-        result.status === 'fulfilled' && result.value !== null
-      )
-      .map(result => result.value as ScanResult);
   }
 
   async scanMultipleSymbolsForMacdReversal(
     symbols: string[],
     params: Omit<MacdReversalScanParams, 'symbol'>
   ): Promise<ScanResult[]> {
-    const results = await Promise.allSettled(
-      symbols.map(symbol =>
-        this.scanMacdReversal({ ...params, symbol })
-      )
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanMacdReversal({ ...scanParams, symbol })
     );
-
-    return results
-      .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
-        result.status === 'fulfilled' && result.value !== null
-      )
-      .map(result => result.value as ScanResult);
   }
 
   async scanMultipleSymbolsForRsiReversal(
     symbols: string[],
     params: Omit<RsiReversalScanParams, 'symbol'>
   ): Promise<ScanResult[]> {
-    const results = await Promise.allSettled(
-      symbols.map(symbol =>
-        this.scanRsiReversal({ ...params, symbol })
-      )
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanRsiReversal({ ...scanParams, symbol })
     );
-
-    return results
-      .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
-        result.status === 'fulfilled' && result.value !== null
-      )
-      .map(result => result.value as ScanResult);
   }
 
   async scanMultipleSymbolsForChannel(
     symbols: string[],
     params: Omit<ChannelScanParams, 'symbol'>
   ): Promise<ScanResult[]> {
-    const results = await Promise.allSettled(
-      symbols.map(symbol =>
-        this.scanChannel({ ...params, symbol })
-      )
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanChannel({ ...scanParams, symbol })
     );
-
-    return results
-      .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
-        result.status === 'fulfilled' && result.value !== null
-      )
-      .map(result => result.value as ScanResult);
   }
 
   async scanMultipleSymbolsForDivergence(
     symbols: string[],
     params: Omit<DivergenceScanParams, 'symbol'>
   ): Promise<ScanResult[]> {
-    const results = await Promise.allSettled(
-      symbols.map(symbol =>
-        this.scanDivergence({ ...params, symbol })
-      )
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanDivergence({ ...scanParams, symbol })
     );
-
-    return results
-      .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
-        result.status === 'fulfilled' && result.value !== null
-      )
-      .map(result => result.value as ScanResult);
   }
 
   async scanMultipleSymbolsForSupportResistance(
     symbols: string[],
     params: Omit<SupportResistanceScanParams, 'symbol'>
   ): Promise<ScanResult[]> {
-    const results = await Promise.allSettled(
-      symbols.map(symbol =>
-        this.scanSupportResistance({ ...params, symbol })
-      )
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanSupportResistance({ ...scanParams, symbol })
     );
-
-    return results
-      .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
-        result.status === 'fulfilled' && result.value !== null
-      )
-      .map(result => result.value as ScanResult);
   }
 
   async scanKalmanTrend(params: KalmanTrendScanParams): Promise<ScanResult | null> {
@@ -1066,13 +1274,135 @@ export class ScannerService {
     symbols: string[],
     params: Omit<KalmanTrendScanParams, 'symbol'>
   ): Promise<ScanResult[]> {
-    const results = await Promise.allSettled(
-      symbols.map(symbol =>
-        this.scanKalmanTrend({ ...params, symbol })
-      )
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanKalmanTrend({ ...scanParams, symbol })
     );
+  }
 
-    return results
+  async scanRitchiTrend(params: RitchiTrendScanParams): Promise<ScanResult | null> {
+    const { symbol, timeframes, config } = params;
+
+    const candleStore = useCandleStore.getState();
+    const closePrices = candleStore.getClosePrices(symbol, '1m', 100) || [];
+
+    for (const timeframe of timeframes) {
+      try {
+        const lookbackCandles = 150;
+        const candles = this.getCandlesFromStore(symbol, timeframe, lookbackCandles);
+
+        if (!candles || candles.length < 50) {
+          continue;
+        }
+
+        // Calculate Ritchi Trend (Siêu Xu Hướng)
+        const ritchiResult = calculateSieuXuHuong(
+          candles as any,
+          config.pivLen,
+          config.smaMin,
+          config.smaMax,
+          1.0, // smaMult
+          100, // trendLen
+          2.0, // atrMult
+          3.0, // tpMult
+        );
+
+        if (!ritchiResult || !ritchiResult.buySignals || !ritchiResult.sellSignals) {
+          continue;
+        }
+
+        const lastIndex = ritchiResult.buySignals.length - 1;
+        if (lastIndex < 0) continue;
+
+        // Check last 3 bars for signals
+        const recentBuy = ritchiResult.buySignals.slice(-3).some(Boolean);
+        const recentSell = ritchiResult.sellSignals.slice(-3).some(Boolean);
+
+        if (!recentBuy && !recentSell) {
+          continue;
+        }
+
+        const directionValue = ritchiResult.direction[lastIndex];
+        const signalType = recentBuy ? 'bullish' : 'bearish';
+        
+        // Find the actual signal index
+        let signalIndex = lastIndex;
+        for (let i = lastIndex; i >= Math.max(0, lastIndex - 3); i--) {
+          if ((recentBuy && ritchiResult.buySignals[i]) || (recentSell && ritchiResult.sellSignals[i])) {
+            signalIndex = i;
+            break;
+          }
+        }
+
+        const price = candles[signalIndex].close;
+        const stopLoss = ritchiResult.stopLoss[signalIndex] || 0;
+        const takeProfit = ritchiResult.takeProfit[signalIndex] || 0;
+
+        const ritchiTrendValue: RitchiTrendValue = {
+          direction: directionValue ? 'bullish' : 'bearish',
+          timeframe,
+          buySignal: recentBuy,
+          sellSignal: recentSell,
+          price,
+          stopLoss,
+          takeProfit,
+        };
+
+        return {
+          symbol,
+          ritchiTrends: [ritchiTrendValue],
+          matchedAt: Date.now(),
+          signalType: signalType as 'bullish' | 'bearish',
+          description: `Ritchi Trend ${signalType === 'bullish' ? 'BUY' : 'SELL'} signal on ${timeframe}`,
+          scanType: 'ritchiTrend',
+          closePrices,
+        };
+      } catch (error) {
+        console.error(`Error scanning Ritchi Trend for ${symbol} on ${timeframe}:`, error);
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  async scanMultipleSymbolsForRitchiTrend(
+    symbols: string[],
+    params: Omit<RitchiTrendScanParams, 'symbol'>
+  ): Promise<ScanResult[]> {
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanRitchiTrend({ ...scanParams, symbol })
+    );
+  }
+
+  private async runScanForSymbols<TParams extends object>(
+    symbols: string[],
+    params: TParams,
+    scanFn: (symbol: string, params: TParams) => Promise<ScanResult | null>
+  ): Promise<ScanResult[]> {
+    const queue = [...symbols];
+    const settledResults: PromiseSettledResult<ScanResult | null>[] = [];
+    const workerCount = Math.min(this.scanConcurrencyLimit, queue.length || 1);
+
+    const worker = async () => {
+      while (queue.length > 0) {
+        const symbol = queue.shift();
+        if (!symbol) {
+          continue;
+        }
+
+        try {
+          const value = await scanFn(symbol, params);
+          settledResults.push({ status: 'fulfilled', value });
+        } catch (reason) {
+          this.logError(`Scan worker failed for ${symbol}`, reason);
+          settledResults.push({ status: 'rejected', reason });
+        }
+      }
+    };
+
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
+
+    return settledResults
       .filter((result): result is PromiseFulfilledResult<ScanResult | null> =>
         result.status === 'fulfilled' && result.value !== null
       )

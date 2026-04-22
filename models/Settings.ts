@@ -155,12 +155,22 @@ export interface KalmanTrendScannerConfig {
   timeframes: ('1m' | '5m')[];
 }
 
+export interface RitchiTrendScannerConfig {
+  enabled: boolean;
+  timeframes: ('1m' | '5m')[];
+  pivLen: number;
+  smaMin: number;
+  smaMax: number;
+}
+
 export interface ScannerSettings {
   enabled: boolean;
   scanInterval: number;
   topMarkets: number;
   playSound: boolean;
   candleCacheDuration: number;
+  mediumDurationWarningSec: number;
+  highDurationWarningSec: number;
   telegramEnabled: boolean;
   telegramBotToken: string;
   telegramChatId: string;
@@ -175,6 +185,7 @@ export interface ScannerSettings {
   volumeSpikeScanner: VolumeSpikeConfig;
   supportResistanceScanner: SupportResistanceScannerConfig;
   kalmanTrendScanner: KalmanTrendScannerConfig;
+  ritchiTrendScanner: RitchiTrendScannerConfig;
 }
 
 export interface OrderSettings {
@@ -315,6 +326,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     topMarkets: 50,
     playSound: true,
     candleCacheDuration: 1,
+    mediumDurationWarningSec: 1.5,
+    highDurationWarningSec: 2.5,
     telegramEnabled: false,
     telegramBotToken: '',
     telegramChatId: '',
@@ -388,6 +401,13 @@ export const DEFAULT_SETTINGS: AppSettings = {
     kalmanTrendScanner: {
       enabled: false,
       timeframes: ['1m', '5m'],
+    },
+    ritchiTrendScanner: {
+      enabled: false,
+      timeframes: ['1m', '5m'],
+      pivLen: 5,
+      smaMin: 5,
+      smaMax: 50,
     },
   },
   orders: {

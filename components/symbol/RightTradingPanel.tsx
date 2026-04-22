@@ -186,90 +186,31 @@ function RightTradingPanel({
                   █ SELL CLOUD
                 </button>
               </div>
-              <div className="text-[9px] text-primary-muted/60 uppercase tracking-wider mt-2 mb-0.5">Small</div>
-              <div className="flex gap-1">
+              
+              {/* Main Trading Buttons */}
+              <div className="space-y-2 mt-3">
                 <button
-                  className={`hidden md:flex px-2 py-1.5 border rounded-sm transition-all ${
-                    crosshairActive && crosshairType === 'sm-long'
-                      ? 'bg-bullish/40 border-bullish/80 shadow-[0_0_12px_rgba(38,166,154,0.6)] animate-pulse'
-                      : 'bg-bullish/20 border-bullish/40 hover:bg-bullish/30 hover:border-bullish/60'
-                  }`}
-                  onClick={() => handleCrosshairClick('sm-long')}
-                  title="Place limit order at clicked price"
-                >
-                  <CrosshairIcon className="w-6 h-6 text-bullish" />
-                </button>
-                <button
-                  className="flex-1 px-2 py-1.5 bg-bullish/20 border border-bullish/40 text-bullish hover:bg-bullish/30 hover:border-bullish/60 active:bg-bullish/50 active:scale-95 active:shadow-inner transition-all rounded-sm hover:shadow-[0_0_8px_rgba(38,166,154,0.3)] cursor-pointer"
-                  onClick={onSmLong}
-                  title="Place small long position (hotkey: A)"
-                >
-                  <span className="text-bullish/60 text-xs font-bold mr-1">A</span>
-                  █ SM LONG
-                </button>
-              </div>
-              <div className="flex gap-1">
-                <button
-                  className={`hidden md:flex px-2 py-1.5 border rounded-sm transition-all ${
-                    crosshairActive && crosshairType === 'sm-short'
-                      ? 'bg-bearish/40 border-bearish/80 shadow-[0_0_12px_rgba(239,83,80,0.6)] animate-pulse'
-                      : 'bg-bearish/20 border-bearish/40 hover:bg-bearish/30 hover:border-bearish/60'
-                  }`}
-                  onClick={() => handleCrosshairClick('sm-short')}
-                  title="Place limit order at clicked price"
-                >
-                  <CrosshairIcon className="w-6 h-6 text-bearish" />
-                </button>
-                <button
-                  className="flex-1 px-2 py-1.5 bg-bearish/20 border border-bearish/40 text-bearish hover:bg-bearish/30 hover:border-bearish/60 active:bg-bearish/50 active:scale-95 active:shadow-inner transition-all rounded-sm hover:shadow-[0_0_8px_rgba(239,83,80,0.3)] cursor-pointer"
-                  onClick={onSmShort}
-                  title="Place small short position (hotkey: S)"
-                >
-                  <span className="text-bearish/60 text-xs font-bold mr-1">S</span>
-                  █ SM SHORT
-                </button>
-              </div>
-              <div className="text-[9px] text-primary-muted/60 uppercase tracking-wider mt-2 mb-0.5">Big</div>
-              <div className="flex gap-1">
-                <button
-                  className={`hidden md:flex px-2 py-1.5 border-2 rounded-sm transition-all ${
-                    crosshairActive && crosshairType === 'big-long'
-                      ? 'bg-bullish/50 border-bullish/90 shadow-[0_0_14px_rgba(38,166,154,0.7)] animate-pulse'
-                      : 'bg-bullish/30 border-bullish/60 hover:bg-bullish/40 hover:border-bullish/80'
-                  }`}
-                  onClick={() => handleCrosshairClick('big-long')}
-                  title="Place limit order at clicked price"
-                >
-                  <CrosshairIcon className="w-6 h-6 text-bullish" />
-                </button>
-                <button
-                  className="flex-1 px-2 py-1.5 bg-bullish/30 border-2 border-bullish/60 text-bullish font-bold hover:bg-bullish/40 hover:border-bullish/80 active:bg-bullish/60 active:scale-95 active:shadow-inner transition-all rounded-sm hover:shadow-[0_0_10px_rgba(38,166,154,0.5)] cursor-pointer"
+                  className="w-full py-4 px-4 bg-gradient-to-br from-bullish/40 to-bullish/20 border-2 border-bullish/70 text-bullish font-extrabold text-base hover:from-bullish/50 hover:to-bullish/30 hover:border-bullish/90 active:from-bullish/60 active:to-bullish/40 active:scale-[0.98] transition-all duration-150 rounded-lg shadow-lg hover:shadow-[0_0_20px_rgba(38,166,154,0.6)] cursor-pointer relative overflow-hidden group"
                   onClick={onBigLong}
-                  title="Place big long position (hotkey: Shift+A)"
+                  title="Buy / Long Position (hotkey: A)"
                 >
-                  <span className="text-bullish/60 text-xs font-bold mr-1">⇧A</span>
-                  ██ BIG LONG
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                  <div className="relative flex items-center justify-center gap-2">
+                    <span className="text-bullish/70 text-sm font-bold">A</span>
+                    <span className="text-lg tracking-wide">Buy / Long</span>
+                  </div>
                 </button>
-              </div>
-              <div className="flex gap-1">
+                
                 <button
-                  className={`hidden md:flex px-2 py-1.5 border-2 rounded-sm transition-all ${
-                    crosshairActive && crosshairType === 'big-short'
-                      ? 'bg-bearish/50 border-bearish/90 shadow-[0_0_14px_rgba(239,83,80,0.7)] animate-pulse'
-                      : 'bg-bearish/30 border-bearish/60 hover:bg-bearish/40 hover:border-bearish/80'
-                  }`}
-                  onClick={() => handleCrosshairClick('big-short')}
-                  title="Place limit order at clicked price"
-                >
-                  <CrosshairIcon className="w-6 h-6 text-bearish" />
-                </button>
-                <button
-                  className="flex-1 px-2 py-1.5 bg-bearish/30 border-2 border-bearish/60 text-bearish font-bold hover:bg-bearish/40 hover:border-bearish/80 active:bg-bearish/60 active:scale-95 active:shadow-inner transition-all rounded-sm hover:shadow-[0_0_10px_rgba(239,83,80,0.5)] cursor-pointer"
+                  className="w-full py-4 px-4 bg-gradient-to-br from-bearish/40 to-bearish/20 border-2 border-bearish/70 text-bearish font-extrabold text-base hover:from-bearish/50 hover:to-bearish/30 hover:border-bearish/90 active:from-bearish/60 active:to-bearish/40 active:scale-[0.98] transition-all duration-150 rounded-lg shadow-lg hover:shadow-[0_0_20px_rgba(239,83,80,0.6)] cursor-pointer relative overflow-hidden group"
                   onClick={onBigShort}
-                  title="Place big short position (hotkey: Shift+S)"
+                  title="Sell / Short Position (hotkey: S)"
                 >
-                  <span className="text-bearish/60 text-xs font-bold mr-1">⇧S</span>
-                  ██ BIG SHORT
+                  <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/10 to-transparent transform -translate-x-full group-hover:translate-x-full transition-transform duration-700"></div>
+                  <div className="relative flex items-center justify-center gap-2">
+                    <span className="text-bearish/70 text-sm font-bold">S</span>
+                    <span className="text-lg tracking-wide">Sell / Short</span>
+                  </div>
                 </button>
               </div>
             </div>

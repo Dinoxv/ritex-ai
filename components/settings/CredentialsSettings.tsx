@@ -381,6 +381,25 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
           <p className="text-xs text-gray-400">Dành cho Binance USDT-M Futures (API Key + Secret).</p>
         </div>
 
+        {/* API Configuration Warning */}
+        <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-3">
+          <div className="flex items-start gap-2">
+            <span className="text-yellow-500 text-lg">⚠️</span>
+            <div className="flex-1">
+              <p className="text-xs font-semibold text-yellow-300 mb-1">Cấu hình API Key đúng:</p>
+              <ul className="text-[11px] text-yellow-200/90 space-y-0.5 list-disc list-inside">
+                <li>API Key phải có quyền <strong>"Enable Futures"</strong></li>
+                <li>Bật thêm <strong>"Enable Reading"</strong> và <strong>"Enable Spot & Margin Trading"</strong></li>
+                <li>Nếu bật IP Whitelist → thêm IP hiện tại của bạn</li>
+                <li>Không dùng API Key Spot cho Futures trading</li>
+              </ul>
+              <p className="text-[10px] text-yellow-400/70 mt-2">
+                💡 Error -2015? Kiểm tra lại permissions trong Binance API Management
+              </p>
+            </div>
+          </div>
+        </div>
+
         <div>
           <label htmlFor="binanceApiKey" className="block text-sm font-medium text-gray-300 mb-2">
             Binance API Key (USDT-M Futures)

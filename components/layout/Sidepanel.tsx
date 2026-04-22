@@ -164,7 +164,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
   const address = useAddressFromUrl();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
 
-  const { results, status, runScan, startAutoScanWithDelay, stopAutoScan } = useScannerStore();
+  const { results, status, scannerMetrics, runScan, startAutoScanWithDelay, stopAutoScan } = useScannerStore();
   const { settings, pinSymbol, unpinSymbol } = useSettingsStore();
   const invertedMode = settings.chart.invertedMode;
   const topSymbols = useTopSymbolsStore((state) => state.symbols);
@@ -283,6 +283,28 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
     const hours = Math.floor(minutes / 60);
     return `${hours}h ago`;
   };
+
+  const formatDurationMs = (durationMs: number | null) => {
+    if (durationMs === null) return '-';
+    if (durationMs < 1000) return `${durationMs.toFixed(0)}ms`;
+    return `${(durationMs / 1000).toFixed(2)}s`;
+  };
+
+  const scannerProgressPercent = status.progress && status.progress.total > 0
+    ? Math.min(100, Math.max(0, Math.round((status.progress.completed / status.progress.total) * 100)))
+    : 0;
+
+  const mediumDurationThresholdMs = Math.max(0.5, settings.scanner.mediumDurationWarningSec) * 1000;
+  const highDurationThresholdMs = Math.max(
+    Math.max(0.5, settings.scanner.highDurationWarningSec),
+    settings.scanner.mediumDurationWarningSec
+  ) * 1000;
+
+  const topScannerMetrics = useMemo(() => {
+    return Object.entries(scannerMetrics.byType)
+      .sort((a, b) => (b[1]?.averageDurationMs ?? 0) - (a[1]?.averageDurationMs ?? 0))
+      .slice(0, 3);
+  }, [scannerMetrics.byType]);
 
   const sortedSymbols = useMemo(() => {
     const symbols = [...allSymbolsToShow];
@@ -497,6 +519,72 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
               <div className="flex justify-between">
                 <span>Last scan:</span>
                 <span>{formatTimeSince(status.lastScanTime)}</span>
+              </div>
+              {status.progress && (
+                <div className="space-y-1 mt-1">
+                  <div className="flex justify-between text-[10px]">
+                    <span>{status.progress.message || status.progress.stage}</span>
+                    <span>{scannerProgressPercent}%</span>
+                  </div>
+                  <div className="h-1.5 bg-bg-secondary border border-frame rounded overflow-hidden">
+                    <div
+                      className="h-full bg-primary transition-all duration-300"
+                      style={{ width: `${scannerProgressPercent}%` }}
+                    />
+                  </div>
+                </div>
+              )}
+              <div className="pt-1 border-t border-frame/40 mt-1 space-y-1 text-[10px]">
+                <div className="flex justify-between">
+                  <span>Runs:</span>
+                  <span>{scannerMetrics.totalRuns}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Avg run:</span>
+                  <span
+                    className={
+                      scannerMetrics.averageDurationMs > highDurationThresholdMs
+                        ? 'text-error font-bold'
+                        : scannerMetrics.averageDurationMs > mediumDurationThresholdMs
+                          ? 'text-yellow-400 font-bold'
+                          : ''
+                    }
+                  >
+                    {formatDurationMs(scannerMetrics.averageDurationMs || null)}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Last run:</span>
+                  <span>{formatDurationMs(scannerMetrics.lastDurationMs)}</span>
+                </div>
+                <div className="flex justify-between">
+                  <span>Failed:</span>
+                  <span>{scannerMetrics.failedRuns}</span>
+                </div>
+                {topScannerMetrics.map(([scanType, metric]) => {
+                  const avgDuration = metric?.averageDurationMs ?? 0;
+                  const isHighScanner = avgDuration > highDurationThresholdMs;
+                  const isMediumScanner = avgDuration > mediumDurationThresholdMs && !isHighScanner;
+
+                  return (
+                    <div
+                      key={scanType}
+                      className={`flex justify-between ${
+                        isHighScanner ? 'text-error font-bold' : isMediumScanner ? 'text-yellow-400 font-bold' : 'text-primary-muted'
+                      }`}
+                      title={
+                        isHighScanner
+                          ? `High warning: avg duration exceeds ${(highDurationThresholdMs / 1000).toFixed(1)}s`
+                          : isMediumScanner
+                            ? `Medium warning: avg duration exceeds ${(mediumDurationThresholdMs / 1000).toFixed(1)}s`
+                            : undefined
+                      }
+                    >
+                      <span>{isHighScanner ? `! ${scanType}` : isMediumScanner ? `~ ${scanType}` : scanType}</span>
+                      <span>{formatDurationMs(avgDuration)}</span>
+                    </div>
+                  );
+                })}
               </div>
               {status.error && (
                 <div className="text-error text-[10px] mt-1">{status.error}</div>

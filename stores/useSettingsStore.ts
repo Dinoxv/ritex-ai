@@ -172,6 +172,8 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         topMarkets: storedSettings.scanner?.topMarkets ?? DEFAULT_SETTINGS.scanner.topMarkets,
         playSound: storedSettings.scanner?.playSound ?? DEFAULT_SETTINGS.scanner.playSound,
         candleCacheDuration: storedSettings.scanner?.candleCacheDuration ?? DEFAULT_SETTINGS.scanner.candleCacheDuration,
+        mediumDurationWarningSec: storedSettings.scanner?.mediumDurationWarningSec ?? DEFAULT_SETTINGS.scanner.mediumDurationWarningSec,
+        highDurationWarningSec: storedSettings.scanner?.highDurationWarningSec ?? DEFAULT_SETTINGS.scanner.highDurationWarningSec,
         telegramEnabled: storedSettings.scanner?.telegramEnabled ?? DEFAULT_SETTINGS.scanner.telegramEnabled,
         telegramBotToken: storedSettings.scanner?.telegramBotToken ?? DEFAULT_SETTINGS.scanner.telegramBotToken,
         telegramChatId: storedSettings.scanner?.telegramChatId ?? DEFAULT_SETTINGS.scanner.telegramChatId,
@@ -245,6 +247,13 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         kalmanTrendScanner: {
           enabled: storedSettings.scanner?.kalmanTrendScanner?.enabled ?? DEFAULT_SETTINGS.scanner.kalmanTrendScanner.enabled,
           timeframes: storedSettings.scanner?.kalmanTrendScanner?.timeframes ?? DEFAULT_SETTINGS.scanner.kalmanTrendScanner.timeframes,
+        },
+        ritchiTrendScanner: {
+          enabled: storedSettings.scanner?.ritchiTrendScanner?.enabled ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.enabled,
+          timeframes: storedSettings.scanner?.ritchiTrendScanner?.timeframes ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.timeframes,
+          pivLen: storedSettings.scanner?.ritchiTrendScanner?.pivLen ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.pivLen,
+          smaMin: storedSettings.scanner?.ritchiTrendScanner?.smaMin ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.smaMin,
+          smaMax: storedSettings.scanner?.ritchiTrendScanner?.smaMax ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.smaMax,
         },
       },
       orders: {

@@ -511,10 +511,8 @@ function SymbolView({ coin }: SymbolViewProps) {
   const keyBindings: KeyBinding[] = [
     { key: 'q', action: handleBuyCloud, description: 'Buy Cloud' },
     { key: 'w', action: handleSellCloud, description: 'Sell Cloud' },
-    { key: 'a', action: handleSmLong, description: 'Small Long' },
-    { key: 's', action: handleSmShort, description: 'Small Short' },
-    { key: 'a', modifiers: { shift: true }, action: handleBigLong, description: 'Big Long' },
-    { key: 's', modifiers: { shift: true }, action: handleBigShort, description: 'Big Short' },
+    { key: 'a', action: handleBigLong, description: 'Buy / Long' },
+    { key: 's', action: handleBigShort, description: 'Sell / Short' },
     { key: '1', action: handleClose25, description: 'Close 25%' },
     { key: '2', action: handleClose50, description: 'Close 50%' },
     { key: '3', action: handleClose75, description: 'Close 75%' },

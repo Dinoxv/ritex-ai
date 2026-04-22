@@ -28,6 +28,21 @@ import type {
 import type { SymbolMetadata } from './metadata-cache.service';
 import type { UserFill } from '@/types';
 
+/**
+ * Binance USDⓈ-M Futures Service
+ * 
+ * IMPORTANT: This service ONLY supports USDⓈ-M (USD-margined) Perpetual Futures
+ * - Base URL: https://fapi.binance.com (NOT /dapi for COIN-M)
+ * - Symbols: BTCUSDT, ETHUSDT, etc. (USDT-margined perpetuals)
+ * - Contract Type: PERPETUAL only
+ * - Margin Asset: USDT
+ * 
+ * NOT supported:
+ * - COIN-M Futures (BTCUSD_PERP, etc.)
+ * - Quarterly/Delivery contracts
+ * - Spot trading
+ */
+
 type BinanceOrderSide = 'BUY' | 'SELL';
 type BinanceOrderType =
   | 'LIMIT'
@@ -44,6 +59,8 @@ type BinanceExchangeInfoSymbol = {
   quantityPrecision: number;
   pricePrecision: number;
   filters: Array<Record<string, string>>;
+  quoteAsset?: string; // For USDⓈ-M validation
+  marginAsset?: string; // For USDⓈ-M validation
 };
 
 type BinancePositionRisk = {
@@ -118,6 +135,26 @@ export class BinanceService extends HyperliquidService {
     expiresAt: 0,
   };
 
+  // Performance optimization: Cache for positions and orders
+  private positionCache: {
+    data: any[] | null;
+    expiresAt: number;
+  } = {
+    data: null,
+    expiresAt: 0,
+  };
+
+  private orderCache: {
+    data: any[] | null;
+    expiresAt: number;
+  } = {
+    data: null,
+    expiresAt: 0,
+  };
+
+  private readonly POSITION_CACHE_TTL = 5_000; // 5s
+  private readonly ORDER_CACHE_TTL = 3_000; // 3s
+
   constructor(apiKey: string | null, apiSecret: string | null, isTestnet: boolean = false) {
     super(null, DUMMY_WALLET, isTestnet);
     this.apiKey = apiKey || '';
@@ -127,6 +164,34 @@ export class BinanceService extends HyperliquidService {
 
   getExchangeKey(): string {
     return `binance:${this.baseUrl.includes('testnet') ? 'testnet' : 'mainnet'}`;
+  }
+
+  /**
+   * Invalidate position cache (call after order placement/cancellation)
+   */
+  private invalidatePositionCache(): void {
+    this.positionCache = {
+      data: null,
+      expiresAt: 0,
+    };
+  }
+
+  /**
+   * Invalidate order cache (call after order placement/cancellation)
+   */
+  private invalidateOrderCache(): void {
+    this.orderCache = {
+      data: null,
+      expiresAt: 0,
+    };
+  }
+
+  /**
+   * Invalidate all caches
+   */
+  private invalidateAllCaches(): void {
+    this.invalidatePositionCache();
+    this.invalidateOrderCache();
   }
 
   private ensureApiCredentials(): void {
@@ -199,7 +264,24 @@ export class BinanceService extends HyperliquidService {
 
     if (!res.ok) {
       const txt = await res.text();
-      throw new Error(`Binance signed API lỗi (${res.status}): ${txt}`);
+      let errorMsg = `Binance signed API lỗi (${res.status}): ${txt}`;
+      
+      // Parse error code and provide helpful troubleshooting
+      try {
+        const errJson = JSON.parse(txt);
+        if (errJson.code === -2015) {
+          errorMsg += '\n\n🔧 TROUBLESHOOTING ERROR -2015:\n';
+          errorMsg += '1️⃣ Kiểm tra API Key có đúng không (copy lại từ Binance)\n';
+          errorMsg += '2️⃣ Đảm bảo API Key có quyền "Enable Futures" trong Binance API Management\n';
+          errorMsg += '3️⃣ Nếu bật IP Whitelist, thêm IP: ' + errJson.msg?.match(/request ip: ([\d.]+)/)?.[1] + '\n';
+          errorMsg += '4️⃣ API Key phải là Futures API, không phải Spot API\n';
+          errorMsg += '5️⃣ Thử tạo API Key mới với quyền "Enable Reading" + "Enable Futures" + "Enable Spot & Margin Trading"';
+        }
+      } catch {
+        // If JSON parse fails, keep original error
+      }
+      
+      throw new Error(errorMsg);
     }
 
     return (await res.json()) as T;
@@ -207,14 +289,35 @@ export class BinanceService extends HyperliquidService {
 
   private async ensureMetadataFresh(): Promise<void> {
     if (Date.now() < this.metadataCache.expiresAt && this.metadataCache.universe.length > 0) {
+      console.log(`[Binance] Using cached metadata (${this.metadataCache.universe.length} symbols, expires in ${Math.round((this.metadataCache.expiresAt - Date.now()) / 1000)}s)`);
       return;
     }
 
+    console.log('[Binance] Fetching fresh metadata from API...');
+    // IMPORTANT: Using /fapi/v1 endpoint for USDⓈ-M Futures ONLY (not COIN-M)
+    // USDⓈ-M = USD-margined perpetual futures (BTCUSDT, ETHUSDT, etc.)
+    // COIN-M = Coin-margined futures would use /dapi/v1 instead
     const exchangeInfo = await this.publicRequest<{ symbols: BinanceExchangeInfoSymbol[] }>('/fapi/v1/exchangeInfo');
 
-    const tradable = exchangeInfo.symbols.filter(
-      (s) => s.contractType === 'PERPETUAL' && s.symbol.endsWith('USDT')
-    );
+    // Filter for USDⓈ-M Futures only:
+    // 1. contractType = PERPETUAL (not CURRENT_QUARTER, NEXT_QUARTER, etc.)
+    // 2. symbol ends with USDT (USDⓈ-M margin asset)
+    // 3. quoteAsset = USDT (if available, extra validation)
+    const tradable = exchangeInfo.symbols.filter((s) => {
+      const isPerpetual = s.contractType === 'PERPETUAL';
+      const isUSDT = s.symbol.endsWith('USDT');
+      const isUSDTQuote = !s.quoteAsset || s.quoteAsset === 'USDT';
+      const isUSDTMargin = !s.marginAsset || s.marginAsset === 'USDT';
+      return isPerpetual && isUSDT && isUSDTQuote && isUSDTMargin;
+    });
+
+    console.log(`[Binance] ✅ Loaded ${tradable.length} USDⓈ-M Futures symbols (USDT-margined perpetuals only)`);
+    
+    // Debug: Check for RAVE and RIVER
+    const raveRiver = tradable.filter(s => s.symbol.includes('RAVE') || s.symbol.includes('RIVER'));
+    if (raveRiver.length > 0) {
+      console.log(`[Binance] Found RAVE/RIVER tokens:`, raveRiver.map(s => s.symbol));
+    }
 
     const universe = tradable.map((s) => ({
       name: fromBinanceSymbol(s.symbol),
@@ -237,7 +340,7 @@ export class BinanceService extends HyperliquidService {
     this.metadataCache = {
       byCoin,
       universe,
-      expiresAt: Date.now() + 60_000,
+      expiresAt: Date.now() + 30_000, // 30s cache for fresh data
     };
   }
 
@@ -308,6 +411,10 @@ export class BinanceService extends HyperliquidService {
     if (params.timeInForce) payload.timeInForce = params.timeInForce;
 
     const result = await this.signedRequest<{ orderId: number }>('POST', '/fapi/v1/order', payload);
+    
+    // Invalidate caches after successful order placement
+    this.invalidateAllCaches();
+    
     return this.toOrderResponse(result.orderId);
   }
 
@@ -425,9 +532,14 @@ export class BinanceService extends HyperliquidService {
   }
 
   async getOpenPositions(_user?: string): Promise<AssetPosition[]> {
+    // Use cache if still fresh
+    if (this.positionCache.data && Date.now() < this.positionCache.expiresAt) {
+      return this.positionCache.data;
+    }
+
     const data = await this.signedRequest<BinancePositionRisk[]>('GET', '/fapi/v2/positionRisk');
 
-    return data
+    const positions = data
       .filter((p) => Math.abs(parseFloat(p.positionAmt)) > 0)
       .map((p) => {
         const szi = parseFloat(p.positionAmt);
@@ -442,6 +554,14 @@ export class BinanceService extends HyperliquidService {
           },
         };
       }) as unknown as AssetPosition[];
+
+    // Update cache
+    this.positionCache = {
+      data: positions,
+      expiresAt: Date.now() + this.POSITION_CACHE_TTL,
+    };
+
+    return positions;
   }
 
   async getAccountBalance(_user?: string): Promise<AccountBalance> {
@@ -454,8 +574,21 @@ export class BinanceService extends HyperliquidService {
   }
 
   async getOpenOrders(_user?: string): Promise<FrontendOrder[]> {
+    // Use cache if still fresh
+    if (this.orderCache.data && Date.now() < this.orderCache.expiresAt) {
+      return this.orderCache.data;
+    }
+
     const orders = await this.signedRequest<any[]>('GET', '/fapi/v1/openOrders');
-    return orders.map((o) => this.toAppOrder(o));
+    const mappedOrders = orders.map((o) => this.toAppOrder(o));
+
+    // Update cache
+    this.orderCache = {
+      data: mappedOrders,
+      expiresAt: Date.now() + this.ORDER_CACHE_TTL,
+    };
+
+    return mappedOrders;
   }
 
   async getUserFillsByTime(startTime: number, endTime?: number, _user?: string): Promise<UserFill[]> {
@@ -644,6 +777,10 @@ export class BinanceService extends HyperliquidService {
       symbol: toCoinSymbol(coin),
       orderId,
     });
+    
+    // Invalidate caches after successful cancellation
+    this.invalidateAllCaches();
+    
     return this.emptyCancelResponse();
   }
 

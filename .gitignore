@@ -33,6 +33,21 @@ yarn-error.log*
 # env files (can opt-in for committing if needed)
 .env*
 
+# local secrets / credentials
+*credentials*.json
+*secrets*.json
+*token*.txt
+accounts.json
+
+# local backups and ops scripts
+*.backup.ts
+*.bak
+*.orig
+
+# local monitoring outputs
+monitor.log
+*.local
+
 # vercel
 .vercel
 

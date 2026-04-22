@@ -21,6 +21,13 @@ export default function SettingsPanel() {
   const [isScannerVolumeExpanded, setIsScannerVolumeExpanded] = useState(false);
   const [isScannerSRExpanded, setIsScannerSRExpanded] = useState(false);
 
+  const clampScannerNumber = useCallback((value: number, min: number, max: number, fallback: number) => {
+    if (Number.isNaN(value) || !Number.isFinite(value)) {
+      return fallback;
+    }
+    return Math.max(min, Math.min(max, value));
+  }, []);
+
   const handleBackdropClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
       closePanel();
@@ -150,11 +157,11 @@ export default function SettingsPanel() {
 
         {/* Content */}
         <div 
-          className="flex-1 overflow-y-auto p-3 md:p-6 overscroll-contain"
-          style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'max(2rem, env(safe-area-inset-bottom, 24px))' }}
+          className="flex-1 overflow-y-auto p-4 md:p-6 overscroll-contain"
+          style={{ WebkitOverflowScrolling: 'touch', paddingBottom: 'max(6rem, env(safe-area-inset-bottom, 96px))' }}
         >
           {activeTab === 'scanner' && (
-            <div className="space-y-3">
+            <div className="space-y-4 pb-8">
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <label className="flex items-center justify-between cursor-pointer">
                   <span className="text-primary-muted text-xs font-mono">ENABLE SCANNER</span>
@@ -177,7 +184,9 @@ export default function SettingsPanel() {
                         min="1"
                         max="60"
                         value={settings.scanner.scanInterval}
-                        onChange={(e) => updateScannerSettings({ scanInterval: Number(e.target.value) })}
+                        onChange={(e) => updateScannerSettings({
+                          scanInterval: clampScannerNumber(Number(e.target.value), 1, 60, 5)
+                        })}
                         className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                       />
                     </div>
@@ -189,7 +198,9 @@ export default function SettingsPanel() {
                         min="5"
                         max="500"
                         value={settings.scanner.topMarkets}
-                        onChange={(e) => updateScannerSettings({ topMarkets: Number(e.target.value) })}
+                        onChange={(e) => updateScannerSettings({
+                          topMarkets: clampScannerNumber(Number(e.target.value), 5, 500, 50)
+                        })}
                         className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                       />
                     </div>
@@ -201,7 +212,44 @@ export default function SettingsPanel() {
                         min="1"
                         max="10"
                         value={settings.scanner.candleCacheDuration}
-                        onChange={(e) => updateScannerSettings({ candleCacheDuration: Number(e.target.value) })}
+                        onChange={(e) => updateScannerSettings({
+                          candleCacheDuration: clampScannerNumber(Number(e.target.value), 1, 10, 5)
+                        })}
+                        className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-primary-muted font-mono block mb-1 text-xs">MEDIUM DURATION WARNING (SECONDS)</label>
+                      <input
+                        type="number"
+                        min="0.5"
+                        max="10"
+                        step="0.1"
+                        value={settings.scanner.mediumDurationWarningSec}
+                        onChange={(e) => updateScannerSettings({
+                          mediumDurationWarningSec: clampScannerNumber(Number(e.target.value), 0.5, 10, 1.5)
+                        })}
+                        className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="text-primary-muted font-mono block mb-1 text-xs">HIGH DURATION WARNING (SECONDS)</label>
+                      <input
+                        type="number"
+                        min="0.5"
+                        max="15"
+                        step="0.1"
+                        value={settings.scanner.highDurationWarningSec}
+                        onChange={(e) => {
+                          const highValue = clampScannerNumber(Number(e.target.value), 0.5, 15, 2.5);
+                          const mediumValue = settings.scanner.mediumDurationWarningSec;
+                          updateScannerSettings({
+                            highDurationWarningSec: highValue,
+                            mediumDurationWarningSec: Math.min(mediumValue, highValue),
+                          });
+                        }}
                         className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                       />
                     </div>
@@ -1049,6 +1097,128 @@ export default function SettingsPanel() {
                         )}
                       </div>
                     )}
+
+                    {/* Ritchi Trend Scanner */}
+                    {settings.scanner.enabled && (
+                      <div className="space-y-3">
+                        <div className="p-3 bg-bg-secondary border border-frame rounded">
+                          <label className="flex items-center justify-between cursor-pointer">
+                            <span className="text-primary-muted text-xs font-mono">ENABLE RITCHI TREND SCANNER</span>
+                            <input
+                              type="checkbox"
+                              checked={settings.scanner.ritchiTrendScanner?.enabled || false}
+                              onChange={(e) =>
+                                updateScannerSettings({
+                                  ritchiTrendScanner: {
+                                    ...settings.scanner.ritchiTrendScanner,
+                                    enabled: e.target.checked,
+                                  },
+                                })
+                              }
+                              className="w-4 h-4 accent-primary cursor-pointer"
+                            />
+                          </label>
+                        </div>
+
+                        {settings.scanner.ritchiTrendScanner?.enabled && (
+                          <>
+                            <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
+                              <div className="text-primary font-mono text-xs font-bold mb-2">TIMEFRAMES TO SCAN</div>
+                              <div className="grid grid-cols-2 gap-2">
+                                {(['1m', '5m'] as const).map((tf) => (
+                                  <label key={tf} className="flex items-center gap-2 cursor-pointer">
+                                    <input
+                                      type="checkbox"
+                                      checked={settings.scanner.ritchiTrendScanner?.timeframes.includes(tf) || false}
+                                      onChange={(e) => {
+                                        const newTimeframes = e.target.checked
+                                          ? [...(settings.scanner.ritchiTrendScanner?.timeframes || []), tf]
+                                          : (settings.scanner.ritchiTrendScanner?.timeframes || []).filter((t: string) => t !== tf);
+                                        updateScannerSettings({
+                                          ritchiTrendScanner: {
+                                            ...settings.scanner.ritchiTrendScanner,
+                                            timeframes: newTimeframes,
+                                          },
+                                        });
+                                      }}
+                                      className="w-4 h-4 accent-primary cursor-pointer"
+                                    />
+                                    <span className="text-primary-muted text-xs font-mono">{tf.toUpperCase()}</span>
+                                  </label>
+                                ))}
+                              </div>
+                            </div>
+
+                            <div className="p-3 bg-bg-secondary border border-frame rounded space-y-2">
+                              <div className="text-primary font-mono text-xs font-bold mb-2">PARAMETERS</div>
+                              
+                              <div className="space-y-1">
+                                <label className="text-primary-muted text-xs font-mono">PIVOT LENGTH</label>
+                                <input
+                                  type="number"
+                                  min="3"
+                                  max="20"
+                                  value={settings.scanner.ritchiTrendScanner?.pivLen || 5}
+                                  onChange={(e) =>
+                                    updateScannerSettings({
+                                      ritchiTrendScanner: {
+                                        ...settings.scanner.ritchiTrendScanner,
+                                        pivLen: parseInt(e.target.value) || 5,
+                                      },
+                                    })
+                                  }
+                                  className="w-full px-2 py-1 bg-bg-primary border border-frame text-primary text-xs font-mono rounded"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-primary-muted text-xs font-mono">SMA MIN</label>
+                                <input
+                                  type="number"
+                                  min="3"
+                                  max="50"
+                                  value={settings.scanner.ritchiTrendScanner?.smaMin || 5}
+                                  onChange={(e) =>
+                                    updateScannerSettings({
+                                      ritchiTrendScanner: {
+                                        ...settings.scanner.ritchiTrendScanner,
+                                        smaMin: parseInt(e.target.value) || 5,
+                                      },
+                                    })
+                                  }
+                                  className="w-full px-2 py-1 bg-bg-primary border border-frame text-primary text-xs font-mono rounded"
+                                />
+                              </div>
+
+                              <div className="space-y-1">
+                                <label className="text-primary-muted text-xs font-mono">SMA MAX</label>
+                                <input
+                                  type="number"
+                                  min="10"
+                                  max="200"
+                                  value={settings.scanner.ritchiTrendScanner?.smaMax || 50}
+                                  onChange={(e) =>
+                                    updateScannerSettings({
+                                      ritchiTrendScanner: {
+                                        ...settings.scanner.ritchiTrendScanner,
+                                        smaMax: parseInt(e.target.value) || 50,
+                                      },
+                                    })
+                                  }
+                                  className="w-full px-2 py-1 bg-bg-primary border border-frame text-primary text-xs font-mono rounded"
+                                />
+                              </div>
+                            </div>
+
+                            <div className="p-3 bg-bg-secondary border border-frame rounded">
+                              <div className="text-primary-muted text-xs font-mono">
+                                Detects Siêu Xu Hướng (Ritchi Trend) reversals with pivot-based dynamic SMA bands. Shows BUY/SELL signals with Stop Loss and Take Profit levels.
+                              </div>
+                            </div>
+                          </>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </>
               )}
@@ -1056,7 +1226,7 @@ export default function SettingsPanel() {
           )}
 
           {activeTab === 'indicators' && (
-            <div className="space-y-3">
+            <div className="space-y-4 pb-8">
               {/* Stochastic Settings - Expandable */}
               <div className="border border-frame rounded overflow-hidden">
                 <button
@@ -1719,7 +1889,7 @@ export default function SettingsPanel() {
           )}
 
           {activeTab === 'orders' && (
-            <div className="space-y-3">
+            <div className="space-y-4 pb-8">
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <div className="text-primary font-mono text-xs font-bold mb-3">█ POSITION SIZE (% OF ACCOUNT VALUE)</div>
                 <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
@@ -1769,7 +1939,7 @@ export default function SettingsPanel() {
 
                   <div>
                     <label className="text-primary-muted font-mono block mb-2 text-xs flex items-center justify-between">
-                      <span>BIG ORDERS (BIG LONG/SHORT)</span>
+                      <span>BUY/SELL ORDERS (MARKET ORDER - Hotkeys A/S)</span>
                       <span className="text-accent-rose">{settings.orders.bigPercentage}%</span>
                     </label>
                     <input
@@ -1828,7 +1998,7 @@ export default function SettingsPanel() {
           )}
 
           {activeTab === 'ui' && (
-            <div className="space-y-3">
+            <div className="space-y-4 pb-8">
               <LanguageSwitcher />
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <div className="text-primary font-mono text-xs font-bold mb-3">█ THEME</div>
@@ -1947,13 +2117,13 @@ export default function SettingsPanel() {
           )}
 
           {activeTab === 'credentials' && (
-            <div className="space-y-3">
+            <div className="space-y-4 pb-8">
               <CredentialsSettings />
             </div>
           )}
 
           {activeTab === 'ai' && (
-            <div className="space-y-3">
+            <div className="space-y-4 pb-8">
               {/* Enable AI Strategy */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <label className="flex items-center justify-between cursor-pointer">
