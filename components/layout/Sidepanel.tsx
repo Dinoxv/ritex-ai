@@ -14,6 +14,7 @@ import { useSymbolMetaStore } from '@/stores/useSymbolMetaStore';
 import { useSymbolVolatilityStore } from '@/stores/useSymbolVolatilityStore';
 import { useSymbolCandlesStore } from '@/stores/useSymbolCandlesStore';
 import { useGlobalPollingStore } from '@/stores/useGlobalPollingStore';
+import { useDexStore } from '@/stores/useDexStore';
 import { formatPrice } from '@/lib/format-utils';
 import { useAddressFromUrl } from '@/lib/hooks/use-address-from-url';
 import { usePriceVolumeAnimation } from '@/hooks/usePriceVolumeAnimation';
@@ -163,9 +164,19 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
   const router = useRouter();
   const address = useAddressFromUrl();
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [symbolSearchQuery, setSymbolSearchQuery] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { results, status, scannerMetrics, runScan, startAutoScanWithDelay, stopAutoScan } = useScannerStore();
   const { settings, pinSymbol, unpinSymbol } = useSettingsStore();
+  const selectedExchange = useDexStore((state) => state.selectedExchange);
+  const scannerRuntime = settings.scanner.runtimeByExchange?.[selectedExchange] ?? {
+    enabled: settings.scanner.enabled,
+    scanInterval: settings.scanner.scanInterval,
+    topMarkets: settings.scanner.topMarkets,
+    playSound: settings.scanner.playSound,
+  };
   const invertedMode = settings.chart.invertedMode;
   const topSymbols = useTopSymbolsStore((state) => state.symbols);
   const isLoadingTopSymbols = useTopSymbolsStore((state) => state.isLoading);
@@ -220,8 +231,15 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
       .sort();
   }, [topSymbols]);
 
+  const filteredNonTop20Symbols = useMemo(() => {
+    if (!symbolSearchQuery.trim()) return nonTop20Symbols;
+
+    const query = symbolSearchQuery.trim().toUpperCase();
+    return nonTop20Symbols.filter((symbol) => symbol.includes(query));
+  }, [nonTop20Symbols, symbolSearchQuery]);
+
   useEffect(() => {
-    if (settings.scanner.enabled) {
+    if (scannerRuntime.enabled) {
       startAutoScanWithDelay();
     } else {
       stopAutoScan();
@@ -230,7 +248,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
     return () => {
       stopAutoScan();
     };
-  }, [settings.scanner.enabled, settings.scanner.scanInterval]);
+  }, [scannerRuntime.enabled, scannerRuntime.scanInterval, selectedExchange]);
 
   useEffect(() => {
     startAutoRefresh();
@@ -273,6 +291,24 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
       return () => clearInterval(intervalId);
     }
   }, [allSymbolsString, lastCandlePollTime]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+        setSymbolSearchQuery('');
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      searchInputRef.current?.focus();
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   const formatTimeSince = (timestamp: number | null) => {
     if (!timestamp) return 'Never';
@@ -480,7 +516,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
   return (
     <div className="p-2 h-full flex gap-2 overflow-hidden">
       {/* Left Column - Scanner */}
-      {settings.scanner.enabled && (mobileView === 'all' || mobileView === 'scanner') && (
+      {scannerRuntime.enabled && (mobileView === 'all' || mobileView === 'scanner') && (
         <div className={`${mobileView === 'scanner' ? 'w-full' : 'w-[200px]'} flex flex-col overflow-hidden flex-shrink-0`}>
           <div className="terminal-border p-2 mb-2 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
@@ -672,9 +708,14 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
             <>
 
             {/* Add Symbols Dropdown */}
-            <div className="flex-shrink-0 mb-2">
+            <div ref={dropdownRef} className="flex-shrink-0 mb-2 relative">
             <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              onClick={() => {
+                setIsDropdownOpen(!isDropdownOpen);
+                if (isDropdownOpen) {
+                  setSymbolSearchQuery('');
+                }
+              }}
               className="w-full terminal-border p-2 hover:bg-primary/5 active:bg-primary/10 active:scale-[0.99] cursor-pointer transition-all"
             >
               <div className="flex items-center justify-between">
@@ -684,14 +725,25 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
             </button>
 
             {isDropdownOpen && (
-              <div className="mt-1 terminal-border bg-bg-primary max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-primary-dark scrollbar-track-transparent">
-                {nonTop20Symbols.length === 0 ? (
+              <div className="mt-1 terminal-border bg-bg-primary max-h-80 overflow-hidden scrollbar-thin scrollbar-thumb-primary-dark scrollbar-track-transparent">
+                <div className="p-2 border-b border-frame">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={symbolSearchQuery}
+                    onChange={(e) => setSymbolSearchQuery(e.target.value)}
+                    placeholder="Search symbols..."
+                    className="w-full px-2 py-1 bg-bg-secondary terminal-border text-primary text-sm font-mono focus:outline-none focus:border-primary/50"
+                  />
+                </div>
+
+                {filteredNonTop20Symbols.length === 0 ? (
                   <div className="p-3 text-center text-primary-muted text-xs font-mono">
-                    No additional symbols available
+                    {symbolSearchQuery.trim() ? 'No symbols found' : 'No additional symbols available'}
                   </div>
                 ) : (
-                  <div className="divide-y divide-frame">
-                    {nonTop20Symbols.map((symbol) => {
+                  <div className="divide-y divide-frame max-h-64 overflow-y-auto">
+                    {filteredNonTop20Symbols.map((symbol) => {
                       const isPinned = pinnedSymbols.includes(symbol);
 
                       return (
