@@ -168,6 +168,20 @@ export interface ScannerSettings {
   scanInterval: number;
   topMarkets: number;
   playSound: boolean;
+  runtimeByExchange: {
+    hyperliquid: {
+      enabled: boolean;
+      scanInterval: number;
+      topMarkets: number;
+      playSound: boolean;
+    };
+    binance: {
+      enabled: boolean;
+      scanInterval: number;
+      topMarkets: number;
+      playSound: boolean;
+    };
+  };
   candleCacheDuration: number;
   mediumDurationWarningSec: number;
   highDurationWarningSec: number;
@@ -176,6 +190,22 @@ export interface ScannerSettings {
   telegramChatId: string;
   telegramSignalFilter: 'all' | 'bullish' | 'bearish';
   telegramShowTpSl: boolean;
+  telegramByExchange: {
+    hyperliquid: {
+      enabled: boolean;
+      botToken: string;
+      chatId: string;
+      signalFilter: 'all' | 'bullish' | 'bearish';
+      showTpSl: boolean;
+    };
+    binance: {
+      enabled: boolean;
+      botToken: string;
+      chatId: string;
+      signalFilter: 'all' | 'bullish' | 'bearish';
+      showTpSl: boolean;
+    };
+  };
   stochasticScanner: StochasticScannerConfig;
   emaAlignmentScanner: EmaAlignmentScannerConfig;
   channelScanner: ChannelScannerConfig;
@@ -193,6 +223,20 @@ export interface OrderSettings {
   smallPercentage: number;
   bigPercentage: number;
   leverage: number;
+  byExchange: {
+    hyperliquid: {
+      cloudPercentage: number;
+      smallPercentage: number;
+      bigPercentage: number;
+      leverage: number;
+    };
+    binance: {
+      cloudPercentage: number;
+      smallPercentage: number;
+      bigPercentage: number;
+      leverage: number;
+    };
+  };
 }
 
 export type ThemeName = 'dark' | 'hyper' | 'hyper-black' | 'midnight' | 'light' | 'dark-blue' | 'afternoon' | 'psychedelic' | 'nintendo' | 'gameboy' | 'sega' | 'playstation' | 'cyberpunk' | 'vaporwave' | 'matrix' | 'synthwave' | 'ocean' | 'c64' | 'amber' | 'girly';
@@ -221,8 +265,41 @@ export interface AIStrategyConfig {
   telegramEnabled: boolean;
   telegramBotToken: string;
   telegramChatId: string;
+  telegramByExchange: {
+    hyperliquid: {
+      enabled: boolean;
+      botToken: string;
+      chatId: string;
+    };
+    binance: {
+      enabled: boolean;
+      botToken: string;
+      chatId: string;
+    };
+  };
   strategy: 'stochastic_reversal_scalp';
   maxCallsPerHour: number;
+}
+
+export type BotIndicatorType = 'ritchi' | 'kalmanTrend' | 'macdReversal';
+export type BotExchange = 'binance' | 'hyperliquid';
+export type BotSymbolMode = 'auto' | 'manual';
+
+export interface BotTradingSettings {
+  enabled: boolean;
+  indicator: BotIndicatorType;
+  paperMode: boolean;
+  exchange: BotExchange;
+  timeframe: '1m' | '5m';
+  scanIntervalSec: number;
+  initialMarginUsdt: number;
+  maxLossPercentPerDay: number;
+  leverageByExchange: {
+    binance: number;
+    hyperliquid: number;
+  };
+  symbolMode: BotSymbolMode;
+  manualSymbols: string[];
 }
 
 export interface AppSettings {
@@ -232,6 +309,7 @@ export interface AppSettings {
   theme: ThemeSettings;
   chart: ChartSettings;
   ai: AIStrategyConfig;
+  bot: BotTradingSettings;
   pinnedSymbols: string[];
 }
 
@@ -325,14 +403,44 @@ export const DEFAULT_SETTINGS: AppSettings = {
     scanInterval: 1,
     topMarkets: 50,
     playSound: true,
+    runtimeByExchange: {
+      hyperliquid: {
+        enabled: false,
+        scanInterval: 1,
+        topMarkets: 50,
+        playSound: true,
+      },
+      binance: {
+        enabled: false,
+        scanInterval: 1,
+        topMarkets: 50,
+        playSound: true,
+      },
+    },
     candleCacheDuration: 1,
-    mediumDurationWarningSec: 1.5,
-    highDurationWarningSec: 2.5,
+    mediumDurationWarningSec: 1.2,
+    highDurationWarningSec: 2.0,
     telegramEnabled: false,
     telegramBotToken: '',
     telegramChatId: '',
     telegramSignalFilter: 'all',
     telegramShowTpSl: false,
+    telegramByExchange: {
+      hyperliquid: {
+        enabled: false,
+        botToken: '',
+        chatId: '',
+        signalFilter: 'all',
+        showTpSl: false,
+      },
+      binance: {
+        enabled: false,
+        botToken: '',
+        chatId: '',
+        signalFilter: 'all',
+        showTpSl: false,
+      },
+    },
     stochasticScanner: {
       enabled: false,
       oversoldThreshold: 20,
@@ -415,6 +523,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
     smallPercentage: 10,
     bigPercentage: 25,
     leverage: 10,
+    byExchange: {
+      hyperliquid: {
+        cloudPercentage: 5,
+        smallPercentage: 10,
+        bigPercentage: 25,
+        leverage: 10,
+      },
+      binance: {
+        cloudPercentage: 5,
+        smallPercentage: 10,
+        bigPercentage: 25,
+        leverage: 10,
+      },
+    },
   },
   theme: {
     selected: 'dark-blue',
@@ -438,8 +560,36 @@ export const DEFAULT_SETTINGS: AppSettings = {
     telegramEnabled: false,
     telegramBotToken: '',
     telegramChatId: '',
+    telegramByExchange: {
+      hyperliquid: {
+        enabled: false,
+        botToken: '',
+        chatId: '',
+      },
+      binance: {
+        enabled: false,
+        botToken: '',
+        chatId: '',
+      },
+    },
     strategy: 'stochastic_reversal_scalp',
     maxCallsPerHour: 30,
+  },
+  bot: {
+    enabled: false,
+    indicator: 'ritchi',
+    paperMode: true,
+    exchange: 'binance',
+    timeframe: '1m',
+    scanIntervalSec: 30,
+    initialMarginUsdt: 25,
+    maxLossPercentPerDay: 3,
+    leverageByExchange: {
+      binance: 10,
+      hyperliquid: 10,
+    },
+    symbolMode: 'auto',
+    manualSymbols: [],
   },
   pinnedSymbols: [],
 };
