@@ -10,8 +10,8 @@ import type {
   AllMidsData
 } from './exchange-websocket.interface';
 
-import { EventClient, WebSocketTransport } from '@nktkas/hyperliquid';
-import type { Candle, WsTrade } from '@nktkas/hyperliquid';
+import { SubscriptionClient, WebSocketTransport } from '@nktkas/hyperliquid';
+import type { CandleWsEvent, TradesWsEvent } from '@nktkas/hyperliquid';
 import { useSymbolMetaStore } from '@/stores/useSymbolMetaStore';
 import { useWebSocketStatusStore } from '@/stores/useWebSocketStatusStore';
 import { formatPrice, formatSize } from '@/lib/format-utils';
@@ -26,7 +26,7 @@ interface Subscription {
 
 export class HyperliquidWebSocketService implements ExchangeWebSocketService {
   private wsTransport: WebSocketTransport | null = null;
-  private eventClient: EventClient | null = null;
+  private eventClient: SubscriptionClient | null = null;
   private subscriptions: Map<string, Subscription> = new Map();
   private isInitialized = false;
   private wsUrl: string;
@@ -43,7 +43,7 @@ export class HyperliquidWebSocketService implements ExchangeWebSocketService {
     try {
       useWebSocketStatusStore.getState().setOverallStatus('connecting');
       this.wsTransport = new WebSocketTransport({ url: this.wsUrl });
-      this.eventClient = new EventClient({ transport: this.wsTransport });
+      this.eventClient = new SubscriptionClient({ transport: this.wsTransport });
       this.isInitialized = true;
       useWebSocketStatusStore.getState().setOverallStatus('connected');
     } catch (error) {
@@ -61,8 +61,8 @@ export class HyperliquidWebSocketService implements ExchangeWebSocketService {
       }
 
       const unsubscribeFn = this.eventClient.candle(
-        { coin: params.coin, interval: params.interval },
-        (candle: Candle) => {
+        { coin: params.coin, interval: params.interval as CandleWsEvent['i'] },
+        (candle: CandleWsEvent) => {
           try {
             const open = parseFloat(candle.o);
             const high = parseFloat(candle.h);
@@ -116,10 +116,10 @@ export class HyperliquidWebSocketService implements ExchangeWebSocketService {
 
       const unsubscribeFn = this.eventClient.trades(
         { coin: params.coin },
-        (trades: WsTrade[]) => {
+        (trades: TradesWsEvent) => {
           try {
             const decimals = useSymbolMetaStore.getState().getDecimals(params.coin);
-            const tradeBatch = trades.map((trade: WsTrade): TradeData => {
+            const tradeBatch = trades.map((trade): TradeData => {
               const price = parseFloat(trade.px);
               const size = parseFloat(trade.sz);
               return {
