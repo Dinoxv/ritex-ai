@@ -3,6 +3,7 @@
 import { memo } from 'react';
 import { useAddressFromUrl } from '@/lib/hooks/use-address-from-url';
 import { useIsOwnWallet } from '@/lib/hooks/use-is-own-wallet';
+import { isBinanceRouteSlug } from '@/lib/constants/routing';
 
 function WalletIndicator() {
   const addressFromUrl = useAddressFromUrl();
@@ -10,6 +11,17 @@ function WalletIndicator() {
 
   if (!addressFromUrl) {
     return null;
+  }
+
+  if (isBinanceRouteSlug(addressFromUrl)) {
+    return (
+      <div className="flex items-center gap-2 px-2 py-1 text-[10px] font-mono">
+        <div className="flex items-center gap-1">
+          <span className="text-bullish">●</span>
+          <span className="text-primary font-bold">BINANCE API MODE</span>
+        </div>
+      </div>
+    );
   }
 
   const shortAddress = `${addressFromUrl.slice(0, 6)}...${addressFromUrl.slice(-4)}`;

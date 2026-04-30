@@ -18,6 +18,7 @@ import { useCandleStore } from '@/stores/useCandleStore';
 import { useTradingStore } from '@/stores/useTradingStore';
 import { useDexStore } from '@/stores/useDexStore';
 import { useAddressFromUrl } from '@/lib/hooks/use-address-from-url';
+import { BINANCE_ROUTE_SLUG } from '@/lib/constants/routing';
 import { calculateAverageCandleHeight } from '@/lib/trading-utils';
 import { playNotificationSound } from '@/lib/sound-utils';
 
@@ -342,7 +343,7 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
             <EyeIcon />
           </button>
           <button
-            onClick={() => address && router.push(`/${address}/bot`)}
+            onClick={() => router.push(`/${BINANCE_ROUTE_SLUG}/bot`)}
             className={`hidden md:flex px-2 py-1.5 active:scale-95 cursor-pointer transition-all rounded-sm text-xs font-bold ${
               isBotView
                 ? 'bg-primary/20 text-primary border-2 border-primary'

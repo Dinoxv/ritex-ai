@@ -69,18 +69,38 @@ export default function ChartPopupView({ coin, address }: ChartPopupViewProps) {
     };
   }, [coin, candleService, fetchCandles, subscribeToCandles, unsubscribeFromCandles]);
 
-  const stochasticCandleData: Partial<Record<TimeInterval, CandleData[]>> = useMemo(() => ({
+  const stochasticCandleData: Record<TimeInterval, CandleData[]> = useMemo(() => ({
     '1m': candles1m,
+    '3m': EMPTY_CANDLES,
     '5m': candles5m,
     '15m': candles15m,
+    '30m': EMPTY_CANDLES,
     '1h': candles1h,
+    '2h': EMPTY_CANDLES,
+    '4h': EMPTY_CANDLES,
+    '8h': EMPTY_CANDLES,
+    '12h': EMPTY_CANDLES,
+    '1d': EMPTY_CANDLES,
+    '3d': EMPTY_CANDLES,
+    '1w': EMPTY_CANDLES,
+    '1M': EMPTY_CANDLES,
   }), [candles1m, candles5m, candles15m, candles1h]);
 
-  const macdCandleData: Partial<Record<TimeInterval, CandleData[]>> = useMemo(() => ({
+  const macdCandleData: Record<TimeInterval, CandleData[]> = useMemo(() => ({
     '1m': candles1m,
+    '3m': EMPTY_CANDLES,
     '5m': candles5m,
     '15m': candles15m,
+    '30m': EMPTY_CANDLES,
     '1h': candles1h,
+    '2h': EMPTY_CANDLES,
+    '4h': EMPTY_CANDLES,
+    '8h': EMPTY_CANDLES,
+    '12h': EMPTY_CANDLES,
+    '1d': EMPTY_CANDLES,
+    '3d': EMPTY_CANDLES,
+    '1w': EMPTY_CANDLES,
+    '1M': EMPTY_CANDLES,
   }), [candles1m, candles5m, candles15m, candles1h]);
 
   return (

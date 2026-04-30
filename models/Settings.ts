@@ -161,6 +161,10 @@ export interface RitchiTrendScannerConfig {
   pivLen: number;
   smaMin: number;
   smaMax: number;
+  smaMult: number;
+  trendLen: number;
+  atrMult: number;
+  tpMult: number;
 }
 
 export interface ScannerSettings {
@@ -292,6 +296,7 @@ export interface BotTradingSettings {
   exchange: BotExchange;
   timeframe: '1m' | '5m';
   scanIntervalSec: number;
+  autoTopSymbolsCount: number;
   initialMarginUsdt: number;
   maxLossPercentPerDay: number;
   leverageByExchange: {
@@ -516,6 +521,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
       pivLen: 5,
       smaMin: 5,
       smaMax: 50,
+      smaMult: 1.0,
+      trendLen: 100,
+      atrMult: 2.0,
+      tpMult: 3.0,
     },
   },
   orders: {
@@ -578,10 +587,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
   bot: {
     enabled: false,
     indicator: 'ritchi',
-    paperMode: true,
+    paperMode: false,
     exchange: 'binance',
     timeframe: '1m',
     scanIntervalSec: 30,
+    autoTopSymbolsCount: 3,
     initialMarginUsdt: 25,
     maxLossPercentPerDay: 3,
     leverageByExchange: {

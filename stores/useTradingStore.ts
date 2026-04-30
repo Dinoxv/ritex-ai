@@ -3,6 +3,7 @@ import type { ExchangeTradingService } from '@/lib/services/types';
 import { useOrderStore } from './useOrderStore';
 import { usePositionStore } from './usePositionStore';
 import { useSettingsStore } from './useSettingsStore';
+import { useDexStore } from './useDexStore';
 import toast from 'react-hot-toast';
 import {
   getRawPositionEntryPrice,
@@ -14,6 +15,36 @@ import {
 const ORDER_COUNT = 5;
 const TAKE_PROFIT_PERCENT = 2;
 const MIN_NOTIONAL = 10; // Hyperliquid minimum order value in USD
+
+function resolveOrderValueByPercent(accountBalance: { accountValue: string; withdrawable: string }, percentage: number): number {
+  const accountValue = Number.parseFloat(accountBalance.accountValue || '0');
+
+  if (!Number.isFinite(accountValue) || accountValue <= 0) {
+    throw new Error('Perps account value is 0. Transfer USDC to Perps or close positions before opening a new trade.');
+  }
+
+  const requestedValue = (accountValue * percentage) / 100;
+  if (requestedValue >= MIN_NOTIONAL) {
+    return requestedValue;
+  }
+
+  if (accountValue >= MIN_NOTIONAL) {
+    return MIN_NOTIONAL;
+  }
+
+  const withdrawable = Number.parseFloat(accountBalance.withdrawable || '0');
+  throw new Error(
+    `Perps account value ($${accountValue.toFixed(2)}) is below minimum $${MIN_NOTIONAL}. ` +
+    `Withdrawable: $${Number.isFinite(withdrawable) ? withdrawable.toFixed(2) : '0.00'}.`
+  );
+}
+
+function resolveActiveLeverage(): number {
+  const orders = useSettingsStore.getState().settings.orders;
+  const selectedExchange = useDexStore.getState().selectedExchange;
+
+  return orders.byExchange?.[selectedExchange]?.leverage ?? orders.leverage;
+}
 
 interface CloudOrderParams {
   symbol: string;
@@ -116,16 +147,10 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         priceLevels.push(level);
       }
 
-      const leverage = useSettingsStore.getState().settings.orders.leverage;
+      const leverage = resolveActiveLeverage();
       await service.setLeverage(symbol, leverage, metadata);
 
-      const accountValue = parseFloat(accountBalance.accountValue);
-      const cloudSize = (accountValue * percentage) / 100;
-
-      // Check if total cloud size can support ORDER_COUNT orders at $10 minimum each
-      if (cloudSize < MIN_NOTIONAL) {
-        throw new Error(`Order value ($${cloudSize.toFixed(2)}) is below minimum $${MIN_NOTIONAL}. Increase position size % or account balance.`);
-      }
+      const cloudSize = resolveOrderValueByPercent(accountBalance, percentage);
 
       const batchOrders = [];
       let totalCoinSize = 0;
@@ -275,15 +300,10 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         priceLevels.push(level);
       }
 
-      const leverage = useSettingsStore.getState().settings.orders.leverage;
+      const leverage = resolveActiveLeverage();
       await service.setLeverage(symbol, leverage, metadata);
 
-      const accountValue = parseFloat(accountBalance.accountValue);
-      const cloudSize = (accountValue * percentage) / 100;
-
-      if (cloudSize < MIN_NOTIONAL) {
-        throw new Error(`Order value ($${cloudSize.toFixed(2)}) is below minimum $${MIN_NOTIONAL}. Increase position size % or account balance.`);
-      }
+      const cloudSize = resolveOrderValueByPercent(accountBalance, percentage);
 
       const batchOrders = [];
       let totalCoinSize = 0;
@@ -426,15 +446,10 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         service.getMetadataCache(symbol)
       ]);
 
-      const leverage = useSettingsStore.getState().settings.orders.leverage;
+      const leverage = resolveActiveLeverage();
       await service.setLeverage(symbol, leverage, metadata);
 
-      const accountValue = parseFloat(accountBalance.accountValue);
-      const positionSize = (accountValue * percentage) / 100;
-
-      if (positionSize < MIN_NOTIONAL) {
-        throw new Error(`Order value ($${positionSize.toFixed(2)}) is below minimum $${MIN_NOTIONAL}. Increase position size % or account balance.`);
-      }
+      const positionSize = resolveOrderValueByPercent(accountBalance, percentage);
 
       const coinSize = positionSize / currentPrice;
       const { size: formattedSize, wasBumped } = service.ensureMinNotional(coinSize, currentPrice, metadata, MIN_NOTIONAL);
@@ -543,15 +558,10 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         service.getMetadataCache(symbol)
       ]);
 
-      const leverage = useSettingsStore.getState().settings.orders.leverage;
+      const leverage = resolveActiveLeverage();
       await service.setLeverage(symbol, leverage, metadata);
 
-      const accountValue = parseFloat(accountBalance.accountValue);
-      const positionSize = (accountValue * percentage) / 100;
-
-      if (positionSize < MIN_NOTIONAL) {
-        throw new Error(`Order value ($${positionSize.toFixed(2)}) is below minimum $${MIN_NOTIONAL}. Increase position size % or account balance.`);
-      }
+      const positionSize = resolveOrderValueByPercent(accountBalance, percentage);
 
       const coinSize = positionSize / currentPrice;
       const { size: formattedSize, wasBumped } = service.ensureMinNotional(coinSize, currentPrice, metadata, MIN_NOTIONAL);
@@ -660,15 +670,10 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         service.getMetadataCache(symbol)
       ]);
 
-      const leverage = useSettingsStore.getState().settings.orders.leverage;
+      const leverage = resolveActiveLeverage();
       await service.setLeverage(symbol, leverage, metadata);
 
-      const accountValue = parseFloat(accountBalance.accountValue);
-      const positionSize = (accountValue * percentage) / 100;
-
-      if (positionSize < MIN_NOTIONAL) {
-        throw new Error(`Order value ($${positionSize.toFixed(2)}) is below minimum $${MIN_NOTIONAL}. Increase position size % or account balance.`);
-      }
+      const positionSize = resolveOrderValueByPercent(accountBalance, percentage);
 
       const coinSize = positionSize / currentPrice;
       const { size: formattedSize, wasBumped } = service.ensureMinNotional(coinSize, currentPrice, metadata, MIN_NOTIONAL);
@@ -777,15 +782,10 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         service.getMetadataCache(symbol)
       ]);
 
-      const leverage = useSettingsStore.getState().settings.orders.leverage;
+      const leverage = resolveActiveLeverage();
       await service.setLeverage(symbol, leverage, metadata);
 
-      const accountValue = parseFloat(accountBalance.accountValue);
-      const positionSize = (accountValue * percentage) / 100;
-
-      if (positionSize < MIN_NOTIONAL) {
-        throw new Error(`Order value ($${positionSize.toFixed(2)}) is below minimum $${MIN_NOTIONAL}. Increase position size % or account balance.`);
-      }
+      const positionSize = resolveOrderValueByPercent(accountBalance, percentage);
 
       const coinSize = positionSize / currentPrice;
       const { size: formattedSize, wasBumped } = service.ensureMinNotional(coinSize, currentPrice, metadata, MIN_NOTIONAL);
@@ -912,22 +912,17 @@ export const useTradingStore = create<TradingStore>((set, get) => ({
         service.getMetadataCache(symbol)
       ]);
 
-      const leverage = useSettingsStore.getState().settings.orders.leverage;
+      const leverage = resolveActiveLeverage();
       await service.setLeverage(symbol, leverage, metadata);
 
-      const accountValue = parseFloat(accountBalance.accountValue);
-      const positionSize = (accountValue * percentage) / 100;
-
-      if (positionSize < MIN_NOTIONAL) {
-        throw new Error(`Order value ($${positionSize.toFixed(2)}) is below minimum $${MIN_NOTIONAL}. Increase position size % or account balance.`);
-      }
+      const positionSize = resolveOrderValueByPercent(accountBalance, percentage);
 
       const coinSize = positionSize / price;
       const { size: formattedSize, wasBumped } = service.ensureMinNotional(coinSize, price, metadata, MIN_NOTIONAL);
       const formattedPrice = service.formatPriceCached(price, metadata);
 
       console.log('[placeLimitOrderAtPrice] Calculated values:', {
-        accountValue,
+        accountValue: parseFloat(accountBalance.accountValue),
         positionSize,
         coinSize,
         formattedSize,

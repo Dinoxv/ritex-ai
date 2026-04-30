@@ -1,12 +1,14 @@
 interface TerminalFooterProps {
   coin: string;
+  exchange?: 'hyperliquid' | 'binance';
 }
 
-export default function TerminalFooter({ coin }: TerminalFooterProps) {
+export default function TerminalFooter({ coin, exchange = 'hyperliquid' }: TerminalFooterProps) {
+  const exchangeLabel = exchange.toUpperCase();
   return (
     <div className="terminal-border p-1 mt-2">
       <div className="flex flex-wrap items-center justify-center gap-2 text-[10px] text-primary-muted font-mono tracking-wider">
-        <span>█ CONNECTED █ STREAMING █ {coin}/USD █ HYPERLIQUID API █</span>
+        <span>█ CONNECTED █ STREAMING █ {coin}/USD █ {exchangeLabel} API █</span>
         <span className="inline-flex items-center gap-1">
           <img
             src="/Ritchi-icon.png"

@@ -22,7 +22,7 @@ export async function generateMetadata({ params }: SymbolPageProps): Promise<Met
 
   return {
     title: `${normalized} Trading | RITEX AI`,
-    description: `Real-time ${normalized} chart with advanced scalping tools on Hyperliquid DEX`,
+    description: `Real-time ${normalized} chart with advanced scalping tools across supported exchanges`,
   };
 }
 

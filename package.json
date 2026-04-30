@@ -6,6 +6,7 @@
     "dev": "next dev -p 3001",
     "build": "next build",
     "start": "next start -p 3001",
+    "deploy:pm2": "./deploy-pm2.sh",
     "lint": "eslint",
     "smoke:multi-exchange": "tsx scripts/smoke-multi-exchange.ts",
     "smoke:multi-exchange:private": "SMOKE_REQUIRE_PRIVATE=true tsx scripts/smoke-multi-exchange.ts"
@@ -28,6 +29,7 @@
     "zustand": "^5.0.8"
   },
   "devDependencies": {
+    "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
     "@types/node": "^20",
     "@types/react": "^19",

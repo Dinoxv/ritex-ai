@@ -52,6 +52,10 @@ type BinanceOrderType =
   | 'TAKE_PROFIT'
   | 'TAKE_PROFIT_MARKET';
 
+type BinanceAlgoOrderType = 'STOP_MARKET' | 'TAKE_PROFIT_MARKET';
+
+type BinanceWorkingType = 'MARK_PRICE' | 'CONTRACT_PRICE';
+
 type BinanceExchangeInfoSymbol = {
   symbol: string;
   contractType: string;
@@ -70,6 +74,10 @@ type BinancePositionRisk = {
   markPrice: string;
   unrealizedProfit: string;
   leverage: string;
+};
+
+type BinancePositionModeResponse = {
+  dualSidePosition: boolean | string;
 };
 
 type BinanceAccountTrade = {
@@ -125,6 +133,12 @@ function normalizeInterval(interval: string): string {
   return interval === '1M' ? '1M' : interval;
 }
 
+function buildClientOrderId(prefix: 'entry' | 'sl' | 'tp'): string {
+  const rand = Math.random().toString(36).slice(2, 8);
+  // Binance newClientOrderId max length is 36
+  return `rtx_${prefix}_${Date.now()}_${rand}`;
+}
+
 export class BinanceService extends HyperliquidService {
   private readonly apiKey: string;
   private readonly apiSecret: string;
@@ -154,6 +168,15 @@ export class BinanceService extends HyperliquidService {
 
   private readonly POSITION_CACHE_TTL = 5_000; // 5s
   private readonly ORDER_CACHE_TTL = 3_000; // 3s
+  private readonly POSITION_MODE_CACHE_TTL = 15_000; // 15s
+  private positionModeCache: {
+    isHedgeMode: boolean | null;
+    expiresAt: number;
+  } = {
+    isHedgeMode: null,
+    expiresAt: 0,
+  };
+  private restBackoffUntil = 0;
 
   constructor(apiKey: string | null, apiSecret: string | null, isTestnet: boolean = false) {
     super(null, DUMMY_WALLET, isTestnet);
@@ -192,6 +215,24 @@ export class BinanceService extends HyperliquidService {
   private invalidateAllCaches(): void {
     this.invalidatePositionCache();
     this.invalidateOrderCache();
+    this.positionModeCache = {
+      isHedgeMode: null,
+      expiresAt: 0,
+    };
+  }
+
+  private async getIsHedgeMode(forceRefresh: boolean = false): Promise<boolean> {
+    if (!forceRefresh && this.positionModeCache.isHedgeMode !== null && Date.now() < this.positionModeCache.expiresAt) {
+      return this.positionModeCache.isHedgeMode;
+    }
+
+    const res = await this.signedRequest<BinancePositionModeResponse>('GET', '/fapi/v1/positionSide/dual');
+    const isHedgeMode = res.dualSidePosition === true || String(res.dualSidePosition).toLowerCase() === 'true';
+    this.positionModeCache = {
+      isHedgeMode,
+      expiresAt: Date.now() + this.POSITION_MODE_CACHE_TTL,
+    };
+    return isHedgeMode;
   }
 
   private ensureApiCredentials(): void {
@@ -200,24 +241,51 @@ export class BinanceService extends HyperliquidService {
     }
   }
 
-  private async signPayload(payload: string): Promise<string> {
-    const encoder = new TextEncoder();
-    const key = await crypto.subtle.importKey(
-      'raw',
-      encoder.encode(this.apiSecret),
-      { name: 'HMAC', hash: 'SHA-256' },
-      false,
-      ['sign']
-    );
+  private parseBannedUntilTimestamp(errorBody: string): number | null {
+    const match = errorBody.match(/banned until\s+(\d{10,13})/i);
+    if (!match?.[1]) {
+      return null;
+    }
 
-    const signature = await crypto.subtle.sign('HMAC', key, encoder.encode(payload));
-    const bytes = new Uint8Array(signature);
-    return Array.from(bytes)
-      .map((b) => b.toString(16).padStart(2, '0'))
-      .join('');
+    const raw = Number(match[1]);
+    if (!Number.isFinite(raw)) {
+      return null;
+    }
+
+    // Binance can return seconds or milliseconds depending on endpoint.
+    return raw < 1_000_000_000_000 ? raw * 1000 : raw;
+  }
+
+  private throwIfBackoffActive(): void {
+    const now = Date.now();
+    if (now < this.restBackoffUntil) {
+      const seconds = Math.max(1, Math.ceil((this.restBackoffUntil - now) / 1000));
+      throw new Error(`Binance REST đang cooldown do rate limit. Tự retry sau khoảng ${seconds}s.`);
+    }
+  }
+
+  private registerRateLimitBackoff(status: number, errorBody: string): void {
+    const lower = errorBody.toLowerCase();
+    const isTooManyRequests =
+      status === 418 ||
+      status === 429 ||
+      lower.includes('too many requests') ||
+      lower.includes('code":-1003') ||
+      lower.includes('"code": -1003');
+
+    if (!isTooManyRequests) {
+      return;
+    }
+
+    const bannedUntil = this.parseBannedUntilTimestamp(errorBody);
+    const fallbackCooldownMs = status === 418 ? 180_000 : 30_000;
+    const nextBackoffUntil = bannedUntil ?? (Date.now() + fallbackCooldownMs);
+    this.restBackoffUntil = Math.max(this.restBackoffUntil, nextBackoffUntil);
   }
 
   private async publicRequest<T>(path: string, params: Record<string, string | number | boolean> = {}): Promise<T> {
+    this.throwIfBackoffActive();
+
     const qs = new URLSearchParams();
     Object.entries(params).forEach(([k, v]) => {
       if (v !== undefined && v !== null) qs.set(k, String(v));
@@ -227,6 +295,7 @@ export class BinanceService extends HyperliquidService {
     const res = await fetch(url, { method: 'GET' });
     if (!res.ok) {
       const txt = await res.text();
+      this.registerRateLimitBackoff(res.status, txt);
       throw new Error(`Binance API lỗi (${res.status}): ${txt}`);
     }
     return (await res.json()) as T;
@@ -238,33 +307,41 @@ export class BinanceService extends HyperliquidService {
     params: Record<string, string | number | boolean> = {}
   ): Promise<T> {
     this.ensureApiCredentials();
+    this.throwIfBackoffActive();
 
-    const finalParams: Record<string, string | number | boolean> = {
-      ...params,
-      recvWindow: 5000,
-      timestamp: Date.now(),
-    };
-
-    const qs = new URLSearchParams();
-    Object.entries(finalParams).forEach(([k, v]) => {
-      if (v !== undefined && v !== null) qs.set(k, String(v));
-    });
-
-    const payload = qs.toString();
-    const signature = await this.signPayload(payload);
-    const withSig = `${payload}&signature=${signature}`;
-
-    const url = `${this.baseUrl}${path}?${withSig}`;
-    const res = await fetch(url, {
-      method,
+    const res = await fetch('/api/binance/signed/', {
+      method: 'POST',
       headers: {
-        'X-MBX-APIKEY': this.apiKey,
+        'Content-Type': 'application/json',
       },
+      body: JSON.stringify({
+        method,
+        path,
+        params,
+        apiKey: this.apiKey,
+        apiSecret: this.apiSecret,
+        isTestnet: this.baseUrl.includes('testnet'),
+      }),
+      cache: 'no-store',
     });
 
-    if (!res.ok) {
-      const txt = await res.text();
-      let errorMsg = `Binance signed API lỗi (${res.status}): ${txt}`;
+    const rawText = await res.text();
+    const payload = (() => {
+      if (!rawText) return null;
+      try {
+        return JSON.parse(rawText) as { ok?: boolean; status?: number; errorText?: string; error?: string; data?: T };
+      } catch {
+        return null;
+      }
+    })() as
+      | { ok?: boolean; status?: number; errorText?: string; error?: string; data?: T }
+      | null;
+
+    if (!res.ok || !payload?.ok) {
+      const responseStatus = payload?.status ?? res.status;
+      const txt = payload?.errorText || payload?.error || rawText || `HTTP ${res.status} ${res.statusText}`;
+      this.registerRateLimitBackoff(responseStatus, txt);
+      let errorMsg = `Binance signed API lỗi (${responseStatus}) [${method} ${path}]: ${txt}`;
       
       // Parse error code and provide helpful troubleshooting
       try {
@@ -274,8 +351,9 @@ export class BinanceService extends HyperliquidService {
           errorMsg += '1️⃣ Kiểm tra API Key có đúng không (copy lại từ Binance)\n';
           errorMsg += '2️⃣ Đảm bảo API Key có quyền "Enable Futures" trong Binance API Management\n';
           errorMsg += '3️⃣ Nếu bật IP Whitelist, thêm IP: ' + errJson.msg?.match(/request ip: ([\d.]+)/)?.[1] + '\n';
-          errorMsg += '4️⃣ API Key phải là Futures API, không phải Spot API\n';
-          errorMsg += '5️⃣ Thử tạo API Key mới với quyền "Enable Reading" + "Enable Futures" + "Enable Spot & Margin Trading"';
+          errorMsg += '4️⃣ Luu y: Signed execution da chay qua server route, request ip Binance thay la IP VPS\n';
+          errorMsg += '5️⃣ API Key phải là Futures API, không phải Spot API\n';
+          errorMsg += '6️⃣ Thử tạo API Key mới với quyền "Enable Reading" + "Enable Futures" + "Enable Spot & Margin Trading"';
         }
       } catch {
         // If JSON parse fails, keep original error
@@ -284,7 +362,7 @@ export class BinanceService extends HyperliquidService {
       throw new Error(errorMsg);
     }
 
-    return (await res.json()) as T;
+    return payload.data as T;
   }
 
   private async ensureMetadataFresh(): Promise<void> {
@@ -346,21 +424,28 @@ export class BinanceService extends HyperliquidService {
 
   private toAppOrder(order: any): FrontendOrder {
     const side = String(order.side || 'BUY').toUpperCase() === 'BUY' ? 'B' : 'A';
-    const orderType = String(order.type || 'LIMIT').toLowerCase();
+    const explicitType = String(order.type || order.algoType || 'LIMIT').toLowerCase();
+    const orderType = explicitType;
     const isTrigger = orderType.includes('stop') || orderType.includes('take_profit');
-    const triggerPx = order.stopPrice || '0';
+    const triggerPx = order.triggerPrice || order.stopPrice || order.activatePrice || '0';
+    const clientOrderId = String(order.clientOrderId || order.clientAlgoId || '').toLowerCase();
+    const isManagedTpSl =
+      Boolean(order.reduceOnly) ||
+      Boolean(order.closePosition) ||
+      clientOrderId.includes('rtx_sl_') ||
+      clientOrderId.includes('rtx_tp_');
 
     return {
-      oid: Number(order.orderId),
+      oid: Number(order.orderId || order.algoId),
       coin: fromBinanceSymbol(order.symbol),
       side,
-      limitPx: order.price || '0',
-      sz: order.origQty || order.executedQty || '0',
+      limitPx: order.price || order.triggerPrice || order.stopPrice || order.activatePrice || '0',
+      sz: order.origQty || order.executedQty || order.quantity || '0',
       timestamp: Number(order.updateTime || order.time || Date.now()),
       orderType,
       triggerPx,
       isTrigger,
-      isPositionTpsl: Boolean(order.reduceOnly),
+      isPositionTpsl: isManagedTpSl,
       reduceOnly: Boolean(order.reduceOnly),
     } as FrontendOrder;
   }
@@ -395,27 +480,91 @@ export class BinanceService extends HyperliquidService {
     price?: string;
     stopPrice?: string;
     reduceOnly?: boolean;
+    clientOrderId?: string;
+    workingType?: BinanceWorkingType;
+    priceProtect?: boolean;
     timeInForce?: 'GTC' | 'IOC' | 'FOK';
   }): Promise<OrderResponse> {
     const symbol = toCoinSymbol(params.coin);
-    const payload: Record<string, string | number | boolean> = {
-      symbol,
-      side: params.side,
-      type: params.type,
-      quantity: params.quantity,
+
+    const buildPayload = (isHedgeMode: boolean): Record<string, string | number | boolean> => {
+      const payload: Record<string, string | number | boolean> = {
+        symbol,
+        side: params.side,
+        type: params.type,
+        quantity: params.quantity,
+      };
+
+      if (params.price) payload.price = params.price;
+      if (params.stopPrice) payload.stopPrice = params.stopPrice;
+      if (params.timeInForce) payload.timeInForce = params.timeInForce;
+      if (params.clientOrderId) payload.newClientOrderId = params.clientOrderId;
+      if (params.workingType) payload.workingType = params.workingType;
+      if (typeof params.priceProtect === 'boolean') payload.priceProtect = params.priceProtect;
+
+      if (isHedgeMode) {
+        // Hedge mode requires explicit LONG/SHORT and does not accept reduceOnly.
+        if (params.reduceOnly) {
+          payload.positionSide = params.side === 'SELL' ? 'LONG' : 'SHORT';
+        } else {
+          payload.positionSide = params.side === 'BUY' ? 'LONG' : 'SHORT';
+        }
+      } else if (typeof params.reduceOnly === 'boolean') {
+        payload.reduceOnly = params.reduceOnly;
+      }
+
+      return payload;
     };
 
-    if (params.price) payload.price = params.price;
-    if (params.stopPrice) payload.stopPrice = params.stopPrice;
-    if (typeof params.reduceOnly === 'boolean') payload.reduceOnly = params.reduceOnly;
-    if (params.timeInForce) payload.timeInForce = params.timeInForce;
+    let isHedgeMode = await this.getIsHedgeMode();
+    let payload = buildPayload(isHedgeMode);
+    let result: { orderId: number };
 
-    const result = await this.signedRequest<{ orderId: number }>('POST', '/fapi/v1/order', payload);
+    try {
+      result = await this.signedRequest<{ orderId: number }>('POST', '/fapi/v1/order', payload);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isPositionSideMismatch = message.includes('"code":-4061') || message.toLowerCase().includes('position side does not match');
+      if (!isPositionSideMismatch) {
+        throw error;
+      }
+
+      // Account mode may have changed or cached mode was stale; refresh and retry once.
+      isHedgeMode = await this.getIsHedgeMode(true);
+      payload = buildPayload(isHedgeMode);
+      result = await this.signedRequest<{ orderId: number }>('POST', '/fapi/v1/order', payload);
+    }
     
     // Invalidate caches after successful order placement
     this.invalidateAllCaches();
     
     return this.toOrderResponse(result.orderId);
+  }
+
+  private async placeAlgoOrder(params: {
+    coin: string;
+    side: BinanceOrderSide;
+    type: BinanceAlgoOrderType;
+    quantity: string;
+    stopPrice: string;
+    reduceOnly?: boolean;
+    clientOrderId?: string;
+    workingType?: BinanceWorkingType;
+    priceProtect?: boolean;
+  }): Promise<OrderResponse> {
+    // Binance USDM supports STOP_MARKET/TAKE_PROFIT_MARKET via /fapi/v1/order.
+    // Avoid /fapi/v1/algoOrder to prevent 404 on accounts/clusters without that endpoint.
+    return this.placeOrder({
+      coin: params.coin,
+      side: params.side,
+      type: params.type as BinanceOrderType,
+      quantity: params.quantity,
+      stopPrice: params.stopPrice,
+      reduceOnly: params.reduceOnly,
+      clientOrderId: params.clientOrderId,
+      workingType: params.workingType,
+      priceProtect: params.priceProtect,
+    });
   }
 
   async getCandles(params: CandleParams): Promise<TransformedCandle[]> {
@@ -667,24 +816,30 @@ export class BinanceService extends HyperliquidService {
   }
 
   async placeStopLoss(params: StopLossParams, _metadata: SymbolMetadata): Promise<OrderResponse> {
-    return this.placeOrder({
+    return this.placeAlgoOrder({
       coin: params.coin,
       side: params.isBuy ? 'BUY' : 'SELL',
       type: 'STOP_MARKET',
       quantity: params.size,
       stopPrice: params.triggerPrice,
       reduceOnly: true,
+      clientOrderId: buildClientOrderId('sl'),
+      workingType: 'MARK_PRICE',
+      priceProtect: true,
     });
   }
 
   async placeTakeProfit(params: TakeProfitParams, _metadata: SymbolMetadata): Promise<OrderResponse> {
-    return this.placeOrder({
+    return this.placeAlgoOrder({
       coin: params.coin,
       side: params.isBuy ? 'BUY' : 'SELL',
       type: 'TAKE_PROFIT_MARKET',
       quantity: params.size,
       stopPrice: params.triggerPrice,
       reduceOnly: true,
+      clientOrderId: buildClientOrderId('tp'),
+      workingType: 'MARK_PRICE',
+      priceProtect: true,
     });
   }
 
@@ -695,6 +850,9 @@ export class BinanceService extends HyperliquidService {
       type: 'STOP_MARKET',
       quantity: params.size,
       stopPrice: params.triggerPrice,
+      clientOrderId: buildClientOrderId('entry'),
+      workingType: 'MARK_PRICE',
+      priceProtect: true,
     });
   }
 
@@ -735,6 +893,9 @@ export class BinanceService extends HyperliquidService {
           price?: string;
           stopPrice?: string;
           reduceOnly?: boolean;
+          clientOrderId?: string;
+          workingType?: BinanceWorkingType;
+          priceProtect?: boolean;
           timeInForce?: 'GTC' | 'IOC' | 'FOK';
         } = {
           coin,
@@ -747,11 +908,27 @@ export class BinanceService extends HyperliquidService {
         if ('limit' in o.t) {
           orderPayload.price = o.p;
           orderPayload.timeInForce = o.t.limit.tif === 'Ioc' ? 'IOC' : 'GTC';
+          orderPayload.clientOrderId = buildClientOrderId('entry');
         } else {
           orderPayload.stopPrice = o.t.trigger.triggerPx;
+          orderPayload.clientOrderId = buildClientOrderId(o.t.trigger.tpsl === 'tp' ? 'tp' : 'sl');
+          orderPayload.workingType = 'MARK_PRICE';
+          orderPayload.priceProtect = true;
         }
 
-        const res = await this.placeOrder(orderPayload);
+        const res = 'trigger' in o.t
+          ? await this.placeAlgoOrder({
+              coin: orderPayload.coin,
+              side: orderPayload.side,
+              type: orderPayload.type as BinanceAlgoOrderType,
+              quantity: orderPayload.quantity,
+              stopPrice: orderPayload.stopPrice || '0',
+              reduceOnly: orderPayload.reduceOnly,
+              clientOrderId: orderPayload.clientOrderId,
+              workingType: orderPayload.workingType,
+              priceProtect: orderPayload.priceProtect,
+            })
+          : await this.placeOrder(orderPayload);
 
         const status0 = res?.response?.data?.statuses?.[0] as any;
         const oid = status0 && typeof status0 === 'object' && 'resting' in status0
@@ -773,10 +950,21 @@ export class BinanceService extends HyperliquidService {
   }
 
   async cancelOrder(coin: string, orderId: number, _metadata: SymbolMetadata): Promise<CancelResponse> {
-    await this.signedRequest('DELETE', '/fapi/v1/order', {
-      symbol: toCoinSymbol(coin),
-      orderId,
-    });
+    try {
+      await this.signedRequest('DELETE', '/fapi/v1/order', {
+        symbol: toCoinSymbol(coin),
+        orderId,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const unknownOrder = message.includes('"code":-2011') || message.toLowerCase().includes('unknown order');
+      if (!unknownOrder) {
+        throw error;
+      }
+      // Order doesn't exist (-2011) — already gone, treat as cancelled successfully.
+      // Do NOT retry with /fapi/v1/algoOrder because that path doesn't exist in
+      // Binance USDM Futures and would return a 404 that propagates as an error.
+    }
     
     // Invalidate caches after successful cancellation
     this.invalidateAllCaches();
@@ -858,16 +1046,25 @@ export class BinanceService extends HyperliquidService {
   }
 
   async setLeverage(coin: string, leverage: number, _metadata: SymbolMetadata, _isCross: boolean = true): Promise<SuccessResponse | null> {
-    await this.signedRequest('POST', '/fapi/v1/leverage', {
-      symbol: toCoinSymbol(coin),
-      leverage,
-    });
+    try {
+      await this.signedRequest('POST', '/fapi/v1/leverage', {
+        symbol: toCoinSymbol(coin),
+        leverage,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      const isNotFound = message.includes('(404)') && message.toLowerCase().includes('page not found');
+      if (!isNotFound) {
+        throw error;
+      }
+      console.warn(`[Binance] leverage endpoint unavailable for ${coin}, skip setLeverage: ${message}`);
+    }
     return { status: 'ok' } as unknown as SuccessResponse;
   }
 
   async closePosition(
     params: ClosePositionParams,
-    price: string,
+    _price: string,
     _metadata: SymbolMetadata,
     positionData: AssetPosition
   ): Promise<OrderResponse> {
@@ -877,11 +1074,10 @@ export class BinanceService extends HyperliquidService {
     return this.placeOrder({
       coin: params.coin,
       side: isLong ? 'SELL' : 'BUY',
-      type: 'LIMIT',
+      type: 'MARKET',
       quantity: size,
-      price,
       reduceOnly: true,
-      timeInForce: 'IOC',
+      clientOrderId: buildClientOrderId('entry'),
     });
   }
 

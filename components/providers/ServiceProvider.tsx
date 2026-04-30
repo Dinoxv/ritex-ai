@@ -34,6 +34,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
   const setGlobalPollingService = useGlobalPollingStore((state) => state.setService);
   const setSymbolCandlesService = useSymbolCandlesStore((state) => state.setService);
   const setBotService = useBotTradingStore((state) => state.setService);
+  const ensureBotAutoResume = useBotTradingStore((state) => state.ensureAutoResume);
 
   useEffect(() => {
     console.log('[ServiceProvider] Service changed, updating all stores');
@@ -56,6 +57,7 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
     setGlobalPollingService(exchangeService);
     setSymbolCandlesService(exchangeService);
     setBotService(exchangeService);
+    void ensureBotAutoResume();
 
     fetchMetadata();
     fetchAndStoreAllOpenPositions();

@@ -19,6 +19,7 @@ interface GlobalPollingStore {
   lastSlowPollTime: number | null;
   lastCandlePollTime: number | null;
   isFirstCandleFetch: boolean;
+  restCooldownUntil: number;
 
   setService: (service: ExchangeTradingService) => void;
   startGlobalPolling: () => void;
@@ -38,6 +39,9 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
   lastSlowPollTime: null,
   lastCandlePollTime: null,
   isFirstCandleFetch: true,
+  restCooldownUntil: 0,
+
+  
 
   setService: (service: ExchangeTradingService) => {
     console.log('[GlobalPolling] setService called, starting global polling');
@@ -50,6 +54,10 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
   fetchFastData: async () => {
     const { service } = get();
     if (!service) {
+      return;
+    }
+
+    if (Date.now() < get().restCooldownUntil) {
       return;
     }
 
@@ -78,6 +86,10 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
 
       set({ lastFastPollTime: Date.now() });
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('Binance API lỗi (418)') || msg.includes('code":-1003') || msg.includes('cooldown')) {
+        set({ restCooldownUntil: Date.now() + 60_000 });
+      }
       console.error('[GlobalPolling] Error in fetchFastData:', error);
     }
   },
@@ -85,6 +97,10 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
   fetchSlowData: async () => {
     const { service } = get();
     if (!service) {
+      return;
+    }
+
+    if (Date.now() < get().restCooldownUntil) {
       return;
     }
 
@@ -123,6 +139,10 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
 
       set({ lastSlowPollTime: Date.now() });
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('Binance API lỗi (418)') || msg.includes('code":-1003') || msg.includes('cooldown')) {
+        set({ restCooldownUntil: Date.now() + 60_000 });
+      }
       console.error('[GlobalPolling] Error in fetchSlowData:', error);
     }
   },
@@ -134,12 +154,19 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
       return;
     }
 
+    if (Date.now() < get().restCooldownUntil) {
+      return;
+    }
+
     try {
       const candleStore = useCandleStore.getState();
       const topSymbolsStore = useTopSymbolsStore.getState();
       const settings = useSettingsStore.getState().settings;
-      const topCount = settings?.scanner?.topMarkets || 50;
-      const topSymbols = topSymbolsStore.symbols.slice(0, topCount);
+      const selectedExchange = useDexStore.getState().selectedExchange;
+      const runtimeTopMarkets = settings?.scanner?.runtimeByExchange?.[selectedExchange]?.topMarkets;
+      const topCount = runtimeTopMarkets ?? settings?.scanner?.topMarkets ?? 50;
+      const effectiveTopCount = selectedExchange === 'binance' ? Math.min(topCount, 12) : topCount;
+      const topSymbols = topSymbolsStore.symbols.slice(0, effectiveTopCount);
 
       if (topSymbols.length === 0) {
         console.log('[GlobalPolling] fetchCandleData: no symbols loaded yet, skipping');
@@ -148,7 +175,7 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
 
       console.log(`[GlobalPolling] fetchCandleData: fetching for ${topSymbols.length} symbols`);
 
-      const staggerDelay = 200;
+      const staggerDelay = selectedExchange === 'binance' ? 450 : 200;
       let index = 0;
 
       for (const symbol of topSymbols) {
@@ -190,12 +217,17 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
         isFirstCandleFetch: false
       });
     } catch (error) {
+      const msg = error instanceof Error ? error.message : String(error);
+      if (msg.includes('Binance API lỗi (418)') || msg.includes('code":-1003') || msg.includes('cooldown')) {
+        set({ restCooldownUntil: Date.now() + 60_000 });
+      }
       console.error('[GlobalPolling] Error in fetchCandleData:', error);
     }
   },
 
   startGlobalPolling: () => {
     const { fastPollingInterval, slowPollingInterval, candlePollingInterval, fetchFastData, fetchSlowData, fetchCandleData } = get();
+    const selectedExchange = useDexStore.getState().selectedExchange;
 
     if (fastPollingInterval || slowPollingInterval || candlePollingInterval) {
       console.log('[GlobalPolling] startGlobalPolling: already running, skipping');
@@ -207,17 +239,21 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
     fetchSlowData();
     fetchCandleData();
 
+    const fastIntervalMs = selectedExchange === 'binance' ? 12_000 : 5_000;
+    const slowIntervalMs = selectedExchange === 'binance' ? 90_000 : 60_000;
+    const candleIntervalMs = selectedExchange === 'binance' ? 180_000 : 60_000;
+
     const fastIntervalId = setInterval(() => {
       fetchFastData();
-    }, 5000);
+    }, fastIntervalMs);
 
     const slowIntervalId = setInterval(() => {
       fetchSlowData();
-    }, 60000);
+    }, slowIntervalMs);
 
     const candleIntervalId = setInterval(() => {
       fetchCandleData();
-    }, 60000);
+    }, candleIntervalMs);
 
     set({
       fastPollingInterval: fastIntervalId,

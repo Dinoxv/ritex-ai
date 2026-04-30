@@ -4,6 +4,12 @@ import { memo } from 'react';
 import { useRouter } from 'next/navigation';
 import MiniPriceChart from '@/components/scanner/MiniPriceChart';
 
+const FavouriteIcon = ({ isPinned }: { isPinned: boolean }) => (
+  <span className="text-[9px] leading-none font-bold tracking-wide" aria-hidden="true">
+    {isPinned ? 'DEL' : 'ADD'}
+  </span>
+);
+
 interface SymbolItemProps {
   symbol: string;
   selectedSymbol: string;
@@ -13,7 +19,7 @@ interface SymbolItemProps {
   isTop20: boolean;
   volumeInMillions: string | null;
   closePrices?: number[];
-  unpinSymbol: (symbol: string) => void;
+  onToggleFavourite: (symbol: string, isPinned: boolean) => void;
   SymbolPrice: React.ComponentType<{ symbol: string; pnlAnimationClass?: string; closePrices?: number[]; show24hChange?: boolean }>;
   SymbolVolume: React.ComponentType<{ symbol: string; volumeInMillions: string }>;
   invertedMode: boolean;
@@ -28,13 +34,20 @@ const SymbolItem = ({
   isTop20,
   volumeInMillions,
   closePrices,
-  unpinSymbol,
+  onToggleFavourite,
   SymbolPrice,
   SymbolVolume,
   invertedMode
 }: SymbolItemProps) => {
   const router = useRouter();
   const isSelected = selectedSymbol === symbol;
+  const debugSample = symbol === 'ZKJ' || symbol === 'DAM' || symbol === 'BTC';
+
+  if (debugSample) {
+    // #region agent log
+    fetch('http://localhost:7746/ingest/e5416380-9097-4690-accf-259c2a55fbab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3d1932'},body:JSON.stringify({sessionId:'3d1932',runId:'fav-debug',hypothesisId:'H2',location:'components/sidepanel/SymbolItem.tsx:58',message:'symbol item render sampled',data:{symbol,isPinned,isTop20,isSelected,hasToggleFavouriteButton:true},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }
 
   return (
     <div
@@ -70,6 +83,14 @@ const SymbolItem = ({
                   >
                     {symbol}/USD
                   </span>
+                  {isPinned && (
+                    <span
+                      className="inline-flex items-center justify-center text-bullish"
+                      title="In favourite list"
+                    >
+                      <span className="text-[9px] leading-none font-bold tracking-wide">FAV</span>
+                    </span>
+                  )}
                 </div>
               </div>
               <div className="flex-1">
@@ -83,19 +104,24 @@ const SymbolItem = ({
             </div>
           </button>
         </div>
-        <div className="flex flex-col">
-          {!isTop20 && isPinned && (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                unpinSymbol(symbol);
-              }}
-              className="p-2 text-primary-muted hover:text-bearish active:scale-90 cursor-pointer transition-all duration-150"
-              title="Unpin symbol"
-            >
-              <span className="text-lg font-bold">−</span>
-            </button>
-          )}
+        <div className="flex items-center gap-1 pr-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              // #region agent log
+              fetch('http://localhost:7746/ingest/e5416380-9097-4690-accf-259c2a55fbab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3d1932'},body:JSON.stringify({sessionId:'3d1932',runId:'fav-debug',hypothesisId:'H3',location:'components/sidepanel/SymbolItem.tsx:118',message:'favourite button clicked',data:{symbol,isPinned},timestamp:Date.now()})}).catch(()=>{});
+              // #endregion
+              onToggleFavourite(symbol, isPinned);
+            }}
+            className={`px-2 py-1 rounded-md border active:scale-90 cursor-pointer transition-all duration-150 min-w-[32px] flex items-center justify-center ${
+              isPinned
+                ? 'text-black border-yellow-300 bg-yellow-300 hover:bg-yellow-200'
+                : 'text-yellow-300 border-yellow-300 bg-yellow-300/10 hover:bg-yellow-300/20'
+            }`}
+            title={isPinned ? 'Remove from favourite list' : 'Add to favourite list'}
+          >
+            <FavouriteIcon isPinned={isPinned} />
+          </button>
           <button
             onClick={(e) => {
               e.stopPropagation();

@@ -320,6 +320,10 @@ const mergeSettings = (storedSettings: any): AppSettings => {
           pivLen: storedSettings.scanner?.ritchiTrendScanner?.pivLen ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.pivLen,
           smaMin: storedSettings.scanner?.ritchiTrendScanner?.smaMin ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.smaMin,
           smaMax: storedSettings.scanner?.ritchiTrendScanner?.smaMax ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.smaMax,
+          smaMult: storedSettings.scanner?.ritchiTrendScanner?.smaMult ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.smaMult,
+          trendLen: storedSettings.scanner?.ritchiTrendScanner?.trendLen ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.trendLen,
+          atrMult: storedSettings.scanner?.ritchiTrendScanner?.atrMult ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.atrMult,
+          tpMult: storedSettings.scanner?.ritchiTrendScanner?.tpMult ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.tpMult,
         },
       },
       orders: {
@@ -411,6 +415,13 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         exchange: storedSettings.bot?.exchange ?? DEFAULT_SETTINGS.bot.exchange,
         timeframe: storedSettings.bot?.timeframe ?? DEFAULT_SETTINGS.bot.timeframe,
         scanIntervalSec: storedSettings.bot?.scanIntervalSec ?? DEFAULT_SETTINGS.bot.scanIntervalSec,
+        autoTopSymbolsCount: Math.min(
+          10,
+          Math.max(
+            1,
+            Number(storedSettings.bot?.autoTopSymbolsCount ?? DEFAULT_SETTINGS.bot.autoTopSymbolsCount) || DEFAULT_SETTINGS.bot.autoTopSymbolsCount
+          )
+        ),
         initialMarginUsdt: storedSettings.bot?.initialMarginUsdt ?? DEFAULT_SETTINGS.bot.initialMarginUsdt,
         maxLossPercentPerDay: storedSettings.bot?.maxLossPercentPerDay ?? DEFAULT_SETTINGS.bot.maxLossPercentPerDay,
         leverageByExchange: {

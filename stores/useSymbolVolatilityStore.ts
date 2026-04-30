@@ -132,17 +132,12 @@ export const useSymbolVolatilityStore = create<SymbolVolatilityStore>((set, get)
   },
 
   updateFromGlobalPoll: (data: { meta: any; assetCtxs: any[] }) => {
-    const { subscribedSymbols } = get();
     const { meta, assetCtxs } = data;
 
     const newVolatility: Record<string, VolatilityData> = {};
 
     meta.universe.forEach((universeItem: any, index: number) => {
       const symbol = universeItem.name;
-
-      if (!subscribedSymbols.has(symbol)) {
-        return;
-      }
 
       const assetCtx = assetCtxs[index];
       if (!assetCtx) {

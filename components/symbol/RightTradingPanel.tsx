@@ -230,7 +230,12 @@ function RightTradingPanel({
                 <div className="grid grid-cols-2 gap-1.5">
                   <button
                     className="w-full py-2 px-2 bg-bullish/20 border border-bullish/50 text-bullish font-bold text-[10px] hover:bg-bullish/30 hover:border-bullish/70 active:scale-95 transition-all rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
-                    onClick={() => { void startBot(); }}
+                  onClick={() => {
+                    // #region agent log
+                    fetch('/debug-log/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'354f27',runId:'pre-fix',hypothesisId:'H13',location:'components/symbol/RightTradingPanel.tsx:start-button',message:'right panel start bot clicked',data:{botEnabled:botSettings.enabled,botIsRunning},timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
+                    void startBot();
+                  }}
                     disabled={!botSettings.enabled || botIsRunning}
                     title="Start bot trading"
                   >

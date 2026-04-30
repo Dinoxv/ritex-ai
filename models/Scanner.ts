@@ -100,6 +100,7 @@ export type ScanType = 'stochastic' | 'emaAlignment' | 'channel' | 'divergence' 
 
 export interface ScanResult {
   symbol: string;
+  exchange?: 'hyperliquid' | 'binance';
   stochastics?: StochasticValue[];
   emaAlignments?: EmaAlignmentValue[];
   channels?: ChannelValue[];

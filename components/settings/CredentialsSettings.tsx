@@ -5,12 +5,25 @@ import { useCredentials } from '@/lib/context/credentials-context';
 
 interface CredentialsSettingsProps {
   initialWalletAddress?: string | null;
+  onBinanceSaved?: () => void;
 }
 
 type LastAction = {
   label: string;
   at: number;
 };
+
+type ConnectionState = {
+  status: 'idle' | 'testing' | 'success' | 'error';
+  message: string;
+  testedFingerprint: string | null;
+};
+
+const createIdleConnectionState = (): ConnectionState => ({
+  status: 'idle',
+  message: '',
+  testedFingerprint: null,
+});
 
 const formatTimeAgo = (timestamp: number, now: number): string => {
   const seconds = Math.max(0, Math.floor((now - timestamp) / 1000));
@@ -28,14 +41,13 @@ const formatTimeAgo = (timestamp: number, now: number): string => {
   return `${hours}h ago`;
 };
 
-export function CredentialsSettings({ initialWalletAddress }: CredentialsSettingsProps = {}) {
+export function CredentialsSettings({ initialWalletAddress, onBinanceSaved }: CredentialsSettingsProps = {}) {
   const {
     credentials,
-    saveCredentials,
+    updateHyperliquidCredentials,
     clearCredentials,
     clearHyperliquidCredentials,
     clearBinanceCredentials,
-    updateNetwork,
     updateBinanceCredentials,
     hasHyperliquidCredentials,
     hasBinanceCredentials,
@@ -57,6 +69,25 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
   const [hyperLastAction, setHyperLastAction] = useState<LastAction | null>(null);
   const [binanceLastAction, setBinanceLastAction] = useState<LastAction | null>(null);
   const [nowTs, setNowTs] = useState(() => Date.now());
+  const [serverIp, setServerIp] = useState('');
+  const [serverIpStatus, setServerIpStatus] = useState<'idle' | 'loading' | 'success' | 'error'>('idle');
+  const [serverIpError, setServerIpError] = useState('');
+  const [hyperConnection, setHyperConnection] = useState<ConnectionState>(createIdleConnectionState);
+  const [binanceConnection, setBinanceConnection] = useState<ConnectionState>(createIdleConnectionState);
+
+  const hyperFingerprint = `${privateKey.trim()}::${walletAddress.trim().toLowerCase()}::${isTestnet ? 'testnet' : 'mainnet'}`;
+  const binanceFingerprint = `${binanceApiKey.trim()}::${binanceApiSecret.trim()}`;
+  const canSaveHyperliquid =
+    hyperConnection.status === 'success' &&
+    hyperConnection.testedFingerprint === hyperFingerprint &&
+    !!privateKey.trim() &&
+    !!walletAddress.trim() &&
+    !walletAddressError;
+  const canSaveBinance =
+    binanceConnection.status === 'success' &&
+    binanceConnection.testedFingerprint === binanceFingerprint &&
+    !!binanceApiKey.trim() &&
+    !!binanceApiSecret.trim();
 
   useEffect(() => {
     if (credentials) {
@@ -94,6 +125,166 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
     return () => window.clearInterval(timer);
   }, []);
 
+  useEffect(() => {
+    const loadServerIp = async () => {
+      try {
+        setServerIpStatus('loading');
+        setServerIpError('');
+
+        const response = await fetch('/api/server-ip/', {
+          method: 'GET',
+          cache: 'no-store',
+        });
+
+        const contentType = response.headers.get('content-type') || '';
+        const responseText = await response.text();
+        let payload: { ip?: string; error?: string } | null = null;
+
+        if (contentType.includes('application/json')) {
+          try {
+            payload = JSON.parse(responseText) as { ip?: string; error?: string };
+          } catch {
+            payload = null;
+          }
+        }
+
+        if (!response.ok || !payload?.ip) {
+          throw new Error(payload?.error || responseText || 'Khong lay duoc IP may chu');
+        }
+
+        setServerIp(payload.ip);
+        setServerIpStatus('success');
+      } catch (error) {
+        setServerIpStatus('error');
+        setServerIpError(error instanceof Error ? error.message : 'Khong lay duoc IP may chu');
+      }
+    };
+
+    loadServerIp().catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    setHyperConnection((current) => {
+      if (current.status === 'idle' && !current.message) {
+        return current;
+      }
+
+      if (current.testedFingerprint === hyperFingerprint) {
+        return current;
+      }
+
+      return {
+        status: 'idle',
+        message: current.testedFingerprint ? 'Thong tin Hyperliquid da thay doi. Hay test lai truoc khi save.' : '',
+        testedFingerprint: null,
+      };
+    });
+  }, [hyperFingerprint]);
+
+  useEffect(() => {
+    setBinanceConnection((current) => {
+      if (current.status === 'idle' && !current.message) {
+        return current;
+      }
+
+      if (current.testedFingerprint === binanceFingerprint) {
+        return current;
+      }
+
+      return {
+        status: 'idle',
+        message: current.testedFingerprint ? 'Thong tin Binance da thay doi. Hay test lai truoc khi save.' : '',
+        testedFingerprint: null,
+      };
+    });
+  }, [binanceFingerprint]);
+
+  const testConnection = async (
+    exchange: 'hyperliquid' | 'binance',
+    payload: Record<string, unknown>,
+    fingerprint: string,
+    setConnection: (value: ConnectionState) => void
+  ) => {
+    try {
+      setConnection({ status: 'testing', message: '', testedFingerprint: null });
+
+      const response = await fetch('/api/credentials/test/', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          exchange,
+          ...payload,
+        }),
+      });
+
+      const contentType = response.headers.get('content-type') || '';
+      const responseText = await response.text();
+      let result: { ok?: boolean; error?: string; message?: string; serverIp?: string } | null = null;
+
+      if (contentType.includes('application/json')) {
+        try {
+          result = JSON.parse(responseText) as {
+            ok?: boolean;
+            error?: string;
+            message?: string;
+            serverIp?: string;
+          };
+        } catch {
+          result = null;
+        }
+      }
+
+      if (result?.serverIp) {
+        setServerIp(result.serverIp);
+        setServerIpStatus('success');
+        setServerIpError('');
+      }
+
+      if (!response.ok || !result?.ok) {
+        throw new Error(result?.error || responseText || 'Test connection that bai');
+      }
+
+      setConnection({
+        status: 'success',
+        message: result.message || 'Test connection thanh cong.',
+        testedFingerprint: fingerprint,
+      });
+    } catch (error) {
+      setConnection({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Test connection that bai',
+        testedFingerprint: null,
+      });
+    }
+  };
+
+  const handleTestHyperliquid = async () => {
+    await testConnection(
+      'hyperliquid',
+      {
+        privateKey: privateKey.trim(),
+        walletAddress: walletAddress.trim(),
+        isTestnet,
+      },
+      hyperFingerprint,
+      setHyperConnection
+    );
+  };
+
+  const handleTestBinance = async () => {
+    await testConnection(
+      'binance',
+      {
+        apiKey: binanceApiKey.trim(),
+        apiSecret: binanceApiSecret.trim(),
+      },
+      binanceFingerprint,
+      setBinanceConnection
+    );
+  };
+
   const handleSaveHyperliquid = async () => {
     try {
       setHyperStatus('saving');
@@ -115,10 +306,11 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
         throw new Error('Wallet address cannot be a private key. Please enter a valid wallet address.');
       }
 
-      await saveCredentials(privateKey, walletAddress, isTestnet, undefined, {
-        binanceApiKey,
-        binanceApiSecret,
-      });
+      if (!canSaveHyperliquid) {
+        throw new Error('Hay test ket noi Hyperliquid thanh cong tren server truoc khi save.');
+      }
+
+      await updateHyperliquidCredentials(privateKey.trim(), walletAddress.trim(), isTestnet);
       setHyperStatus('success');
       setHyperInfoMessage('Da luu Hyperliquid credentials vao localStorage key: hyperliquid_credentials.');
       setHyperLastAction({ label: 'saved', at: Date.now() });
@@ -138,10 +330,20 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
         throw new Error('Binance API Key và API Secret là bắt buộc');
       }
 
+      if (!canSaveBinance) {
+        throw new Error('Hay test ket noi Binance thanh cong tren server truoc khi save.');
+      }
+
       await updateBinanceCredentials(binanceApiKey.trim(), binanceApiSecret.trim());
       setBinanceStatus('success');
       setBinanceInfoMessage('Da luu Binance credentials vao localStorage key: binance_credentials.');
       setBinanceLastAction({ label: 'saved', at: Date.now() });
+
+      if (onBinanceSaved) {
+        onBinanceSaved();
+        return;
+      }
+
       setTimeout(() => setBinanceStatus('idle'), 2000);
     } catch (error) {
       setBinanceStatus('error');
@@ -163,6 +365,8 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
       setBinanceErrorMessage('');
       setHyperInfoMessage('Da xoa Hyperliquid credentials (hyperliquid_credentials).');
       setBinanceInfoMessage('Da xoa Binance credentials (binance_credentials).');
+      setHyperConnection(createIdleConnectionState());
+      setBinanceConnection(createIdleConnectionState());
       setHyperLastAction({ label: 'cleared', at: Date.now() });
       setBinanceLastAction({ label: 'cleared', at: Date.now() });
     }
@@ -180,6 +384,7 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
     setHyperStatus('idle');
     setHyperErrorMessage('');
     setHyperInfoMessage('Da xoa Hyperliquid credentials (hyperliquid_credentials).');
+    setHyperConnection(createIdleConnectionState());
     setHyperLastAction({ label: 'cleared', at: Date.now() });
   };
 
@@ -194,22 +399,12 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
     setBinanceStatus('idle');
     setBinanceErrorMessage('');
     setBinanceInfoMessage('Da xoa Binance credentials (binance_credentials).');
+    setBinanceConnection(createIdleConnectionState());
     setBinanceLastAction({ label: 'cleared', at: Date.now() });
   };
 
-  const handleNetworkChange = async (testnet: boolean) => {
+  const handleNetworkChange = (testnet: boolean) => {
     setIsTestnet(testnet);
-    if (credentials) {
-      try {
-        await updateNetwork(testnet);
-        setHyperStatus('success');
-        setHyperLastAction({ label: 'network updated', at: Date.now() });
-        setTimeout(() => setHyperStatus('idle'), 2000);
-      } catch (error) {
-        setHyperStatus('error');
-        setHyperErrorMessage('Failed to update network');
-      }
-    }
   };
 
   const handleWalletAddressChange = (value: string) => {
@@ -231,6 +426,13 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
         <p className="text-sm text-gray-400">
           Credentials are encrypted and stored locally. Hyperliquid và Binance được tách riêng để tránh nhầm lẫn.
         </p>
+        <p className="text-xs text-gray-500 mt-2">
+          Test Connection chay tu chinh server nay truoc khi save.
+          {serverIp && <span className="text-gray-300"> Public IP: {serverIp}</span>}
+        </p>
+        {serverIpStatus === 'error' && serverIpError && (
+          <p className="text-xs text-red-400 mt-2">Khong tai duoc public IP: {serverIpError}</p>
+        )}
       </div>
 
       <div className="bg-yellow-900/20 border border-yellow-700/50 rounded-lg p-4">
@@ -349,10 +551,41 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
           </div>
         )}
 
+        {hyperConnection.message && (
+          <div
+            className={`rounded-lg p-3 border ${
+              hyperConnection.status === 'error'
+                ? 'bg-red-900/20 border-red-700/50'
+                : hyperConnection.status === 'success'
+                  ? 'bg-green-900/20 border-green-700/50'
+                  : 'bg-slate-900/40 border-slate-700/50'
+            }`}
+          >
+            <p
+              className={`text-sm ${
+                hyperConnection.status === 'error'
+                  ? 'text-red-400'
+                  : hyperConnection.status === 'success'
+                    ? 'text-green-400'
+                    : 'text-slate-300'
+              }`}
+            >
+              {hyperConnection.message}
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-3">
           <button
+            onClick={handleTestHyperliquid}
+            disabled={hyperConnection.status === 'testing' || !privateKey.trim() || !walletAddress.trim() || !!walletAddressError}
+            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-medium transition-colors"
+          >
+            {hyperConnection.status === 'testing' ? 'Testing...' : 'Test Connection'}
+          </button>
+          <button
             onClick={handleSaveHyperliquid}
-            disabled={hyperStatus === 'saving' || !privateKey || !walletAddress || !!walletAddressError}
+            disabled={hyperStatus === 'saving' || hyperConnection.status === 'testing' || !canSaveHyperliquid}
             className="flex-1 px-6 py-3 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-medium transition-colors"
           >
             {hyperStatus === 'saving' ? 'Saving...' : hyperStatus === 'success' ? 'Saved!' : 'Save Hyperliquid'}
@@ -390,7 +623,12 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
               <ul className="text-[11px] text-yellow-200/90 space-y-0.5 list-disc list-inside">
                 <li>API Key phải có quyền <strong>"Enable Futures"</strong></li>
                 <li>Bật thêm <strong>"Enable Reading"</strong> và <strong>"Enable Spot & Margin Trading"</strong></li>
-                <li>Nếu bật IP Whitelist → thêm IP hiện tại của bạn</li>
+                <li>
+                  Nếu bật IP Whitelist → thêm IP hiện tại là:{' '}
+                  <strong>
+                    {serverIp || (serverIpStatus === 'loading' ? 'dang tai...' : 'khong lay duoc')}
+                  </strong>
+                </li>
                 <li>Không dùng API Key Spot cho Futures trading</li>
               </ul>
               <p className="text-[10px] text-yellow-400/70 mt-2">
@@ -440,10 +678,41 @@ export function CredentialsSettings({ initialWalletAddress }: CredentialsSetting
           </div>
         )}
 
+        {binanceConnection.message && (
+          <div
+            className={`rounded-lg p-3 border ${
+              binanceConnection.status === 'error'
+                ? 'bg-red-900/20 border-red-700/50'
+                : binanceConnection.status === 'success'
+                  ? 'bg-green-900/20 border-green-700/50'
+                  : 'bg-slate-900/40 border-slate-700/50'
+            }`}
+          >
+            <p
+              className={`text-sm ${
+                binanceConnection.status === 'error'
+                  ? 'text-red-400'
+                  : binanceConnection.status === 'success'
+                    ? 'text-green-400'
+                    : 'text-slate-300'
+              }`}
+            >
+              {binanceConnection.message}
+            </p>
+          </div>
+        )}
+
         <div className="flex gap-3">
           <button
+            onClick={handleTestBinance}
+            disabled={binanceConnection.status === 'testing' || !binanceApiKey.trim() || !binanceApiSecret.trim()}
+            className="px-6 py-3 bg-slate-700 hover:bg-slate-600 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-medium transition-colors"
+          >
+            {binanceConnection.status === 'testing' ? 'Testing...' : 'Test Connection'}
+          </button>
+          <button
             onClick={handleSaveBinance}
-            disabled={binanceStatus === 'saving' || !binanceApiKey.trim() || !binanceApiSecret.trim()}
+            disabled={binanceStatus === 'saving' || binanceConnection.status === 'testing' || !canSaveBinance}
             className="flex-1 px-6 py-3 bg-emerald-600 hover:bg-emerald-700 disabled:bg-gray-700 disabled:text-gray-500 text-white rounded-lg font-medium transition-colors"
           >
             {binanceStatus === 'saving' ? 'Saving...' : binanceStatus === 'success' ? 'Saved!' : 'Save Binance'}

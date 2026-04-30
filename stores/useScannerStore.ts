@@ -2,8 +2,10 @@ import { create } from 'zustand';
 import type { ScanResult, ScannerStatus, ScanType } from '@/models/Scanner';
 import { ScannerService } from '@/lib/services/scanner.service';
 import type { ExchangeTradingService } from '@/lib/services/types';
+import type { ScannerSettings } from '@/models/Settings';
 import { useSettingsStore } from './useSettingsStore';
 import { useTopSymbolsStore } from './useTopSymbolsStore';
+import { useDexStore } from './useDexStore';
 import { playNotificationSound } from '@/lib/sound-utils';
 import { useAIStrategyStore } from './useAIStrategyStore';
 import type { IndicatorSnapshot } from '@/lib/ai/types';
@@ -32,6 +34,23 @@ type ScannerMetrics = {
   lastDurationMs: number | null;
   lastRunAt: number | null;
   byType: Partial<Record<ScanType, ScannerTypeMetrics>>;
+};
+
+type ScannerExchange = 'hyperliquid' | 'binance';
+
+type TelegramScannerConfig = {
+  enabled: boolean;
+  botToken: string;
+  chatId: string;
+  signalFilter: 'all' | 'bullish' | 'bearish';
+  showTpSl: boolean;
+};
+
+type ScannerRuntimeConfig = {
+  enabled: boolean;
+  scanInterval: number;
+  topMarkets: number;
+  playSound: boolean;
 };
 
 const createDefaultScannerMetrics = (): ScannerMetrics => ({
@@ -158,10 +177,13 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
     try {
       const settings = useSettingsStore.getState().settings.scanner;
       const indicatorSettings = useSettingsStore.getState().settings.indicators;
+      const selectedExchange = useDexStore.getState().selectedExchange as ScannerExchange;
+      const scannerRuntime = resolveScannerRuntimeConfig(settings, selectedExchange);
+      const telegramConfig = resolveScannerTelegramConfig(settings, selectedExchange);
 
       const topSymbolsStore = useTopSymbolsStore.getState();
       const symbols = topSymbolsStore.symbols
-        .slice(0, settings.topMarkets)
+        .slice(0, scannerRuntime.topMarkets)
         .map(s => s.name);
 
       if (symbols.length === 0) {
@@ -368,6 +390,7 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
 
       // Augment results with realtime volume trigger signal
       for (const result of newResults) {
+        result.exchange = selectedExchange;
         if (hasTrigger(result.symbol)) {
           result.realtimeVolumeTrigger = true;
         }
@@ -375,13 +398,13 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
 
       const newSymbols = new Set(newResults.map((r: ScanResult) => r.symbol));
 
-      if (newResults.length > 0 && settings.playSound) {
+      if (newResults.length > 0 && scannerRuntime.playSound) {
         const firstResult = newResults[0];
         scannerLogger.info(`Scan completed with ${newResults.length} result(s): ${newResults.map(r => r.symbol).join(', ')} - Playing sound`);
         playNotificationSound(firstResult.signalType).catch(err =>
           scannerLogger.error('Error playing sound:', err)
         );
-      } else if (settings.playSound) {
+      } else if (scannerRuntime.playSound) {
         scannerLogger.info('Scan completed with no results - skipping sound');
       } else {
         scannerLogger.info('Sound disabled in settings');
@@ -390,16 +413,16 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
       // Scanner Telegram Alerts
       if (
         newResults.length > 0 &&
-        settings.telegramEnabled &&
-        settings.telegramBotToken &&
-        settings.telegramChatId
+        telegramConfig.enabled &&
+        telegramConfig.botToken &&
+        telegramConfig.chatId
       ) {
-        const filteredResults = settings.telegramSignalFilter === 'all'
+        const filteredResults = telegramConfig.signalFilter === 'all'
           ? newResults
-          : newResults.filter(r => r.signalType === settings.telegramSignalFilter);
+          : newResults.filter(r => r.signalType === telegramConfig.signalFilter);
 
         if (filteredResults.length > 0) {
-          sendScannerTelegramAlerts(filteredResults, settings.telegramBotToken, settings.telegramChatId, settings.telegramShowTpSl).catch(err =>
+          sendScannerTelegramAlerts(filteredResults, selectedExchange, telegramConfig.botToken, telegramConfig.chatId, telegramConfig.showTpSl).catch(err =>
             scannerLogger.error('[Scanner Telegram] Error sending alerts:', err)
           );
         }
@@ -483,7 +506,9 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
     get().runScan();
 
     const settings = useSettingsStore.getState().settings.scanner;
-    const intervalMs = settings.scanInterval * 60 * 1000;
+    const selectedExchange = useDexStore.getState().selectedExchange as ScannerExchange;
+    const scannerRuntime = resolveScannerRuntimeConfig(settings, selectedExchange);
+    const intervalMs = scannerRuntime.scanInterval * 60 * 1000;
 
     const newIntervalId = setInterval(() => {
       get().runScan();
@@ -504,7 +529,9 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
     if (status.isRunning) return;
 
     const settings = useSettingsStore.getState().settings.scanner;
-    const intervalMs = settings.scanInterval * 60 * 1000;
+    const selectedExchange = useDexStore.getState().selectedExchange as ScannerExchange;
+    const scannerRuntime = resolveScannerRuntimeConfig(settings, selectedExchange);
+    const intervalMs = scannerRuntime.scanInterval * 60 * 1000;
 
     const newIntervalId = setInterval(() => {
       get().runScan();
@@ -609,6 +636,7 @@ function getStrategyName(result: ScanResult): string {
 
 async function sendScannerTelegramAlerts(
   results: ScanResult[],
+  exchange: ScannerExchange,
   botToken: string,
   chatId: string,
   showTpSl: boolean = false,
@@ -630,7 +658,7 @@ async function sendScannerTelegramAlerts(
     const lines = [
       `${emoji} ${arrow} <b>${action} — ${r.symbol}USDT</b>`,
       `━━━━━━━━━━━━━━━━━━━━━━`,
-      `📊 Sàn: HYPERLIQUID  |  KH: ${tf}  |  Side: ${side}`,
+      `📊 Sàn: ${exchange.toUpperCase()}  |  KH: ${tf}  |  Side: ${side}`,
       `💰 Giá vào: ${formatPrice(entry)}`,
       `📈 Volume Delta: ${delta}`,
       `━━━━━━━━━━━━━━━━━━━━━━`,
@@ -671,4 +699,38 @@ async function sendScannerTelegramAlerts(
       console.error(`[Scanner Telegram] Failed to send for ${r.symbol}:`, err);
     }
   }
+}
+
+function resolveScannerTelegramConfig(settings: ScannerSettings, exchange: ScannerExchange): TelegramScannerConfig {
+  const exchangeConfig = settings.telegramByExchange?.[exchange];
+  const legacyConfig: TelegramScannerConfig = {
+    enabled: settings.telegramEnabled ?? false,
+    botToken: settings.telegramBotToken ?? '',
+    chatId: settings.telegramChatId ?? '',
+    signalFilter: settings.telegramSignalFilter ?? 'all',
+    showTpSl: settings.telegramShowTpSl ?? false,
+  };
+
+  if (!exchangeConfig) {
+    return legacyConfig;
+  }
+
+  return {
+    enabled: exchangeConfig.enabled ?? legacyConfig.enabled,
+    botToken: exchangeConfig.botToken ?? legacyConfig.botToken,
+    chatId: exchangeConfig.chatId ?? legacyConfig.chatId,
+    signalFilter: exchangeConfig.signalFilter ?? legacyConfig.signalFilter,
+    showTpSl: exchangeConfig.showTpSl ?? legacyConfig.showTpSl,
+  };
+}
+
+function resolveScannerRuntimeConfig(settings: ScannerSettings, exchange: ScannerExchange): ScannerRuntimeConfig {
+  const exchangeRuntime = settings.runtimeByExchange?.[exchange];
+
+  return {
+    enabled: exchangeRuntime?.enabled ?? settings.enabled ?? false,
+    scanInterval: exchangeRuntime?.scanInterval ?? settings.scanInterval ?? 1,
+    topMarkets: exchangeRuntime?.topMarkets ?? settings.topMarkets ?? 50,
+    playSound: exchangeRuntime?.playSound ?? settings.playSound ?? true,
+  };
 }

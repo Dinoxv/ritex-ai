@@ -2,12 +2,16 @@
 
 import { useEffect, useCallback, useState } from 'react';
 import { useSettingsStore } from '@/stores/useSettingsStore';
-import { EmaConfig, ThemeName } from '@/models/Settings';
+import { EmaConfig, ThemeName, ScannerSettings, OrderSettings } from '@/models/Settings';
+import { useDexStore } from '@/stores/useDexStore';
 import { CredentialsSettings } from '@/components/settings/CredentialsSettings';
 import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
+import { useLanguageStore } from '@/stores/useLanguageStore';
 
 export default function SettingsPanel() {
   const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateKalmanTrendSettings, updateSieuXuHuongSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings, updateAISettings } = useSettingsStore();
+  const { t } = useLanguageStore();
+  const selectedExchange = useDexStore((state) => state.selectedExchange);
   const [isStochasticExpanded, setIsStochasticExpanded] = useState(false);
   const [isEmaExpanded, setIsEmaExpanded] = useState(false);
   const [isMacdExpanded, setIsMacdExpanded] = useState(false);
@@ -27,6 +31,132 @@ export default function SettingsPanel() {
     }
     return Math.max(min, Math.min(max, value));
   }, []);
+
+  const scannerTelegramByExchange = settings.scanner.telegramByExchange ?? {
+    hyperliquid: {
+      enabled: settings.scanner.telegramEnabled || false,
+      botToken: settings.scanner.telegramBotToken || '',
+      chatId: settings.scanner.telegramChatId || '',
+      signalFilter: settings.scanner.telegramSignalFilter || 'all',
+      showTpSl: settings.scanner.telegramShowTpSl || false,
+    },
+    binance: {
+      enabled: false,
+      botToken: '',
+      chatId: '',
+      signalFilter: 'all',
+      showTpSl: false,
+    },
+  };
+
+  const scannerRuntimeByExchange = settings.scanner.runtimeByExchange ?? {
+    hyperliquid: {
+      enabled: settings.scanner.enabled,
+      scanInterval: settings.scanner.scanInterval,
+      topMarkets: settings.scanner.topMarkets,
+      playSound: settings.scanner.playSound,
+    },
+    binance: {
+      enabled: settings.scanner.enabled,
+      scanInterval: settings.scanner.scanInterval,
+      topMarkets: settings.scanner.topMarkets,
+      playSound: settings.scanner.playSound,
+    },
+  };
+
+  const activeScannerRuntime = scannerRuntimeByExchange[selectedExchange];
+
+  const orderSettingsByExchange = settings.orders.byExchange ?? {
+    hyperliquid: {
+      cloudPercentage: settings.orders.cloudPercentage,
+      smallPercentage: settings.orders.smallPercentage,
+      bigPercentage: settings.orders.bigPercentage,
+      leverage: settings.orders.leverage,
+    },
+    binance: {
+      cloudPercentage: settings.orders.cloudPercentage,
+      smallPercentage: settings.orders.smallPercentage,
+      bigPercentage: settings.orders.bigPercentage,
+      leverage: settings.orders.leverage,
+    },
+  };
+
+  const activeOrderSettings = orderSettingsByExchange[selectedExchange];
+
+  const updateOrderSettingsExchange = useCallback((
+    exchange: 'hyperliquid' | 'binance',
+    updates: Partial<OrderSettings['byExchange']['hyperliquid']>
+  ) => {
+    updateOrderSettings({
+      byExchange: {
+        ...orderSettingsByExchange,
+        [exchange]: {
+          ...orderSettingsByExchange[exchange],
+          ...updates,
+        },
+      },
+    });
+  }, [orderSettingsByExchange, updateOrderSettings]);
+
+  const aiTelegramByExchange = settings.ai.telegramByExchange ?? {
+    hyperliquid: {
+      enabled: settings.ai.telegramEnabled,
+      botToken: settings.ai.telegramBotToken,
+      chatId: settings.ai.telegramChatId,
+    },
+    binance: {
+      enabled: settings.ai.telegramEnabled,
+      botToken: settings.ai.telegramBotToken,
+      chatId: settings.ai.telegramChatId,
+    },
+  };
+
+  const activeAiTelegramSettings = aiTelegramByExchange[selectedExchange];
+
+  const updateAiTelegramExchange = useCallback((
+    exchange: 'hyperliquid' | 'binance',
+    updates: Partial<{ enabled: boolean; botToken: string; chatId: string }>
+  ) => {
+    updateAISettings({
+      telegramByExchange: {
+        ...aiTelegramByExchange,
+        [exchange]: {
+          ...aiTelegramByExchange[exchange],
+          ...updates,
+        },
+      },
+    });
+  }, [aiTelegramByExchange, updateAISettings]);
+
+  const updateScannerRuntimeExchange = useCallback((
+    exchange: 'hyperliquid' | 'binance',
+    updates: Partial<ScannerSettings['runtimeByExchange']['hyperliquid']>
+  ) => {
+    updateScannerSettings({
+      runtimeByExchange: {
+        ...scannerRuntimeByExchange,
+        [exchange]: {
+          ...scannerRuntimeByExchange[exchange],
+          ...updates,
+        },
+      },
+    });
+  }, [scannerRuntimeByExchange, updateScannerSettings]);
+
+  const updateScannerTelegramExchange = useCallback((
+    exchange: 'hyperliquid' | 'binance',
+    updates: Partial<ScannerSettings['telegramByExchange']['hyperliquid']>
+  ) => {
+    updateScannerSettings({
+      telegramByExchange: {
+        ...scannerTelegramByExchange,
+        [exchange]: {
+          ...scannerTelegramByExchange[exchange],
+          ...updates,
+        },
+      },
+    });
+  }, [scannerTelegramByExchange, updateScannerSettings]);
 
   const handleBackdropClick = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     if (e.target === e.currentTarget) {
@@ -75,83 +205,83 @@ export default function SettingsPanel() {
         }
       `}</style>
 
-      <div className="terminal-border bg-bg-primary w-full md:w-[600px] h-[100dvh] md:h-auto md:max-h-[80vh] flex flex-col animate-slide-in">
+      <div className="terminal-border bg-bg-primary w-full md:w-[600px] h-[100dvh] md:h-[calc(100dvh-2rem)] md:max-h-[900px] flex flex-col animate-slide-in overflow-hidden">
         {/* Header */}
-        <div className="p-3 md:p-4 border-b border-frame flex justify-between items-center">
+        <div className="p-3 md:p-4 border-b border-frame flex justify-between items-center bg-bg-primary relative z-20">
           <div className="flex items-center gap-2">
             <span className="text-primary text-2xl">⚙</span>
-            <h2 className="text-primary text-sm font-bold uppercase tracking-wider">Settings</h2>
+            <h2 className="text-primary text-sm font-bold uppercase tracking-wider">{t.settings.title}</h2>
           </div>
           <button
             onClick={closePanel}
             className="text-primary-muted hover:text-primary active:scale-90 transition-all text-2xl leading-none"
-            title="Close settings"
+            title={t.settings.title}
           >
             ✕
           </button>
         </div>
 
         {/* Tabs */}
-        <div className="flex border-b border-frame bg-bg-secondary overflow-x-auto">
+        <div className="flex border-b border-frame bg-bg-secondary overflow-x-auto md:overflow-x-hidden relative z-10 scrollbar-thin scrollbar-thumb-primary/30 scrollbar-track-transparent min-h-[48px]">
           <button
             onClick={() => setActiveTab('scanner')}
-            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider transition-all whitespace-nowrap ${
+            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider leading-none transition-all whitespace-nowrap flex items-center justify-center ${
               activeTab === 'scanner'
                 ? 'bg-primary/10 text-primary border-b-2 border-primary'
                 : 'text-primary-muted hover:text-primary hover:bg-primary/5'
             }`}
           >
-            Scanner
+            {t.settings.scannerTab}
           </button>
           <button
             onClick={() => setActiveTab('indicators')}
-            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider transition-all whitespace-nowrap ${
+            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider leading-none transition-all whitespace-nowrap flex items-center justify-center ${
               activeTab === 'indicators'
                 ? 'bg-primary/10 text-primary border-b-2 border-primary'
                 : 'text-primary-muted hover:text-primary hover:bg-primary/5'
             }`}
           >
-            Indicators
+            {t.settings.indicatorsTab}
           </button>
           <button
             onClick={() => setActiveTab('orders')}
-            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider transition-all whitespace-nowrap ${
+            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider leading-none transition-all whitespace-nowrap flex items-center justify-center ${
               activeTab === 'orders'
                 ? 'bg-primary/10 text-primary border-b-2 border-primary'
                 : 'text-primary-muted hover:text-primary hover:bg-primary/5'
             }`}
           >
-            Orders
+            {t.settings.ordersTab}
           </button>
           <button
             onClick={() => setActiveTab('ui')}
-            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider transition-all whitespace-nowrap ${
+            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider leading-none transition-all whitespace-nowrap flex items-center justify-center ${
               activeTab === 'ui'
                 ? 'bg-primary/10 text-primary border-b-2 border-primary'
                 : 'text-primary-muted hover:text-primary hover:bg-primary/5'
             }`}
           >
-            UI
+            {t.settings.uiTab}
           </button>
           <button
             onClick={() => setActiveTab('credentials')}
-            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider transition-all whitespace-nowrap ${
+            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider leading-none transition-all whitespace-nowrap flex items-center justify-center ${
               activeTab === 'credentials'
                 ? 'bg-primary/10 text-primary border-b-2 border-primary'
                 : 'text-primary-muted hover:text-primary hover:bg-primary/5'
             }`}
           >
-            Credentials
+            {t.settings.credentialsTab}
           </button>
           <button
             onClick={() => setActiveTab('ai')}
-            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider transition-all whitespace-nowrap ${
+            className={`flex-1 px-2 md:px-4 py-2 md:py-3 text-[10px] md:text-xs font-mono uppercase tracking-wider leading-none transition-all whitespace-nowrap flex items-center justify-center ${
               activeTab === 'ai'
                 ? 'bg-primary/10 text-primary border-b-2 border-primary'
                 : 'text-primary-muted hover:text-primary hover:bg-primary/5'
             }`}
           >
-            AI
+            {t.settings.aiTab}
           </button>
         </div>
 
@@ -164,27 +294,27 @@ export default function SettingsPanel() {
             <div className="space-y-4 pb-8">
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-primary-muted text-xs font-mono">ENABLE SCANNER</span>
+                  <span className="text-primary-muted text-xs font-mono">{t.settings.enableScanner}</span>
                   <input
                     type="checkbox"
-                    checked={settings.scanner.enabled}
-                    onChange={(e) => updateScannerSettings({ enabled: e.target.checked })}
+                    checked={activeScannerRuntime.enabled}
+                    onChange={(e) => updateScannerRuntimeExchange(selectedExchange, { enabled: e.target.checked })}
                     className="w-4 h-4 accent-primary cursor-pointer"
                   />
                 </label>
               </div>
 
-              {settings.scanner.enabled && (
+              {activeScannerRuntime.enabled && (
                 <>
                   <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">SCAN INTERVAL (MINUTES)</label>
+                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.scanInterval} - {selectedExchange.toUpperCase()}</label>
                       <input
                         type="number"
                         min="1"
                         max="60"
-                        value={settings.scanner.scanInterval}
-                        onChange={(e) => updateScannerSettings({
+                        value={activeScannerRuntime.scanInterval}
+                        onChange={(e) => updateScannerRuntimeExchange(selectedExchange, {
                           scanInterval: clampScannerNumber(Number(e.target.value), 1, 60, 5)
                         })}
                         className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
@@ -192,13 +322,13 @@ export default function SettingsPanel() {
                     </div>
 
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">TOP MARKETS TO SCAN</label>
+                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.topMarkets} - {selectedExchange.toUpperCase()}</label>
                       <input
                         type="number"
                         min="5"
                         max="500"
-                        value={settings.scanner.topMarkets}
-                        onChange={(e) => updateScannerSettings({
+                        value={activeScannerRuntime.topMarkets}
+                        onChange={(e) => updateScannerRuntimeExchange(selectedExchange, {
                           topMarkets: clampScannerNumber(Number(e.target.value), 5, 500, 50)
                         })}
                         className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
@@ -206,7 +336,7 @@ export default function SettingsPanel() {
                     </div>
 
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">CANDLE CACHE DURATION (MINUTES)</label>
+                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.candleCacheDuration}</label>
                       <input
                         type="number"
                         min="1"
@@ -220,7 +350,7 @@ export default function SettingsPanel() {
                     </div>
 
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">MEDIUM DURATION WARNING (SECONDS)</label>
+                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.mediumDurationWarning}</label>
                       <input
                         type="number"
                         min="0.5"
@@ -235,7 +365,7 @@ export default function SettingsPanel() {
                     </div>
 
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">HIGH DURATION WARNING (SECONDS)</label>
+                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.highDurationWarning}</label>
                       <input
                         type="number"
                         min="0.5"
@@ -256,11 +386,11 @@ export default function SettingsPanel() {
 
                     <div>
                       <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary-muted text-xs font-mono">PLAY SOUND ON NEW RESULTS</span>
+                        <span className="text-primary-muted text-xs font-mono">{t.settings.playSoundOnResults} - {selectedExchange.toUpperCase()}</span>
                         <input
                           type="checkbox"
-                          checked={settings.scanner.playSound}
-                          onChange={(e) => updateScannerSettings({ playSound: e.target.checked })}
+                          checked={activeScannerRuntime.playSound}
+                          onChange={(e) => updateScannerRuntimeExchange(selectedExchange, { playSound: e.target.checked })}
                           className="w-4 h-4 accent-primary cursor-pointer"
                         />
                       </label>
@@ -270,73 +400,138 @@ export default function SettingsPanel() {
                   {/* Scanner Telegram Alerts */}
                   <div className="border border-frame rounded overflow-hidden">
                     <div className="p-3 bg-bg-secondary">
-                      <div className="text-primary text-xs font-mono mb-3 uppercase tracking-wider">📲 Telegram Scanner Alerts</div>
+                      <div className="text-primary text-xs font-mono mb-3 uppercase tracking-wider">📲 {t.settings.scannerTelegramAlerts}</div>
 
-                      <div className="space-y-3">
-                        <label className="flex items-center justify-between cursor-pointer">
-                          <span className="text-primary-muted text-xs font-mono">ENABLE TELEGRAM ALERTS</span>
-                          <input
-                            type="checkbox"
-                            checked={settings.scanner.telegramEnabled || false}
-                            onChange={(e) => updateScannerSettings({ telegramEnabled: e.target.checked })}
-                            className="w-4 h-4 accent-primary cursor-pointer"
-                          />
-                        </label>
+                      <div className="space-y-4">
+                        <div className="border border-frame rounded p-3 bg-bg-primary/40">
+                          <div className="text-primary text-xs font-mono mb-2">{t.settings.exchangeHyperliquid}</div>
 
-                        {settings.scanner.telegramEnabled && (
-                          <>
-                            <div>
-                              <label className="block text-primary-muted text-xs font-mono mb-1">BOT TOKEN</label>
-                              <input
-                                type="password"
-                                value={settings.scanner.telegramBotToken || ''}
-                                onChange={(e) => updateScannerSettings({ telegramBotToken: e.target.value })}
-                                placeholder="123456:ABC-..."
-                                className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
-                              />
-                            </div>
+                          <label className="flex items-center justify-between cursor-pointer mb-3">
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableExchangeAlerts} {t.settings.exchangeHyperliquid}</span>
+                            <input
+                              type="checkbox"
+                              checked={scannerTelegramByExchange.hyperliquid.enabled}
+                              onChange={(e) => updateScannerTelegramExchange('hyperliquid', { enabled: e.target.checked })}
+                              className="w-4 h-4 accent-primary cursor-pointer"
+                            />
+                          </label>
 
-                            <div>
-                              <label className="block text-primary-muted text-xs font-mono mb-1">CHAT ID</label>
-                              <input
-                                type="text"
-                                value={settings.scanner.telegramChatId || ''}
-                                onChange={(e) => updateScannerSettings({ telegramChatId: e.target.value })}
-                                placeholder="-100..."
-                                className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
-                              />
-                            </div>
+                          {scannerTelegramByExchange.hyperliquid.enabled && (
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.botToken}</label>
+                                <input
+                                  type="password"
+                                  value={scannerTelegramByExchange.hyperliquid.botToken}
+                                  onChange={(e) => updateScannerTelegramExchange('hyperliquid', { botToken: e.target.value })}
+                                  placeholder="123456:ABC-..."
+                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                                />
+                              </div>
 
-                            <div>
-                              <label className="block text-primary-muted text-xs font-mono mb-1">SIGNAL FILTER</label>
-                              <select
-                                value={settings.scanner.telegramSignalFilter || 'all'}
-                                onChange={(e) => updateScannerSettings({ telegramSignalFilter: e.target.value as 'all' | 'bullish' | 'bearish' })}
-                                className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary focus:outline-none focus:border-primary"
-                              >
-                                <option value="all">All Signals</option>
-                                <option value="bullish">Bullish Only</option>
-                                <option value="bearish">Bearish Only</option>
-                              </select>
-                            </div>
+                              <div>
+                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.chatId}</label>
+                                <input
+                                  type="text"
+                                  value={scannerTelegramByExchange.hyperliquid.chatId}
+                                  onChange={(e) => updateScannerTelegramExchange('hyperliquid', { chatId: e.target.value })}
+                                  placeholder="-100..."
+                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                                />
+                              </div>
 
-                            <div className="mt-2">
+                              <div>
+                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.signalFilter}</label>
+                                <select
+                                  value={scannerTelegramByExchange.hyperliquid.signalFilter}
+                                  onChange={(e) => updateScannerTelegramExchange('hyperliquid', { signalFilter: e.target.value as 'all' | 'bullish' | 'bearish' })}
+                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary focus:outline-none focus:border-primary"
+                                >
+                                  <option value="all">{t.settings.allSignals}</option>
+                                  <option value="bullish">{t.settings.bullishOnly}</option>
+                                  <option value="bearish">{t.settings.bearishOnly}</option>
+                                </select>
+                              </div>
+
                               <label className="flex items-center justify-between cursor-pointer">
-                                <span className="text-primary-muted text-xs font-mono">SHOW TP/SL IN MESSAGE</span>
+                                <span className="text-primary-muted text-xs font-mono">{t.settings.showTpSlInMessage}</span>
                                 <input
                                   type="checkbox"
-                                  checked={settings.scanner.telegramShowTpSl || false}
-                                  onChange={(e) => updateScannerSettings({ telegramShowTpSl: e.target.checked })}
+                                  checked={scannerTelegramByExchange.hyperliquid.showTpSl}
+                                  onChange={(e) => updateScannerTelegramExchange('hyperliquid', { showTpSl: e.target.checked })}
                                   className="w-4 h-4 accent-primary cursor-pointer"
                                 />
                               </label>
                             </div>
+                          )}
+                        </div>
 
-                            <div className="text-primary-muted font-mono text-[10px]">
-                              Sends a Telegram message each time the scanner detects an entry signal matching your filter.
+                        <div className="border border-frame rounded p-3 bg-bg-primary/40">
+                          <div className="text-primary text-xs font-mono mb-2">{t.settings.exchangeBinance}</div>
+
+                          <label className="flex items-center justify-between cursor-pointer mb-3">
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableExchangeAlerts} {t.settings.exchangeBinance}</span>
+                            <input
+                              type="checkbox"
+                              checked={scannerTelegramByExchange.binance.enabled}
+                              onChange={(e) => updateScannerTelegramExchange('binance', { enabled: e.target.checked })}
+                              className="w-4 h-4 accent-primary cursor-pointer"
+                            />
+                          </label>
+
+                          {scannerTelegramByExchange.binance.enabled && (
+                            <div className="space-y-3">
+                              <div>
+                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.botToken}</label>
+                                <input
+                                  type="password"
+                                  value={scannerTelegramByExchange.binance.botToken}
+                                  onChange={(e) => updateScannerTelegramExchange('binance', { botToken: e.target.value })}
+                                  placeholder="123456:ABC-..."
+                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.chatId}</label>
+                                <input
+                                  type="text"
+                                  value={scannerTelegramByExchange.binance.chatId}
+                                  onChange={(e) => updateScannerTelegramExchange('binance', { chatId: e.target.value })}
+                                  placeholder="-100..."
+                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                                />
+                              </div>
+
+                              <div>
+                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.signalFilter}</label>
+                                <select
+                                  value={scannerTelegramByExchange.binance.signalFilter}
+                                  onChange={(e) => updateScannerTelegramExchange('binance', { signalFilter: e.target.value as 'all' | 'bullish' | 'bearish' })}
+                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary focus:outline-none focus:border-primary"
+                                >
+                                  <option value="all">{t.settings.allSignals}</option>
+                                  <option value="bullish">{t.settings.bullishOnly}</option>
+                                  <option value="bearish">{t.settings.bearishOnly}</option>
+                                </select>
+                              </div>
+
+                              <label className="flex items-center justify-between cursor-pointer">
+                                <span className="text-primary-muted text-xs font-mono">{t.settings.showTpSlInMessage}</span>
+                                <input
+                                  type="checkbox"
+                                  checked={scannerTelegramByExchange.binance.showTpSl}
+                                  onChange={(e) => updateScannerTelegramExchange('binance', { showTpSl: e.target.checked })}
+                                  className="w-4 h-4 accent-primary cursor-pointer"
+                                />
+                              </label>
                             </div>
-                          </>
-                        )}
+                          )}
+                        </div>
+
+                        <div className="text-primary-muted font-mono text-[10px]">
+                          {t.settings.scannerTelegramNote}
+                        </div>
                       </div>
                     </div>
                   </div>
@@ -347,7 +542,7 @@ export default function SettingsPanel() {
                       className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-primary font-mono text-xs font-bold">█ STOCHASTIC SCANNER</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.stochasticScanner}</span>
                       </div>
                       <span className="text-primary text-base">{isScannerStochExpanded ? '▼' : '▶'}</span>
                     </button>
@@ -356,7 +551,7 @@ export default function SettingsPanel() {
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">ENABLE STOCHASTIC SCANNER</span>
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableStochastic}</span>
                             <input
                               type="checkbox"
                               checked={settings.scanner.stochasticScanner.enabled}
@@ -375,7 +570,7 @@ export default function SettingsPanel() {
 
                         {settings.scanner.stochasticScanner.enabled && (
                           <div className="p-3 bg-bg-secondary border border-frame rounded">
-                            <div className="text-primary font-mono text-xs font-bold mb-3">THRESHOLDS</div>
+                            <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.thresholds}</div>
                             <div className="grid grid-cols-2 gap-3 text-xs">
                               <div>
                                 <label className="text-primary-muted font-mono block mb-1">OVERSOLD</label>
@@ -415,7 +610,7 @@ export default function SettingsPanel() {
                               </div>
                             </div>
                             <div className="mt-3 text-primary-muted font-mono text-[10px]">
-                              Uses stochastic variants from Indicator Settings (Ultra Fast, Fast, Medium, Slow)
+                              {t.settings.stochasticNote}
                             </div>
                           </div>
                         )}
@@ -429,7 +624,7 @@ export default function SettingsPanel() {
                       className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-primary font-mono text-xs font-bold">█ EMA ALIGNMENT SCANNER</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.emaAlignmentScanner}</span>
                       </div>
                       <span className="text-primary text-base">{isScannerEmaExpanded ? '▼' : '▶'}</span>
                     </button>
@@ -438,7 +633,7 @@ export default function SettingsPanel() {
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">ENABLE EMA ALIGNMENT SCANNER</span>
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableEmaAlignment}</span>
                             <input
                               type="checkbox"
                               checked={settings.scanner.emaAlignmentScanner.enabled}
@@ -459,15 +654,15 @@ export default function SettingsPanel() {
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
                               <div className="text-primary-muted text-xs font-mono mb-2">
-                                Uses chart EMA settings (EMA1: {settings.indicators.ema.ema1.period}, EMA2: {settings.indicators.ema.ema2.period}, EMA3: {settings.indicators.ema.ema3.period})
+                                {t.settings.usesChartEmaSettings} (EMA1: {settings.indicators.ema.ema1.period}, EMA2: {settings.indicators.ema.ema2.period}, EMA3: {settings.indicators.ema.ema3.period})
                               </div>
                               <div className="text-primary-muted text-xs font-mono">
-                                Detects when all EMAs align in the same direction
+                                {t.settings.emaAlignmentNote}
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">TIMEFRAMES TO SCAN</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
                                   <label key={tf} className="flex items-center gap-2 cursor-pointer">
@@ -494,7 +689,7 @@ export default function SettingsPanel() {
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">LOOKBACK PERIOD</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.lookbackPeriod}</div>
                               <div>
                                 <label className="text-primary-muted font-mono block mb-1 text-xs">BARS TO CHECK</label>
                                 <input
@@ -513,7 +708,7 @@ export default function SettingsPanel() {
                                   className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                                 />
                                 <div className="text-primary-muted text-xs font-mono mt-1">
-                                  How many bars back to check for recent alignment
+                                  {t.settings.lookbackNote}
                                 </div>
                               </div>
                             </div>
@@ -529,7 +724,7 @@ export default function SettingsPanel() {
                       className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-primary font-mono text-xs font-bold">█ DIVERGENCE SCANNER</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.divergenceScanner}</span>
                       </div>
                       <span className="text-primary text-base">{isScannerDivExpanded ? '▼' : '▶'}</span>
                     </button>
@@ -538,7 +733,7 @@ export default function SettingsPanel() {
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">ENABLE DIVERGENCE SCANNER</span>
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableDivergence}</span>
                             <input
                               type="checkbox"
                               checked={settings.scanner.divergenceScanner.enabled}
@@ -558,10 +753,10 @@ export default function SettingsPanel() {
                         {settings.scanner.divergenceScanner.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">DIVERGENCE TYPES TO SCAN</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.divergenceTypes}</div>
                               <div className="space-y-2">
                                 <label className="flex items-center justify-between cursor-pointer">
-                                  <span className="text-primary-muted text-xs font-mono">BULLISH DIVERGENCE</span>
+                                  <span className="text-primary-muted text-xs font-mono">{t.settings.bullishDivergence}</span>
                                   <input
                                     type="checkbox"
                                     checked={settings.scanner.divergenceScanner.scanBullish}
@@ -577,7 +772,7 @@ export default function SettingsPanel() {
                                   />
                                 </label>
                                 <label className="flex items-center justify-between cursor-pointer">
-                                  <span className="text-primary-muted text-xs font-mono">BEARISH DIVERGENCE</span>
+                                  <span className="text-primary-muted text-xs font-mono">{t.settings.bearishDivergence}</span>
                                   <input
                                     type="checkbox"
                                     checked={settings.scanner.divergenceScanner.scanBearish}
@@ -593,7 +788,7 @@ export default function SettingsPanel() {
                                   />
                                 </label>
                                 <label className="flex items-center justify-between cursor-pointer">
-                                  <span className="text-primary-muted text-xs font-mono">HIDDEN DIVERGENCES</span>
+                                  <span className="text-primary-muted text-xs font-mono">{t.settings.hiddenDivergences}</span>
                                   <input
                                     type="checkbox"
                                     checked={settings.scanner.divergenceScanner.scanHidden}
@@ -613,7 +808,7 @@ export default function SettingsPanel() {
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
                               <div className="text-primary-muted text-xs font-mono">
-                                Uses enabled stochastic variants from Indicator Settings (Ultra Fast, Fast, Medium, Slow)
+                                {t.settings.usesEnabledStochasticVariants}
                               </div>
                             </div>
                           </>
@@ -629,7 +824,7 @@ export default function SettingsPanel() {
                       className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-primary font-mono text-xs font-bold">█ MACD REVERSAL SCANNER</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.macdReversalScanner}</span>
                       </div>
                       <span className="text-primary text-base">{isScannerMacdExpanded ? '▼' : '▶'}</span>
                     </button>
@@ -638,7 +833,7 @@ export default function SettingsPanel() {
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">ENABLE MACD REVERSAL SCANNER</span>
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableMacdReversal}</span>
                             <input
                               type="checkbox"
                               checked={settings.scanner.macdReversalScanner.enabled}
@@ -658,7 +853,7 @@ export default function SettingsPanel() {
                         {settings.scanner.macdReversalScanner.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">TIMEFRAMES TO SCAN</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
                                   <label key={tf} className="flex items-center gap-2 cursor-pointer">
@@ -686,7 +881,7 @@ export default function SettingsPanel() {
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
                               <div className="text-primary-muted text-xs font-mono">
-                                Detects MACD line crossing signal line (Fast: {settings.scanner.macdReversalScanner.fastPeriod}, Slow: {settings.scanner.macdReversalScanner.slowPeriod}, Signal: {settings.scanner.macdReversalScanner.signalPeriod})
+                                {t.settings.detectsMacdCross} (Fast: {settings.scanner.macdReversalScanner.fastPeriod}, Slow: {settings.scanner.macdReversalScanner.slowPeriod}, Signal: {settings.scanner.macdReversalScanner.signalPeriod})
                               </div>
                             </div>
                           </>
@@ -702,7 +897,7 @@ export default function SettingsPanel() {
                       className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-primary font-mono text-xs font-bold">█ RSI REVERSAL SCANNER</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.rsiReversalScanner}</span>
                       </div>
                       <span className="text-primary text-base">{isScannerRsiExpanded ? '▼' : '▶'}</span>
                     </button>
@@ -711,7 +906,7 @@ export default function SettingsPanel() {
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">ENABLE RSI REVERSAL SCANNER</span>
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableRsiReversal}</span>
                             <input
                               type="checkbox"
                               checked={settings.scanner.rsiReversalScanner.enabled}
@@ -731,7 +926,7 @@ export default function SettingsPanel() {
                         {settings.scanner.rsiReversalScanner.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">TIMEFRAMES TO SCAN</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
                                   <label key={tf} className="flex items-center gap-2 cursor-pointer">
@@ -759,7 +954,7 @@ export default function SettingsPanel() {
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
                               <div className="text-primary-muted text-xs font-mono">
-                                Detects RSI exiting overbought ({'>'}{settings.scanner.rsiReversalScanner.overboughtLevel}) or oversold ({'<'}{settings.scanner.rsiReversalScanner.oversoldLevel}) zones (Period: {settings.scanner.rsiReversalScanner.period})
+                                {t.settings.detectsRsiZones} ({'>'}{settings.scanner.rsiReversalScanner.overboughtLevel}) / ({'<'}{settings.scanner.rsiReversalScanner.oversoldLevel}) (Period: {settings.scanner.rsiReversalScanner.period})
                               </div>
                             </div>
                           </>
@@ -775,7 +970,7 @@ export default function SettingsPanel() {
                       className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-primary font-mono text-xs font-bold">█ VOLUME SPIKE SCANNER</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.volumeSpikeScanner}</span>
                       </div>
                       <span className="text-primary text-base">{isScannerVolumeExpanded ? '▼' : '▶'}</span>
                     </button>
@@ -784,7 +979,7 @@ export default function SettingsPanel() {
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">ENABLE VOLUME SPIKE SCANNER</span>
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableVolumeSpike}</span>
                             <input
                               type="checkbox"
                               checked={settings.scanner.volumeSpikeScanner.enabled}
@@ -804,7 +999,7 @@ export default function SettingsPanel() {
                         {settings.scanner.volumeSpikeScanner.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">TIMEFRAMES TO SCAN</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
                                   <label key={tf} className="flex items-center gap-2 cursor-pointer">
@@ -831,7 +1026,7 @@ export default function SettingsPanel() {
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">THRESHOLDS</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.thresholds}</div>
                               <div className="grid grid-cols-2 gap-3 text-xs">
                                 <div>
                                   <label className="text-primary-muted font-mono block mb-1">VOLUME MULTIPLIER</label>
@@ -852,7 +1047,7 @@ export default function SettingsPanel() {
                                     className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                                   />
                                   <div className="text-primary-muted font-mono text-[10px] mt-1">
-                                    Current: {settings.scanner.volumeSpikeScanner.volumeThreshold}x average
+                                    {t.settings.currentAverage}: {settings.scanner.volumeSpikeScanner.volumeThreshold}x
                                   </div>
                                 </div>
                                 <div>
@@ -874,14 +1069,14 @@ export default function SettingsPanel() {
                                     className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                                   />
                                   <div className="text-primary-muted font-mono text-[10px] mt-1">
-                                    Min: {settings.scanner.volumeSpikeScanner.priceChangeThreshold}%
+                                    {t.settings.minimum}: {settings.scanner.volumeSpikeScanner.priceChangeThreshold}%
                                   </div>
                                 </div>
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">LOOKBACK PERIOD</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.lookbackPeriod}</div>
                               <div>
                                 <label className="text-primary-muted font-mono block mb-1 text-xs">CANDLES FOR AVG VOLUME</label>
                                 <input
@@ -900,14 +1095,14 @@ export default function SettingsPanel() {
                                   className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                                 />
                                 <div className="text-primary-muted font-mono text-[10px] mt-1">
-                                  Average volume calculated from last {settings.scanner.volumeSpikeScanner.lookbackPeriod} candles
+                                  {t.settings.avgVolumeCalculatedFromLast} {settings.scanner.volumeSpikeScanner.lookbackPeriod}
                                 </div>
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
                               <div className="text-primary-muted text-xs font-mono">
-                                Detects when volume is ≥{settings.scanner.volumeSpikeScanner.volumeThreshold}x average AND price changes ≥{settings.scanner.volumeSpikeScanner.priceChangeThreshold}%
+                                {t.settings.detectsVolumeAndPriceChange} ≥{settings.scanner.volumeSpikeScanner.volumeThreshold}x / ≥{settings.scanner.volumeSpikeScanner.priceChangeThreshold}%
                               </div>
                             </div>
                           </>
@@ -923,7 +1118,7 @@ export default function SettingsPanel() {
                       className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                     >
                       <div className="flex items-center gap-2">
-                        <span className="text-primary font-mono text-xs font-bold">█ SUPPORT/RESISTANCE SCANNER</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.supportResistanceScanner}</span>
                       </div>
                       <span className="text-primary text-base">{isScannerSRExpanded ? '▼' : '▶'}</span>
                     </button>
@@ -932,7 +1127,7 @@ export default function SettingsPanel() {
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">ENABLE SUPPORT/RESISTANCE SCANNER</span>
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableSupportResistance}</span>
                             <input
                               type="checkbox"
                               checked={settings.scanner.supportResistanceScanner?.enabled || false}
@@ -952,7 +1147,7 @@ export default function SettingsPanel() {
                         {settings.scanner.supportResistanceScanner?.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">TIMEFRAMES TO SCAN</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
                                   <label key={tf} className="flex items-center gap-2 cursor-pointer">
@@ -979,7 +1174,7 @@ export default function SettingsPanel() {
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">THRESHOLDS</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.thresholds}</div>
                               <div className="grid grid-cols-2 gap-3 text-xs">
                                 <div>
                                   <label className="text-primary-muted font-mono block mb-1">DISTANCE THRESHOLD (%)</label>
@@ -1000,7 +1195,7 @@ export default function SettingsPanel() {
                                     className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                                   />
                                   <div className="text-primary-muted font-mono text-[10px] mt-1">
-                                    Alert when within {settings.scanner.supportResistanceScanner?.distanceThreshold || 1.0}% of level
+                                    {t.settings.alertWhenWithinOfLevel} {settings.scanner.supportResistanceScanner?.distanceThreshold || 1.0}%
                                   </div>
                                 </div>
                                 <div>
@@ -1021,7 +1216,7 @@ export default function SettingsPanel() {
                                     className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                                   />
                                   <div className="text-primary-muted font-mono text-[10px] mt-1">
-                                    Minimum: {settings.scanner.supportResistanceScanner?.minTouches || 3} touches
+                                    {t.settings.minimumTouchesLabel}: {settings.scanner.supportResistanceScanner?.minTouches || 3}
                                   </div>
                                 </div>
                               </div>
@@ -1029,7 +1224,7 @@ export default function SettingsPanel() {
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
                               <div className="text-primary-muted text-xs font-mono">
-                                Uses trendline-based support/resistance detection. Alerts when price approaches a valid S/R level.
+                                {t.settings.supportResistanceNote}
                               </div>
                             </div>
                           </>
@@ -1038,11 +1233,11 @@ export default function SettingsPanel() {
                     )}
 
                     {/* Kalman Trend Scanner */}
-                    {settings.scanner.enabled && (
+                    {activeScannerRuntime.enabled && (
                       <div className="space-y-3">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">ENABLE KALMAN TREND SCANNER</span>
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableKalmanTrendScanner}</span>
                             <input
                               type="checkbox"
                               checked={settings.scanner.kalmanTrendScanner?.enabled || false}
@@ -1062,7 +1257,7 @@ export default function SettingsPanel() {
                         {settings.scanner.kalmanTrendScanner?.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">TIMEFRAMES TO SCAN</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
                                   <label key={tf} className="flex items-center gap-2 cursor-pointer">
@@ -1090,7 +1285,7 @@ export default function SettingsPanel() {
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
                               <div className="text-primary-muted text-xs font-mono">
-                                Detects Kalman Filter trend reversals. Shows BUY/SELL signals when price crosses the Kalman trend line with volume confirmation.
+                                {t.settings.detectsKalmanTrendReversals}
                               </div>
                             </div>
                           </>
@@ -1099,11 +1294,11 @@ export default function SettingsPanel() {
                     )}
 
                     {/* Ritchi Trend Scanner */}
-                    {settings.scanner.enabled && (
+                    {activeScannerRuntime.enabled && (
                       <div className="space-y-3">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">ENABLE RITCHI TREND SCANNER</span>
+                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableRitchiTrendScanner}</span>
                             <input
                               type="checkbox"
                               checked={settings.scanner.ritchiTrendScanner?.enabled || false}
@@ -1123,7 +1318,7 @@ export default function SettingsPanel() {
                         {settings.scanner.ritchiTrendScanner?.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">TIMEFRAMES TO SCAN</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
                                   <label key={tf} className="flex items-center gap-2 cursor-pointer">
@@ -1150,10 +1345,10 @@ export default function SettingsPanel() {
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-2">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">PARAMETERS</div>
+                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.parameters}</div>
                               
                               <div className="space-y-1">
-                                <label className="text-primary-muted text-xs font-mono">PIVOT LENGTH</label>
+                                <label className="text-primary-muted text-xs font-mono">{t.settings.pivotLength}</label>
                                 <input
                                   type="number"
                                   min="3"
@@ -1172,7 +1367,7 @@ export default function SettingsPanel() {
                               </div>
 
                               <div className="space-y-1">
-                                <label className="text-primary-muted text-xs font-mono">SMA MIN</label>
+                                <label className="text-primary-muted text-xs font-mono">{t.settings.smaMin}</label>
                                 <input
                                   type="number"
                                   min="3"
@@ -1191,7 +1386,7 @@ export default function SettingsPanel() {
                               </div>
 
                               <div className="space-y-1">
-                                <label className="text-primary-muted text-xs font-mono">SMA MAX</label>
+                                <label className="text-primary-muted text-xs font-mono">{t.settings.smaMax}</label>
                                 <input
                                   type="number"
                                   min="10"
@@ -1212,7 +1407,7 @@ export default function SettingsPanel() {
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
                               <div className="text-primary-muted text-xs font-mono">
-                                Detects Siêu Xu Hướng (Ritchi Trend) reversals with pivot-based dynamic SMA bands. Shows BUY/SELL signals with Stop Loss and Take Profit levels.
+                                {t.settings.detectsRitchiTrendReversals}
                               </div>
                             </div>
                           </>
@@ -1234,7 +1429,7 @@ export default function SettingsPanel() {
                   className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-primary font-mono text-xs font-bold">█ MULTI-TIMEFRAME STOCHASTIC</span>
+                    <span className="text-primary font-mono text-xs font-bold">{t.settings.multiTimeframeStochastic}</span>
                   </div>
                   <span className="text-primary text-base">{isStochasticExpanded ? '▼' : '▶'}</span>
                 </button>
@@ -1244,7 +1439,7 @@ export default function SettingsPanel() {
                     {/* Global Toggle */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary-muted text-xs font-mono">SHOW STOCHASTIC VARIANTS (1M)</span>
+                        <span className="text-primary-muted text-xs font-mono">{t.settings.showStochasticVariants}</span>
                         <input
                           type="checkbox"
                           checked={settings.indicators.stochastic.showMultiVariant}
@@ -1257,7 +1452,7 @@ export default function SettingsPanel() {
                     {/* Divergence Settings */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
                       <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary-muted text-xs font-mono">SHOW DIVERGENCE LINES</span>
+                        <span className="text-primary-muted text-xs font-mono">{t.settings.showDivergenceLines}</span>
                         <input
                           type="checkbox"
                           checked={settings.indicators.stochastic.showDivergence}
@@ -1268,16 +1463,16 @@ export default function SettingsPanel() {
 
                       {settings.indicators.stochastic.showDivergence && (
                         <div>
-                          <label className="text-primary-muted font-mono block mb-1 text-xs">DIVERGENCE VARIANT</label>
+                          <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.divergenceVariant}</label>
                           <select
                             value={settings.indicators.stochastic.divergenceVariant}
                             onChange={(e) => updateStochasticSettings({ divergenceVariant: e.target.value as any })}
                             className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
                           >
-                            <option value="ultraFast">ULTRA FAST</option>
-                            <option value="fast">FAST</option>
-                            <option value="medium">MEDIUM</option>
-                            <option value="slow">SLOW</option>
+                            <option value="ultraFast">{t.settings.ultraFast}</option>
+                            <option value="fast">{t.settings.fast}</option>
+                            <option value="medium">{t.settings.medium}</option>
+                            <option value="slow">{t.settings.slow}</option>
                           </select>
                         </div>
                       )}
@@ -1285,15 +1480,15 @@ export default function SettingsPanel() {
 
                     {/* Variant Configuration */}
                     <div className="space-y-2">
-                      <div className="text-primary text-xs font-mono mb-2">█ VARIANT CONFIGURATION</div>
+                      <div className="text-primary text-xs font-mono mb-2">{t.settings.variantConfiguration}</div>
 
                       {(Object.keys(settings.indicators.stochastic.variants) as Array<keyof typeof settings.indicators.stochastic.variants>).map((variant) => {
                         const config = settings.indicators.stochastic.variants[variant];
                         const variantLabel =
-                          variant === 'ultraFast' ? 'ULTRA FAST' :
-                          variant === 'fast' ? 'FAST' :
-                          variant === 'medium' ? 'MEDIUM' :
-                          'SLOW';
+                          variant === 'ultraFast' ? t.settings.ultraFast :
+                          variant === 'fast' ? t.settings.fast :
+                          variant === 'medium' ? t.settings.medium :
+                          t.settings.slow;
                         return (
                           <div key={variant} className="p-3 bg-bg-secondary border border-frame rounded">
                             <div className="flex items-center justify-between mb-3">
@@ -1318,7 +1513,7 @@ export default function SettingsPanel() {
                             {config.enabled && (
                               <div className="grid grid-cols-3 gap-3 text-xs">
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">PERIOD</label>
+                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.period}</label>
                                   <input
                                     type="number"
                                     min="5"
@@ -1336,7 +1531,7 @@ export default function SettingsPanel() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">SMOOTH K</label>
+                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.smoothK}</label>
                                   <input
                                     type="number"
                                     min="1"
@@ -1354,7 +1549,7 @@ export default function SettingsPanel() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">SMOOTH D</label>
+                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.smoothD}</label>
                                   <input
                                     type="number"
                                     min="1"
@@ -1388,7 +1583,7 @@ export default function SettingsPanel() {
                   className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-primary font-mono text-xs font-bold">█ EXPONENTIAL MOVING AVERAGES</span>
+                    <span className="text-primary font-mono text-xs font-bold">{t.settings.ema}</span>
                   </div>
                   <span className="text-primary text-base">{isEmaExpanded ? '▼' : '▶'}</span>
                 </button>
@@ -1398,7 +1593,7 @@ export default function SettingsPanel() {
                     {/* EMA 1 */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-primary font-mono text-xs font-bold">EMA 1</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.ema1}</span>
                         <label className="flex items-center cursor-pointer">
                           <input
                             type="checkbox"
@@ -1414,7 +1609,7 @@ export default function SettingsPanel() {
                       </div>
                       {settings.indicators.ema.ema1.enabled && (
                         <div>
-                          <label className="text-primary-muted font-mono block mb-1 text-xs">PERIOD</label>
+                          <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.period}</label>
                           <input
                             type="number"
                             min="2"
@@ -1434,7 +1629,7 @@ export default function SettingsPanel() {
                     {/* EMA 2 */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-primary font-mono text-xs font-bold">EMA 2</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.ema2}</span>
                         <label className="flex items-center cursor-pointer">
                           <input
                             type="checkbox"
@@ -1450,7 +1645,7 @@ export default function SettingsPanel() {
                       </div>
                       {settings.indicators.ema.ema2.enabled && (
                         <div>
-                          <label className="text-primary-muted font-mono block mb-1 text-xs">PERIOD</label>
+                          <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.period}</label>
                           <input
                             type="number"
                             min="2"
@@ -1470,7 +1665,7 @@ export default function SettingsPanel() {
                     {/* EMA 3 */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <div className="flex items-center justify-between mb-3">
-                        <span className="text-primary font-mono text-xs font-bold">EMA 3</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.ema3}</span>
                         <label className="flex items-center cursor-pointer">
                           <input
                             type="checkbox"
@@ -1486,7 +1681,7 @@ export default function SettingsPanel() {
                       </div>
                       {settings.indicators.ema.ema3.enabled && (
                         <div>
-                          <label className="text-primary-muted font-mono block mb-1 text-xs">PERIOD</label>
+                          <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.period}</label>
                           <input
                             type="number"
                             min="2"
@@ -1513,7 +1708,7 @@ export default function SettingsPanel() {
                   className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-primary font-mono text-xs font-bold">█ MULTI-TIMEFRAME MACD</span>
+                    <span className="text-primary font-mono text-xs font-bold">{t.settings.multiTimeframeMacd}</span>
                   </div>
                   <span className="text-primary text-base">{isMacdExpanded ? '▼' : '▶'}</span>
                 </button>
@@ -1523,7 +1718,7 @@ export default function SettingsPanel() {
                     {/* Global Toggle */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary-muted text-xs font-mono">SHOW MULTI-TIMEFRAME MACD</span>
+                        <span className="text-primary-muted text-xs font-mono">{t.settings.showMultiTimeframeMacd}</span>
                         <input
                           type="checkbox"
                           checked={settings.indicators.macd.showMultiTimeframe}
@@ -1535,7 +1730,7 @@ export default function SettingsPanel() {
 
                     {/* Timeframe Configuration */}
                     <div className="space-y-2">
-                      <div className="text-primary text-xs font-mono mb-2">█ TIMEFRAME CONFIGURATION</div>
+                      <div className="text-primary text-xs font-mono mb-2">{t.settings.timeframeConfiguration}</div>
 
                       {(Object.keys(settings.indicators.macd.timeframes) as Array<keyof typeof settings.indicators.macd.timeframes>).map((timeframe) => {
                         const config = settings.indicators.macd.timeframes[timeframe];
@@ -1563,7 +1758,7 @@ export default function SettingsPanel() {
                             {config.enabled && (
                               <div className="grid grid-cols-3 gap-3 text-xs">
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">FAST PERIOD</label>
+                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.fastPeriod}</label>
                                   <input
                                     type="number"
                                     min="2"
@@ -1581,7 +1776,7 @@ export default function SettingsPanel() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">SLOW PERIOD</label>
+                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.slowPeriod}</label>
                                   <input
                                     type="number"
                                     min="2"
@@ -1599,7 +1794,7 @@ export default function SettingsPanel() {
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">SIGNAL PERIOD</label>
+                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.signalPeriod}</label>
                                   <input
                                     type="number"
                                     min="2"
@@ -1633,7 +1828,7 @@ export default function SettingsPanel() {
                   className="w-full flex items-center justify-between p-3 bg-bg-secondary hover:bg-bg-primary transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-primary font-mono text-xs font-bold">█ KALMAN VOLUME TREND</span>
+                    <span className="text-primary font-mono text-xs font-bold">█ {t.settings.kalmanVolumeTrend}</span>
                   </div>
                   <span className="text-primary text-base">{isKalmanExpanded ? '▼' : '▶'}</span>
                 </button>
@@ -1643,7 +1838,7 @@ export default function SettingsPanel() {
                     {/* Enable Toggle */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary font-mono text-xs font-bold">ENABLED</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.enabled}</span>
                         <input
                           type="checkbox"
                           checked={settings.indicators.kalmanTrend.enabled}
@@ -1658,7 +1853,7 @@ export default function SettingsPanel() {
                         {/* Show Signals */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted font-mono text-xs">SHOW BUY/SELL SIGNALS</span>
+                            <span className="text-primary-muted font-mono text-xs">{t.settings.showBuySellSignals}</span>
                             <input
                               type="checkbox"
                               checked={settings.indicators.kalmanTrend.showSignals}
@@ -1671,7 +1866,7 @@ export default function SettingsPanel() {
                         {/* Volume Confirmation */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted font-mono text-xs">VOLUME CONFIRMATION</span>
+                            <span className="text-primary-muted font-mono text-xs">{t.settings.volumeConfirmation}</span>
                             <input
                               type="checkbox"
                               checked={settings.indicators.kalmanTrend.volConfirm}
@@ -1683,10 +1878,10 @@ export default function SettingsPanel() {
 
                         {/* Parameters */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                          <div className="text-primary font-mono text-xs font-bold mb-2">PARAMETERS</div>
+                          <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.parameters}</div>
                           <div className="grid grid-cols-2 gap-3 text-xs">
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">PROCESS NOISE (Q)</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.processNoise}</label>
                               <input
                                 type="number"
                                 min="0.0001"
@@ -1698,7 +1893,7 @@ export default function SettingsPanel() {
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">MEAS. NOISE (R)</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.measurementNoise}</label>
                               <input
                                 type="number"
                                 min="0.01"
@@ -1710,7 +1905,7 @@ export default function SettingsPanel() {
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">BAND MULTIPLIER</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.bandMultiplier}</label>
                               <input
                                 type="number"
                                 min="0.5"
@@ -1722,7 +1917,7 @@ export default function SettingsPanel() {
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">VOL THRESHOLD</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.volThreshold}</label>
                               <input
                                 type="number"
                                 min="0.0"
@@ -1748,7 +1943,7 @@ export default function SettingsPanel() {
                   className="w-full flex items-center justify-between p-3 bg-bg-secondary hover:bg-bg-primary transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <span className="text-primary font-mono text-xs font-bold">█ RITCHI TREND</span>
+                    <span className="text-primary font-mono text-xs font-bold">█ {t.settings.ritchiTrend}</span>
                   </div>
                   <span className="text-primary text-base">{isRitchiExpanded ? '▼' : '▶'}</span>
                 </button>
@@ -1758,7 +1953,7 @@ export default function SettingsPanel() {
                     {/* Enable Toggle */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary font-mono text-xs font-bold">ENABLED</span>
+                        <span className="text-primary font-mono text-xs font-bold">{t.settings.enabled}</span>
                         <input
                           type="checkbox"
                           checked={settings.indicators.sieuXuHuong.enabled}
@@ -1773,7 +1968,7 @@ export default function SettingsPanel() {
                         {/* Show Signals */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
                           <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted font-mono text-xs">SHOW BUY/SELL SIGNALS</span>
+                            <span className="text-primary-muted font-mono text-xs">{t.settings.showBuySellSignals}</span>
                             <input
                               type="checkbox"
                               checked={settings.indicators.sieuXuHuong.showSignals}
@@ -1785,10 +1980,10 @@ export default function SettingsPanel() {
 
                         {/* Pivot & SMA Parameters */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                          <div className="text-primary font-mono text-xs font-bold mb-2">PIVOT & SMA</div>
+                          <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.pivotAndSma}</div>
                           <div className="grid grid-cols-2 gap-3 text-xs">
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">PIVOT LENGTH</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.pivotLength}</label>
                               <input
                                 type="number"
                                 min="1"
@@ -1800,7 +1995,7 @@ export default function SettingsPanel() {
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">SMA MIN</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.smaMin}</label>
                               <input
                                 type="number"
                                 min="2"
@@ -1812,7 +2007,7 @@ export default function SettingsPanel() {
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">SMA MAX</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.smaMax}</label>
                               <input
                                 type="number"
                                 min="10"
@@ -1824,7 +2019,7 @@ export default function SettingsPanel() {
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">SMA MULTIPLIER</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.smaMultiplier}</label>
                               <input
                                 type="number"
                                 min="0.1"
@@ -1840,10 +2035,10 @@ export default function SettingsPanel() {
 
                         {/* Trend & Risk Parameters */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                          <div className="text-primary font-mono text-xs font-bold mb-2">TREND & RISK</div>
+                          <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.trendAndRisk}</div>
                           <div className="grid grid-cols-2 gap-3 text-xs">
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">TREND LENGTH (COLOR)</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.trendLengthColor}</label>
                               <input
                                 type="number"
                                 min="10"
@@ -1855,7 +2050,7 @@ export default function SettingsPanel() {
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">ATR MULT (SL)</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.atrMultSl}</label>
                               <input
                                 type="number"
                                 min="0.5"
@@ -1867,7 +2062,7 @@ export default function SettingsPanel() {
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">TP MULTIPLIER</label>
+                              <label className="text-primary-muted font-mono block mb-1">{t.settings.tpMultiplier}</label>
                               <input
                                 type="number"
                                 min="0.5"
@@ -1891,24 +2086,23 @@ export default function SettingsPanel() {
           {activeTab === 'orders' && (
             <div className="space-y-4 pb-8">
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ POSITION SIZE (% OF ACCOUNT VALUE)</div>
+                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.positionSize} - {selectedExchange.toUpperCase()}</div>
                 <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
-                  Configure the percentage of your account value to use for each order type.
-                  These percentages will be applied when executing trades.
+                  {t.settings.positionSizeDesc}
                 </p>
                 <div className="space-y-4">
                   <div>
                     <label className="text-primary-muted font-mono block mb-2 text-xs flex items-center justify-between">
-                      <span>CLOUD ORDERS</span>
-                      <span className="text-accent-blue">{settings.orders.cloudPercentage}%</span>
+                      <span>{t.settings.cloudOrders}</span>
+                      <span className="text-accent-blue">{activeOrderSettings.cloudPercentage}%</span>
                     </label>
                     <input
                       type="range"
                       min="1"
                       max="50"
                       step="1"
-                      value={settings.orders.cloudPercentage}
-                      onChange={(e) => updateOrderSettings({ cloudPercentage: Number(e.target.value) })}
+                      value={activeOrderSettings.cloudPercentage}
+                      onChange={(e) => updateOrderSettingsExchange(selectedExchange, { cloudPercentage: Number(e.target.value) })}
                       className="w-full h-2 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-accent-blue"
                     />
                     <div className="flex justify-between text-[10px] text-primary-muted mt-1">
@@ -1919,16 +2113,16 @@ export default function SettingsPanel() {
 
                   <div>
                     <label className="text-primary-muted font-mono block mb-2 text-xs flex items-center justify-between">
-                      <span>SMALL ORDERS (SM LONG/SHORT)</span>
-                      <span className="text-primary">{settings.orders.smallPercentage}%</span>
+                      <span>{t.settings.smallOrders}</span>
+                      <span className="text-primary">{activeOrderSettings.smallPercentage}%</span>
                     </label>
                     <input
                       type="range"
                       min="1"
                       max="50"
                       step="1"
-                      value={settings.orders.smallPercentage}
-                      onChange={(e) => updateOrderSettings({ smallPercentage: Number(e.target.value) })}
+                      value={activeOrderSettings.smallPercentage}
+                      onChange={(e) => updateOrderSettingsExchange(selectedExchange, { smallPercentage: Number(e.target.value) })}
                       className="w-full h-2 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-primary"
                     />
                     <div className="flex justify-between text-[10px] text-primary-muted mt-1">
@@ -1939,16 +2133,16 @@ export default function SettingsPanel() {
 
                   <div>
                     <label className="text-primary-muted font-mono block mb-2 text-xs flex items-center justify-between">
-                      <span>BUY/SELL ORDERS (MARKET ORDER - Hotkeys A/S)</span>
-                      <span className="text-accent-rose">{settings.orders.bigPercentage}%</span>
+                      <span>{t.settings.bigOrders}</span>
+                      <span className="text-accent-rose">{activeOrderSettings.bigPercentage}%</span>
                     </label>
                     <input
                       type="range"
                       min="1"
                       max="100"
                       step="1"
-                      value={settings.orders.bigPercentage}
-                      onChange={(e) => updateOrderSettings({ bigPercentage: Number(e.target.value) })}
+                      value={activeOrderSettings.bigPercentage}
+                      onChange={(e) => updateOrderSettingsExchange(selectedExchange, { bigPercentage: Number(e.target.value) })}
                       className="w-full h-2 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-accent-rose"
                     />
                     <div className="flex justify-between text-[10px] text-primary-muted mt-1">
@@ -1960,23 +2154,22 @@ export default function SettingsPanel() {
               </div>
 
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ LEVERAGE</div>
+                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.leverage} - {selectedExchange.toUpperCase()}</div>
                 <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
-                  Set the leverage multiplier for your trades. Higher leverage increases both potential gains and losses.
-                  Leverage is applied when opening new positions.
+                  {t.settings.leverageDesc}
                 </p>
                 <div>
                   <label className="text-primary-muted font-mono block mb-2 text-xs flex items-center justify-between">
-                    <span>LEVERAGE</span>
-                    <span className="text-accent-yellow">{settings.orders.leverage}x</span>
+                    <span>{t.settings.leverage}</span>
+                    <span className="text-accent-yellow">{activeOrderSettings.leverage}x</span>
                   </label>
                   <input
                     type="range"
                     min="1"
                     max="50"
                     step="1"
-                    value={settings.orders.leverage}
-                    onChange={(e) => updateOrderSettings({ leverage: Number(e.target.value) })}
+                    value={activeOrderSettings.leverage}
+                    onChange={(e) => updateOrderSettingsExchange(selectedExchange, { leverage: Number(e.target.value) })}
                     className="w-full h-2 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-accent-yellow"
                   />
                   <div className="flex justify-between text-[10px] text-primary-muted mt-1">
@@ -1989,9 +2182,7 @@ export default function SettingsPanel() {
 
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <div className="text-primary-muted text-[10px] leading-relaxed">
-                  <span className="text-bullish font-bold">NOTE:</span> These percentages represent how much of your total account value will be used for each order type.
-                  Make sure the total of all active positions doesn&apos;t exceed your risk tolerance.
-                  Leverage is set per-asset when placing orders.
+                  {t.settings.leverageNote}
                 </div>
               </div>
             </div>
@@ -2001,9 +2192,9 @@ export default function SettingsPanel() {
             <div className="space-y-4 pb-8">
               <LanguageSwitcher />
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ THEME</div>
+                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.theme.toUpperCase()}</div>
                 <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
-                  Choose a color theme for the application. Changes apply instantly.
+                  {t.settings.themeDesc}
                 </p>
                 <div className="grid grid-cols-3 gap-2">
                   {(['hyper', 'hyper-black', 'dark', 'dark-blue', 'midnight', 'light', 'afternoon', 'psychedelic', 'nintendo', 'gameboy', 'sega', 'playstation', 'cyberpunk', 'vaporwave', 'matrix', 'synthwave', 'ocean', 'c64', 'amber', 'girly'] as ThemeName[]).map((themeName) => (
@@ -2026,17 +2217,17 @@ export default function SettingsPanel() {
               </div>
 
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ CHART</div>
+                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.chart.toUpperCase()}</div>
                 <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
-                  Configure chart display options.
+                  {t.settings.chartDesc}
                 </p>
                 <div className="space-y-2">
                   <div className="p-3 bg-bg-primary border border-frame rounded">
                     <label className="flex items-center justify-between cursor-pointer">
                       <div>
-                        <span className="text-primary-muted text-xs font-mono block">SHOW PIVOT MARKERS</span>
+                        <span className="text-primary-muted text-xs font-mono block">{t.settings.showPivotMarkers}</span>
                         <span className="text-primary-muted text-[10px] block mt-1">
-                          Display red and green dots at pivot highs/lows on price and stochastic charts
+                          {t.settings.showPivotMarkersDesc}
                         </span>
                       </div>
                       <input
@@ -2053,9 +2244,9 @@ export default function SettingsPanel() {
                   <div className="p-3 bg-bg-primary border border-frame rounded">
                     <label className="flex items-center justify-between cursor-pointer">
                       <div>
-                        <span className="text-primary-muted text-xs font-mono block">SCHMECKLES MODE</span>
+                        <span className="text-primary-muted text-xs font-mono block">{t.settings.schmecklesMode}</span>
                         <span className="text-primary-muted text-[10px] block mt-1">
-                          Show PnL in schmeckles - interdimensional currency from the Giants' Dimension (1 SH = $1 profit per $2000 account balance)
+                          {t.settings.schmecklesModeDesc}
                         </span>
                       </div>
                       <input
@@ -2072,9 +2263,9 @@ export default function SettingsPanel() {
                   <div className="p-3 bg-bg-primary border border-frame rounded">
                     <label className="flex items-center justify-between cursor-pointer">
                       <div>
-                        <span className="text-primary-muted text-xs font-mono block">INVERTED MODE</span>
+                        <span className="text-primary-muted text-xs font-mono block">{t.settings.invertedMode}</span>
                         <span className="text-primary-muted text-[10px] block mt-1">
-                          Invert charts and reverse trading actions for down-market trading
+                          {t.settings.invertedModeDesc}
                         </span>
                       </div>
                       <input
@@ -2092,16 +2283,16 @@ export default function SettingsPanel() {
               </div>
 
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ SOUNDS</div>
+                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.sounds.toUpperCase()}</div>
                 <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
-                  Configure audio notifications for trading activity.
+                  {t.settings.soundsDesc}
                 </p>
                 <div className="p-3 bg-bg-primary border border-frame rounded">
                   <label className="flex items-center justify-between cursor-pointer">
                     <div>
-                      <span className="text-primary-muted text-xs font-mono block">PLAY SOUND ON TRADES</span>
+                      <span className="text-primary-muted text-xs font-mono block">{t.settings.playSoundOnTrades}</span>
                       <span className="text-primary-muted text-[10px] block mt-1">
-                        Play a sound for each trade (batches spread sequentially)
+                        {t.settings.playSoundOnTradesDesc}
                       </span>
                     </div>
                     <input
@@ -2127,7 +2318,7 @@ export default function SettingsPanel() {
               {/* Enable AI Strategy */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-primary-muted text-xs font-mono">ENABLE AI STRATEGY</span>
+                  <span className="text-primary-muted text-xs font-mono">{t.ai.enableAI}</span>
                   <input
                     type="checkbox"
                     checked={settings.ai.enabled}
@@ -2139,7 +2330,7 @@ export default function SettingsPanel() {
 
               {/* Claude API Key */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="block text-primary-muted text-xs font-mono mb-2">CLAUDE API KEY</label>
+                <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.claudeApiKey}</label>
                 <input
                   type="password"
                   value={settings.ai.claudeApiKey}
@@ -2151,7 +2342,7 @@ export default function SettingsPanel() {
 
               {/* Claude Model */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="block text-primary-muted text-xs font-mono mb-2">CLAUDE MODEL</label>
+                <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.claudeModel}</label>
                 <select
                   value={settings.ai.claudeModel}
                   onChange={(e) => updateAISettings({ claudeModel: e.target.value })}
@@ -2165,7 +2356,7 @@ export default function SettingsPanel() {
               {/* Confidence Threshold */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <label className="block text-primary-muted text-xs font-mono mb-2">
-                  CONFIDENCE THRESHOLD: {(settings.ai.confidenceThreshold * 100).toFixed(0)}%
+                  {t.ai.confidenceThreshold}: {(settings.ai.confidenceThreshold * 100).toFixed(0)}%
                 </label>
                 <input
                   type="range"
@@ -2184,11 +2375,11 @@ export default function SettingsPanel() {
 
               {/* Strategy */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="block text-primary-muted text-xs font-mono mb-2">STRATEGY</label>
+                <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.strategy}</label>
                 <div className="bg-bg-primary border border-frame rounded px-3 py-2">
-                  <div className="text-xs font-mono text-primary">Stochastic Reversal Scalp</div>
+                  <div className="text-xs font-mono text-primary">{t.ai.stochasticReversalScalp}</div>
                   <div className="text-[10px] font-mono text-primary-muted mt-1">
-                    Stochastic exits oversold/overbought + MACD confirms. TP 2%.
+                    {t.ai.stochasticReversalScalpDesc}
                   </div>
                 </div>
               </div>
@@ -2196,7 +2387,7 @@ export default function SettingsPanel() {
               {/* Max Calls Per Hour */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
                 <label className="block text-primary-muted text-xs font-mono mb-2">
-                  MAX CALLS / HOUR: {settings.ai.maxCallsPerHour}
+                  {t.ai.maxCallsPerHour}: {settings.ai.maxCallsPerHour}
                 </label>
                 <input
                   type="range"
@@ -2211,37 +2402,37 @@ export default function SettingsPanel() {
 
               {/* Telegram Section */}
               <div className="border-t border-frame pt-3 mt-3">
-                <div className="text-primary text-xs font-mono mb-3 uppercase tracking-wider">Telegram Notifications</div>
+                <div className="text-primary text-xs font-mono mb-3 uppercase tracking-wider">{t.ai.telegramNotifications} - {selectedExchange.toUpperCase()}</div>
 
                 <div className="p-3 bg-bg-secondary border border-frame rounded mb-3">
                   <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-primary-muted text-xs font-mono">ENABLE TELEGRAM</span>
+                    <span className="text-primary-muted text-xs font-mono">{t.ai.enableTelegram} - {selectedExchange.toUpperCase()}</span>
                     <input
                       type="checkbox"
-                      checked={settings.ai.telegramEnabled}
-                      onChange={(e) => updateAISettings({ telegramEnabled: e.target.checked })}
+                      checked={activeAiTelegramSettings.enabled}
+                      onChange={(e) => updateAiTelegramExchange(selectedExchange, { enabled: e.target.checked })}
                       className="w-4 h-4 accent-primary cursor-pointer"
                     />
                   </label>
                 </div>
 
                 <div className="p-3 bg-bg-secondary border border-frame rounded mb-3">
-                  <label className="block text-primary-muted text-xs font-mono mb-2">BOT TOKEN</label>
+                  <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.botToken}</label>
                   <input
                     type="password"
-                    value={settings.ai.telegramBotToken}
-                    onChange={(e) => updateAISettings({ telegramBotToken: e.target.value })}
+                    value={activeAiTelegramSettings.botToken}
+                    onChange={(e) => updateAiTelegramExchange(selectedExchange, { botToken: e.target.value })}
                     placeholder="123456:ABC-..."
                     className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
                   />
                 </div>
 
                 <div className="p-3 bg-bg-secondary border border-frame rounded">
-                  <label className="block text-primary-muted text-xs font-mono mb-2">CHAT ID</label>
+                  <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.chatId}</label>
                   <input
                     type="text"
-                    value={settings.ai.telegramChatId}
-                    onChange={(e) => updateAISettings({ telegramChatId: e.target.value })}
+                    value={activeAiTelegramSettings.chatId}
+                    onChange={(e) => updateAiTelegramExchange(selectedExchange, { chatId: e.target.value })}
                     placeholder="-100..."
                     className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
                   />
