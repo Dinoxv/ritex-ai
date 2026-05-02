@@ -190,7 +190,8 @@ export class BinanceDirectClient {
     });
   }
 
-  async placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string): Promise<number> {
+  /** Open a new position (hedge mode: positionSide = direction of new position). */
+  async openMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string): Promise<number> {
     const isHedge = await this.getPositionMode();
     const params: Record<string, string | number | boolean> = {
       symbol: toCoinSymbol(symbol),
@@ -199,10 +200,38 @@ export class BinanceDirectClient {
       quantity,
     };
     if (isHedge) {
+      // BUY opens LONG, SELL opens SHORT
       params.positionSide = side === 'BUY' ? 'LONG' : 'SHORT';
     }
     const res = await this.signedRequest<BinanceOrderResult>('POST', '/fapi/v1/order', params);
     return res.orderId;
+  }
+
+  /**
+   * Close an existing position (hedge mode: positionSide = direction of position being closed).
+   * B-01 fix: closing LONG requires side=SELL + positionSide=LONG (NOT SHORT).
+   */
+  async closeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string): Promise<number> {
+    const isHedge = await this.getPositionMode();
+    const params: Record<string, string | number | boolean> = {
+      symbol: toCoinSymbol(symbol),
+      side,
+      type: 'MARKET',
+      quantity,
+    };
+    if (isHedge) {
+      // SELL closes LONG → positionSide=LONG; BUY closes SHORT → positionSide=SHORT
+      params.positionSide = side === 'BUY' ? 'SHORT' : 'LONG';
+    } else {
+      params.reduceOnly = true;
+    }
+    const res = await this.signedRequest<BinanceOrderResult>('POST', '/fapi/v1/order', params);
+    return res.orderId;
+  }
+
+  /** @deprecated Use openMarketOrder or closeMarketOrder instead. */
+  async placeMarketOrder(symbol: string, side: 'BUY' | 'SELL', quantity: string): Promise<number> {
+    return this.openMarketOrder(symbol, side, quantity);
   }
 
   async placeStopMarket(

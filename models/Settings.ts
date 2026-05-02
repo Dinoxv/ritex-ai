@@ -287,7 +287,7 @@ export interface AIStrategyConfig {
 
 export type BotIndicatorType = 'ritchi' | 'kalmanTrend' | 'macdReversal';
 export type BotExchange = 'binance' | 'hyperliquid';
-export type BotSymbolMode = 'auto' | 'manual';
+export type BotSymbolMode = 'auto' | 'manual' | 'favourite';
 
 export interface BotTradingSettings {
   enabled: boolean;
@@ -305,6 +305,8 @@ export interface BotTradingSettings {
   };
   symbolMode: BotSymbolMode;
   manualSymbols: string[];
+  /** Symbols included when symbolMode='favourite' */
+  favouriteSymbols: string[];
   safetyStopLossPercent: number;
   /** ATR multiplier for dynamic SL distance. Default: 1.5 */
   atrMultiplier: number;
@@ -611,6 +613,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     },
     symbolMode: 'auto',
     manualSymbols: [],
+    favouriteSymbols: [],
     safetyStopLossPercent: 1.5,
     atrMultiplier: 1.5,
     riskPercent: 1.0,

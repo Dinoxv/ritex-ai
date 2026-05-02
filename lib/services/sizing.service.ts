@@ -47,3 +47,22 @@ export function calcStopPrice(
 ): number {
   return side === 'long' ? entryPrice - slDistance : entryPrice + slDistance;
 }
+
+/**
+ * Calculate ATR(period) from candle data — aligned with Pine Script ATR(50).
+ * Mirrors the algorithm in binance-direct.ts for shared use in browser store.
+ */
+export function calcAtr(candles: { high: number; low: number; close: number }[], period = 50): number {
+  if (candles.length < period + 1) return 0;
+  const recent = candles.slice(-(period + 1));
+  let trSum = 0;
+  for (let i = 1; i < recent.length; i++) {
+    const tr = Math.max(
+      recent[i].high - recent[i].low,
+      Math.abs(recent[i].high - recent[i - 1].close),
+      Math.abs(recent[i].low - recent[i - 1].close),
+    );
+    trSum += tr;
+  }
+  return trSum / period;
+}

@@ -223,3 +223,19 @@ export function setBotSettingsKey(key: string, value: string): void {
     .prepare('INSERT OR REPLACE INTO bot_settings (key, value) VALUES (?, ?)')
     .run(key, value);
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Last Acted Signal (B-02: stale-signal guard)
+// Persists which signal side was last used to OPEN a position per symbol+timeframe.
+// Key pattern: `last_acted_signal_${symbol}_${timeframe}`
+// ─────────────────────────────────────────────────────────────────────────────
+
+export function getLastActedSignal(symbol: string, timeframe: string): 'long' | 'short' | null {
+  const val = getBotState(`last_acted_signal_${symbol}_${timeframe}`);
+  if (val === 'long' || val === 'short') return val;
+  return null;
+}
+
+export function setLastActedSignal(symbol: string, timeframe: string, side: 'long' | 'short'): void {
+  setBotState(`last_acted_signal_${symbol}_${timeframe}`, side);
+}

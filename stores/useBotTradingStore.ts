@@ -12,6 +12,7 @@ import { calculateSieuXuHuong } from '@/lib/indicators';
 import { INTERVAL_TO_MS } from '@/lib/time-utils';
 import { getRawPositionSignedSize, getRawPositionSymbol } from '@/lib/utils/exchange-normalizers';
 import type { TimeInterval } from '@/types';
+import { calcAtr, calcSlDistanceFromAtr, calcStopPrice } from '@/lib/services/sizing.service';
 
 type BotSignal = 'bullish' | 'bearish';
 type BotPositionSide = 'long' | 'short';
@@ -469,13 +470,23 @@ export const useBotTradingStore = create<BotTradingStore>()(
   },
 
   syncTrackedSymbols: () => {
-    const botSettings = useSettingsStore.getState().settings.bot;
+    const settingsStore = useSettingsStore.getState();
+    const botSettings = settingsStore.settings.bot;
+    const pinnedSymbols = Array.isArray(settingsStore.settings.pinnedSymbols)
+      ? settingsStore.settings.pinnedSymbols.filter((symbol): symbol is string => typeof symbol === 'string')
+      : [];
     const state = get();
     let nextTracked: string[] = [];
 
     if (botSettings.symbolMode === 'manual') {
       nextTracked = [...botSettings.manualSymbols];
       set({ desiredAutoSymbols: [] });
+    } else if (botSettings.symbolMode === 'favourite') {
+      const desired = [...pinnedSymbols];
+      const withOpenPositions = Object.keys(state.positions);
+      const keepOpen = withOpenPositions.filter((symbol) => !desired.includes(symbol));
+      nextTracked = Array.from(new Set([...keepOpen, ...desired]));
+      set({ desiredAutoSymbols: desired });
     } else {
       const desired = getTopVolatileSymbols(botSettings.autoTopSymbolsCount);
       const withOpenPositions = Object.keys(state.positions);
@@ -572,9 +583,15 @@ export const useBotTradingStore = create<BotTradingStore>()(
       return;
     }
 
+    const pinnedSymbols = Array.isArray(settingsStore.settings.pinnedSymbols)
+      ? settingsStore.settings.pinnedSymbols.filter((symbol): symbol is string => typeof symbol === 'string')
+      : [];
+
     let symbols: string[] = [];
     if (botSettings.symbolMode === 'manual') {
       symbols = [...botSettings.manualSymbols];
+    } else if (botSettings.symbolMode === 'favourite') {
+      symbols = [...pinnedSymbols];
     } else {
       symbols = getTopVolatileSymbols(botSettings.autoTopSymbolsCount);
     }
@@ -630,9 +647,15 @@ export const useBotTradingStore = create<BotTradingStore>()(
       return;
     }
 
+    const pinnedSymbols = Array.isArray(settingsStore.settings.pinnedSymbols)
+      ? settingsStore.settings.pinnedSymbols.filter((symbol): symbol is string => typeof symbol === 'string')
+      : [];
+
     let symbols: string[] = [];
     if (botSettings.symbolMode === 'manual') {
       symbols = [...botSettings.manualSymbols];
+    } else if (botSettings.symbolMode === 'favourite') {
+      symbols = [...pinnedSymbols];
     } else {
       symbols = getTopVolatileSymbols(botSettings.autoTopSymbolsCount);
     }
@@ -937,14 +960,15 @@ export const useBotTradingStore = create<BotTradingStore>()(
       for (const symbol of symbols) {
         const latestState = get();
         const desiredAutoSet = new Set(latestState.desiredAutoSymbols);
-        const outOfTopOpenPositions =
-          botSettings.symbolMode === 'auto'
+        const outOfScopeOpenPositions =
+          botSettings.symbolMode !== 'manual'
             ? Object.values(latestState.positions).filter((position) => !desiredAutoSet.has(position.symbol))
             : [];
 
-        // Auto mode rule: if desired auto list changed and we still have open positions outside
-        // desired list, delay opening newly desired symbols until those positions close.
-        if (botSettings.symbolMode === 'auto' && outOfTopOpenPositions.length > 0) {
+        // Managed list modes (auto/favourite): if desired list changed and we still
+        // have open positions outside desired list, delay opening newly desired symbols
+        // until those positions close.
+        if (botSettings.symbolMode !== 'manual' && outOfScopeOpenPositions.length > 0) {
           const hasCurrentPosition = Boolean(latestState.positions[symbol]);
           const isDesiredSymbol = desiredAutoSet.has(symbol);
           if (!hasCurrentPosition && isDesiredSymbol) {
@@ -957,7 +981,7 @@ export const useBotTradingStore = create<BotTradingStore>()(
                   indicator: botSettings.indicator,
                   action: 'skip' as const,
                   signal: null,
-                  message: 'Waiting for existing out-of-top positions to close before opening new auto symbols',
+                  message: 'Waiting for existing out-of-list positions to close before opening new symbols',
                 },
                 ...prev.logs,
               ].slice(0, MAX_LOGS),
@@ -1149,10 +1173,22 @@ export const useBotTradingStore = create<BotTradingStore>()(
             numericSize = Number.parseFloat(size);
             // Place safety STOP_MARKET after market order succeeds (non-blocking)
             try {
-              const slPercent = botSettings.safetyStopLossPercent / 100;
-              const stopPrice = signalSide === 'long'
-                ? midPrice * (1 - slPercent)
-                : midPrice * (1 + slPercent);
+              // ATR-based SL (Fix #6): use ATR(50) × atrMultiplier when configured, fallback to percent
+              let stopPrice: number;
+              if (botSettings.atrMultiplier > 0) {
+                try {
+                  const atrStart = Date.now() - 55 * INTERVAL_TO_MS[botSettings.timeframe];
+                  const atrCandles = await service.getCandles({ coin: symbol, interval: botSettings.timeframe, startTime: atrStart });
+                  const atr = calcAtr(atrCandles, 50);
+                  stopPrice = atr > 0
+                    ? calcStopPrice(midPrice, signalSide, calcSlDistanceFromAtr(atr, botSettings.atrMultiplier))
+                    : calcStopPrice(midPrice, signalSide, midPrice * (botSettings.safetyStopLossPercent / 100));
+                } catch {
+                  stopPrice = calcStopPrice(midPrice, signalSide, midPrice * (botSettings.safetyStopLossPercent / 100));
+                }
+              } else {
+                stopPrice = calcStopPrice(midPrice, signalSide, midPrice * (botSettings.safetyStopLossPercent / 100));
+              }
               const formattedStop = service.formatPriceCached(stopPrice, metadata);
               const slResp = await service.placeStopLoss(
                 { coin: symbol, triggerPrice: formattedStop, size: service.formatSizeCached(numericSize, metadata), isBuy: signalSide === 'short' },
@@ -1322,10 +1358,22 @@ export const useBotTradingStore = create<BotTradingStore>()(
             openNumericSize = Number.parseFloat(size);
             // Place safety STOP_MARKET for the new position (non-blocking)
             try {
-              const slPercent = botSettings.safetyStopLossPercent / 100;
-              const stopPrice = signalSide === 'long'
-                ? openPrice * (1 - slPercent)
-                : openPrice * (1 + slPercent);
+              // ATR-based SL (Fix #6): use ATR(50) × atrMultiplier when configured, fallback to percent
+              let stopPrice: number;
+              if (botSettings.atrMultiplier > 0) {
+                try {
+                  const atrStart = Date.now() - 55 * INTERVAL_TO_MS[botSettings.timeframe];
+                  const atrCandles = await service.getCandles({ coin: symbol, interval: botSettings.timeframe, startTime: atrStart });
+                  const atr = calcAtr(atrCandles, 50);
+                  stopPrice = atr > 0
+                    ? calcStopPrice(openPrice, signalSide, calcSlDistanceFromAtr(atr, botSettings.atrMultiplier))
+                    : calcStopPrice(openPrice, signalSide, openPrice * (botSettings.safetyStopLossPercent / 100));
+                } catch {
+                  stopPrice = calcStopPrice(openPrice, signalSide, openPrice * (botSettings.safetyStopLossPercent / 100));
+                }
+              } else {
+                stopPrice = calcStopPrice(openPrice, signalSide, openPrice * (botSettings.safetyStopLossPercent / 100));
+              }
               const formattedStop = service.formatPriceCached(stopPrice, metadata);
               const slResp = await service.placeStopLoss(
                 { coin: symbol, triggerPrice: formattedStop, size: service.formatSizeCached(openNumericSize, metadata), isBuy: signalSide === 'short' },

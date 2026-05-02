@@ -18,8 +18,10 @@ export interface DaemonSettings {
   initialMarginUsdt: number;
   maxLossPercentPerDay: number;
   leverageByExchange: { binance: number; hyperliquid: number };
-  symbolMode: 'auto' | 'manual';
+  symbolMode: 'auto' | 'manual' | 'favourite';
   manualSymbols: string[];
+  /** Symbols included when symbolMode='favourite' */
+  favouriteSymbols: string[];
   safetyStopLossPercent: number;
   /** ATR multiplier for dynamic SL distance (Fix #6). Default: 1.5 */
   atrMultiplier: number;
@@ -53,6 +55,7 @@ export const DEFAULT_DAEMON_SETTINGS: DaemonSettings = {
   leverageByExchange: { binance: 10, hyperliquid: 10 },
   symbolMode: 'manual',
   manualSymbols: [],
+  favouriteSymbols: [],
   safetyStopLossPercent: 1.5,
   atrMultiplier: 1.5,
   riskPercent: 1.0,

@@ -15,6 +15,8 @@ import {
   insertLog,
   getBotState,
   setBotState,
+  getLastActedSignal,
+  setLastActedSignal,
 } from '@/lib/services/db.service';
 import { AlertService } from '@/lib/services/alert.service';
 import { calcPositionSize, calcSlDistanceFromAtr, calcStopPrice } from '@/lib/services/sizing.service';
@@ -313,8 +315,14 @@ async function processSymbol(
   const signalSide: 'long' | 'short' = signal === 'bullish' ? 'long' : 'short';
   const currentPosition = positions[symbol] ?? null;
 
-  // 4. No position → open
+  // 4. No position → open (B-02: stale-signal guard)
   if (!currentPosition) {
+    const lastActed = getLastActedSignal(symbol, settings.timeframe);
+    if (lastActed === signalSide) {
+      // Signal hasn't flipped since last position — this is a stale lookback signal, skip it
+      log(symbol, indicator, 'skip', `Stale signal suppressed — last acted=${lastActed}, current=${signalSide} (no flip detected)`);
+      return;
+    }
     await openPosition(symbol, signalSide, client, settings, stats, positions, indicator, equity, candles, alerts);
     return;
   }
@@ -368,8 +376,8 @@ async function openPosition(
 
   const meta = await client.getSymbolMeta(symbol);
 
-  // ATR-based SL distance (Fix #6)
-  const atr = client.calcAtr(candles, 14);
+  // ATR-based SL distance (Fix #6) — sync with indicator: ATR(50) instead of ATR(14)
+  const atr = client.calcAtr(candles, 50);
   const slDist = settings.atrMultiplier > 0 && atr > 0
     ? calcSlDistanceFromAtr(atr, settings.atrMultiplier)
     : midPrice * (settings.safetyStopLossPercent / 100);
@@ -396,7 +404,7 @@ async function openPosition(
     numericSize = parseFloat(sizeStr);
 
     const binanceSide = side === 'long' ? 'BUY' : 'SELL';
-    await client.placeMarketOrder(symbol, binanceSide, sizeStr);
+    await client.openMarketOrder(symbol, binanceSide, sizeStr);
 
     // Place safety stop (Fix #6: use ATR-based stop price)
     try {
@@ -421,6 +429,8 @@ async function openPosition(
   };
   positions[symbol] = pos;
   savePosition(pos);
+  // B-02: record which signal side triggered this open so stale-signal guard works correctly
+  setLastActedSignal(symbol, settings.timeframe, side);
 
   stats.totalTradedNotional += pos.notional;
 
@@ -468,12 +478,12 @@ async function closeAndReversePosition(
     } catch { /* already gone */ }
   }
 
-  // Close existing position
+  // Close existing position (B-01: use closeMarketOrder so hedge mode positionSide=LONG/SHORT is correct)
   if (!settings.paperMode) {
     const meta = await client.getSymbolMeta(symbol);
     const closeSide = currentPosition.side === 'long' ? 'SELL' : 'BUY';
     const closeSize = client.formatSize(currentPosition.size, meta);
-    await client.placeMarketOrder(symbol, closeSide, closeSize);
+    await client.closeMarketOrder(symbol, closeSide, closeSize);
   }
 
   const pnlPerCoin = currentPosition.side === 'long'
@@ -551,7 +561,8 @@ async function forceClosePosition(
   if (!settings.paperMode) {
     const meta = await client.getSymbolMeta(symbol);
     const closeSide = pos.side === 'long' ? 'SELL' : 'BUY';
-    await client.placeMarketOrder(symbol, closeSide, client.formatSize(pos.size, meta));
+    // B-01: use closeMarketOrder so hedge mode sends correct positionSide
+    await client.closeMarketOrder(symbol, closeSide, client.formatSize(pos.size, meta));
   }
 
   const pnlPerCoin = pos.side === 'long'

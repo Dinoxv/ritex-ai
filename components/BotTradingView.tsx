@@ -303,6 +303,12 @@ export default function BotTradingView() {
   const leverage = botSettings.leverageByExchange[botSettings.exchange];
   const expectedNotionalPerPosition = botSettings.initialMarginUsdt * leverage;
   const availableSymbols = useMemo(() => topSymbols.map((item) => item.name).slice(0, 30), [topSymbols]);
+  const favouriteSymbols = useMemo(
+    () => (Array.isArray(settings.pinnedSymbols)
+      ? settings.pinnedSymbols.filter((symbol): symbol is string => typeof symbol === 'string')
+      : []),
+    [settings.pinnedSymbols]
+  );
   const riskScore = useMemo(() => {
     let score = 0;
     if (leverage >= 20) score += 2;
@@ -675,11 +681,12 @@ export default function BotTradingView() {
               Symbol mode
               <select
                 value={botSettings.symbolMode}
-                onChange={(e) => updateBotSettings({ symbolMode: e.target.value as 'auto' | 'manual' })}
+                onChange={(e) => updateBotSettings({ symbolMode: e.target.value as 'auto' | 'manual' | 'favourite' })}
                 className="bg-bg-secondary border border-frame rounded px-2 py-1"
               >
                 <option value="auto">Auto top volatility</option>
                 <option value="manual">Manual</option>
+                <option value="favourite">Favourite</option>
               </select>
             </label>
 
@@ -787,6 +794,29 @@ export default function BotTradingView() {
                   );
                 })}
               </div>
+            </div>
+          )}
+
+          {botSettings.symbolMode === 'favourite' && (
+            <div className="space-y-1">
+              <div className="text-xs font-mono text-primary-muted">
+                Favourite symbols (from app FAV list) — bot will only trade these tokens
+              </div>
+              <div className="grid grid-cols-3 md:grid-cols-6 gap-1">
+                {favouriteSymbols.map((symbol) => (
+                  <div
+                    key={symbol}
+                    className="px-2 py-1 text-[10px] border rounded border-yellow-400 text-yellow-400 bg-yellow-400/10"
+                  >
+                    ★ {symbol}
+                  </div>
+                ))}
+              </div>
+              {favouriteSymbols.length === 0 && (
+                <div className="text-[10px] text-yellow-400">
+                  No app favourites found — please add symbols in the main FAV panel first.
+                </div>
+              )}
             </div>
           )}
         </div>

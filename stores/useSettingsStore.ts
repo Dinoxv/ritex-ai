@@ -432,6 +432,9 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         manualSymbols: Array.isArray(storedSettings.bot?.manualSymbols)
           ? storedSettings.bot.manualSymbols.filter((symbol: unknown): symbol is string => typeof symbol === 'string')
           : DEFAULT_SETTINGS.bot.manualSymbols,
+        favouriteSymbols: Array.isArray(storedSettings.bot?.favouriteSymbols)
+          ? storedSettings.bot.favouriteSymbols.filter((symbol: unknown): symbol is string => typeof symbol === 'string')
+          : DEFAULT_SETTINGS.bot.favouriteSymbols,
         safetyStopLossPercent: storedSettings.bot?.safetyStopLossPercent ?? DEFAULT_SETTINGS.bot.safetyStopLossPercent,
         atrMultiplier: storedSettings.bot?.atrMultiplier ?? DEFAULT_SETTINGS.bot.atrMultiplier,
         riskPercent: storedSettings.bot?.riskPercent ?? DEFAULT_SETTINGS.bot.riskPercent,
