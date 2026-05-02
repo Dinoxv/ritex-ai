@@ -76,6 +76,12 @@ function normalizeParams(input: unknown): Record<string, string | number | boole
   return output;
 }
 
+function maskApiKey(apiKey: string): string {
+  if (!apiKey) return '';
+  if (apiKey.length <= 10) return `${apiKey.slice(0, 2)}***`;
+  return `${apiKey.slice(0, 6)}...${apiKey.slice(-4)}`;
+}
+
 function shouldRetryOnNotFound(status: number, bodyText: string): boolean {
   if (status !== 404) return false;
   const lower = bodyText.toLowerCase();
@@ -138,6 +144,19 @@ export async function POST(request: NextRequest) {
       timestamp: Date.now(),
     };
 
+    const isOrderPath = path === '/fapi/v1/order';
+    if (isOrderPath) {
+      console.info('[BinanceSigned][Order][Request]', {
+        method,
+        path,
+        symbol: String(finalParams.symbol || ''),
+        side: String(finalParams.side || ''),
+        positionSide: String(finalParams.positionSide || ''),
+        quantity: String(finalParams.quantity || ''),
+        apiKey: maskApiKey(apiKey),
+      });
+    }
+
     const qs = new URLSearchParams();
     for (const [key, value] of Object.entries(finalParams)) {
       qs.set(key, String(value));
@@ -171,6 +190,15 @@ export async function POST(request: NextRequest) {
       lastStatus = response.status;
 
       if (response.ok) {
+        if (isOrderPath) {
+          console.info('[BinanceSigned][Order][Success]', {
+            method,
+            path,
+            symbol: String(finalParams.symbol || ''),
+            side: String(finalParams.side || ''),
+            positionSide: String(finalParams.positionSide || ''),
+          });
+        }
         break;
       }
 
@@ -189,6 +217,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (!response || !response.ok) {
+      if (isOrderPath) {
+        console.warn('[BinanceSigned][Order][FailoverExhausted]', {
+          method,
+          path,
+          symbol: String(finalParams.symbol || ''),
+          side: String(finalParams.side || ''),
+          positionSide: String(finalParams.positionSide || ''),
+          status: lastStatus,
+        });
+      }
       return NextResponse.json(
         {
           ok: false,

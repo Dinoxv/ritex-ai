@@ -10,6 +10,7 @@ import toast from 'react-hot-toast';
 import type { BotIndicatorType } from '@/models/Settings';
 import { calculateSieuXuHuong } from '@/lib/indicators';
 import { INTERVAL_TO_MS } from '@/lib/time-utils';
+import { getRawPositionSignedSize, getRawPositionSymbol } from '@/lib/utils/exchange-normalizers';
 import type { TimeInterval } from '@/types';
 
 type BotSignal = 'bullish' | 'bearish';
@@ -22,6 +23,7 @@ interface BotTrackedPosition {
   entryPrice: number;
   openedAt: number;
   notional: number;
+  safetyStopOrderId: string | null;
 }
 
 interface BotDailyStats {
@@ -37,6 +39,7 @@ type BotLogAction =
   | 'close-reversal'
   | 'close-manual'
   | 'skip'
+  | 'info'
   | 'error';
 
 export interface BotLogEntry {
@@ -50,6 +53,9 @@ export interface BotLogEntry {
   price?: number;
   size?: number;
   realizedPnl?: number;
+  closePrice?: number;
+  openPrice?: number;
+  slippageBps?: number;
   message: string;
 }
 
@@ -115,6 +121,8 @@ interface BotTradingStore {
   backtestPresetResults: BotBacktestPresetResult[];
   dailyStats: BotDailyStats;
   intervalId: NodeJS.Timeout | null;
+  lastReversalAt: Record<string, number>;
+  reversalPendingVerification: Record<string, boolean>;
   setService: (service: ExchangeTradingService) => void;
   start: () => Promise<void>;
   stop: () => void;
@@ -379,6 +387,8 @@ export const useBotTradingStore = create<BotTradingStore>()(
   backtestPresetResults: [],
   dailyStats: defaultDailyStats(),
   intervalId: null,
+  lastReversalAt: {},
+  reversalPendingVerification: {},
 
   setService: (service) => {
     set({
@@ -392,7 +402,59 @@ export const useBotTradingStore = create<BotTradingStore>()(
     if (!keepRunning || isRunning || !service || !scannerService) {
       return;
     }
-
+    // Sync open positions from exchange before resuming so local state reflects reality.
+    try {
+      const exchangePositions = await service.getOpenPositions();
+      const syncedPositions: Record<string, BotTrackedPosition> = {};
+      for (const pos of exchangePositions) {
+        const symbol = getRawPositionSymbol(pos);
+        const signedSize = getRawPositionSignedSize(pos);
+        const size = Math.abs(signedSize);
+        if (size <= 0) continue;
+        const payload = (pos as { position?: { entryPx?: string; entryPrice?: string } }).position;
+        const entryPrice = Number.parseFloat(String(payload?.entryPx ?? payload?.entryPrice ?? '0'));
+        if (!Number.isFinite(entryPrice) || entryPrice <= 0) continue;
+        syncedPositions[symbol] = {
+          symbol,
+          side: signedSize >= 0 ? 'long' : 'short',
+          size,
+          entryPrice,
+          openedAt: Date.now(),
+          notional: size * entryPrice,
+          safetyStopOrderId: null,
+        };
+      }
+      const count = Object.keys(syncedPositions).length;
+      set({ positions: syncedPositions });
+      set((prev) => ({
+        logs: [
+          {
+            id: createLogId(),
+            timestamp: Date.now(),
+            symbol: 'SYSTEM',
+            indicator: useSettingsStore.getState().settings.bot.indicator,
+            action: 'info' as const,
+            message: `[BotResume] Synced ${count} position(s) from Binance`,
+          },
+          ...prev.logs,
+        ].slice(0, MAX_LOGS),
+      }));
+    } catch (syncErr) {
+      const msg = syncErr instanceof Error ? syncErr.message : String(syncErr);
+      set((prev) => ({
+        logs: [
+          {
+            id: createLogId(),
+            timestamp: Date.now(),
+            symbol: 'SYSTEM',
+            indicator: useSettingsStore.getState().settings.bot.indicator,
+            action: 'error' as const,
+            message: `[BotResume] WARNING: Position sync failed, starting without sync. Error: ${msg}`,
+          },
+          ...prev.logs,
+        ].slice(0, MAX_LOGS),
+      }));
+    }
     await get().start();
   },
 
@@ -473,6 +535,7 @@ export const useBotTradingStore = create<BotTradingStore>()(
       intervalId: null,
       isExecuting: false,
       keepRunning: false,
+      reversalPendingVerification: {},
       logs: [
         createSystemLog('Bot stopped'),
         ...prev.logs,
@@ -839,12 +902,33 @@ export const useBotTradingStore = create<BotTradingStore>()(
     }
 
     if (dailyStats.tradingDisabled) {
+      set((prev) => {
+        // Only log once per disable event (avoid spamming)
+        const lastLog = prev.logs[0];
+        if (lastLog?.message === 'Daily loss limit reached — trading disabled for today') return prev;
+        return {
+          logs: [
+            createSystemLog('Daily loss limit reached — trading disabled for today'),
+            ...prev.logs,
+          ].slice(0, MAX_LOGS),
+        };
+      });
       return;
     }
 
     get().syncTrackedSymbols();
     const symbols = get().trackedSymbols;
     if (symbols.length === 0) {
+      set((prev) => {
+        const lastLog = prev.logs[0];
+        if (lastLog?.message === 'No symbols tracked — check symbol mode and top volatility list') return prev;
+        return {
+          logs: [
+            createSystemLog('No symbols tracked — check symbol mode and top volatility list'),
+            ...prev.logs,
+          ].slice(0, MAX_LOGS),
+        };
+      });
       return;
     }
 
@@ -882,7 +966,69 @@ export const useBotTradingStore = create<BotTradingStore>()(
           }
         }
 
-        let result: { signalType: BotSignal } | null = null;
+        // Periodic reconcile: every 2 intervals, re-check exchange truth for symbols
+        // whose last reversal-open failed (reversalPendingVerification flag is set).
+        if (get().reversalPendingVerification[symbol] && !botSettings.paperMode) {
+          const cycleIntervalMs = INTERVAL_TO_MS[botSettings.timeframe];
+          const timeSinceReversal = Date.now() - (get().lastReversalAt[symbol] ?? 0);
+          if (timeSinceReversal >= 2 * cycleIntervalMs) {
+            try {
+              const maybeInvalidate = service as ExchangeTradingService & { invalidateAccountCache?: () => void };
+              if (typeof maybeInvalidate.invalidateAccountCache === 'function') {
+                maybeInvalidate.invalidateAccountCache();
+              }
+              const exchangePositions = await service.getOpenPositions();
+              const exchangePosition = exchangePositions.find((pos) => getRawPositionSymbol(pos) === symbol);
+              if (exchangePosition) {
+                const signedSize = getRawPositionSignedSize(exchangePosition);
+                const size = Math.abs(signedSize);
+                const payload = (exchangePosition as { position?: { entryPx?: string; entryPrice?: string } }).position;
+                const entryPrice = Number.parseFloat(String(payload?.entryPx ?? payload?.entryPrice ?? '0'));
+                if (size > 0 && Number.isFinite(entryPrice) && entryPrice > 0) {
+                  set((prev) => ({
+                    positions: {
+                      ...prev.positions,
+                      [symbol]: { symbol, side: signedSize >= 0 ? 'long' : 'short', size, entryPrice, openedAt: Date.now(), notional: size * entryPrice, safetyStopOrderId: null },
+                    },
+                    reversalPendingVerification: { ...prev.reversalPendingVerification, [symbol]: false },
+                    logs: [
+                      {
+                        id: createLogId(),
+                        timestamp: Date.now(),
+                        symbol,
+                        indicator: botSettings.indicator,
+                        action: 'open' as const,
+                        message: `[RECONCILED] Position recovered from exchange after prior reversal open failure`,
+                      },
+                      ...prev.logs,
+                    ].slice(0, MAX_LOGS),
+                  }));
+                  toast.success(`${symbol} position recovered from exchange reconciliation`);
+                }
+              } else {
+                set((prev) => ({
+                  reversalPendingVerification: { ...prev.reversalPendingVerification, [symbol]: false },
+                  logs: [
+                    {
+                      id: createLogId(),
+                      timestamp: Date.now(),
+                      symbol,
+                      indicator: botSettings.indicator,
+                      action: 'skip' as const,
+                      signal: null,
+                      message: `[RECONCILED] Confirmed flat on exchange after reversal open failure — no position found`,
+                    },
+                    ...prev.logs,
+                  ].slice(0, MAX_LOGS),
+                }));
+              }
+            } catch {
+              // Reconcile fetch failed — leave flag set, will retry next cycle
+            }
+          }
+        }
+
+        let result: { signalType: BotSignal; isFallback?: boolean } | null = null;
 
         if (botSettings.indicator === 'ritchi') {
           const ritchiSettings = settingsStore.settings.indicators.sieuXuHuong;
@@ -901,7 +1047,7 @@ export const useBotTradingStore = create<BotTradingStore>()(
               tpMult: ritchiSettings.tpMult,
             },
           });
-          result = r ? { signalType: r.signalType } : null;
+          result = r ? { signalType: r.signalType, isFallback: r.isFallback } : null;
         } else if (botSettings.indicator === 'kalmanTrend') {
           const r = await scannerService.scanKalmanTrend({
             symbol,
@@ -929,11 +1075,12 @@ export const useBotTradingStore = create<BotTradingStore>()(
           result = r ? { signalType: r.signalType } : null;
         }
 
-        const signal = result?.signalType ?? null;
-        const currentPosition = get().positions[symbol] || null;
-        set((prev) => ({ lastSignals: { ...prev.lastSignals, [symbol]: signal } }));
-
-        if (!signal) {
+        // Post-reversal cooldown: suppress fallback (trend-direction) signals for 3 bars
+        const REVERSAL_COOLDOWN_BARS = 3;
+        const cooldownMs = INTERVAL_TO_MS[botSettings.timeframe] * REVERSAL_COOLDOWN_BARS;
+        const timeSinceReversal = Date.now() - (get().lastReversalAt[symbol] ?? 0);
+        if (result?.isFallback && timeSinceReversal < cooldownMs) {
+          result = null;
           set((prev) => ({
             logs: [
               {
@@ -943,7 +1090,33 @@ export const useBotTradingStore = create<BotTradingStore>()(
                 indicator: botSettings.indicator,
                 action: 'skip' as const,
                 signal: null,
-                message: 'No valid signal for current cycle',
+                message: `Fallback signal suppressed — post-reversal cooldown (${Math.ceil((cooldownMs - timeSinceReversal) / 1000)}s remaining)`,
+              },
+              ...prev.logs,
+            ].slice(0, MAX_LOGS),
+          }));
+        }
+
+        const signal = result?.signalType ?? null;
+        const currentPosition = get().positions[symbol] || null;
+        set((prev) => ({ lastSignals: { ...prev.lastSignals, [symbol]: signal } }));
+
+        if (!signal) {
+          // Compute a descriptive skip reason for easier debugging
+          const skipReason = (() => {
+            if (!result) return 'No signal — indicator returned null (candles unavailable or no crossover)';
+            return 'No valid signal for current cycle';
+          })();
+          set((prev) => ({
+            logs: [
+              {
+                id: createLogId(),
+                timestamp: Date.now(),
+                symbol,
+                indicator: botSettings.indicator,
+                action: 'skip' as const,
+                signal: null,
+                message: skipReason,
               },
               ...prev.logs,
             ].slice(0, MAX_LOGS),
@@ -962,6 +1135,7 @@ export const useBotTradingStore = create<BotTradingStore>()(
           const notional = botSettings.initialMarginUsdt * leverage;
           const rawSize = notional / midPrice;
           let numericSize = rawSize;
+          let safetyStopOrderId: string | null = null;
 
           if (!isPaperMode) {
             const metadata = await service.getMetadataCache(symbol);
@@ -973,6 +1147,28 @@ export const useBotTradingStore = create<BotTradingStore>()(
               await service.placeMarketSell(symbol, size, String(midPrice), metadata);
             }
             numericSize = Number.parseFloat(size);
+            // Place safety STOP_MARKET after market order succeeds (non-blocking)
+            try {
+              const slPercent = botSettings.safetyStopLossPercent / 100;
+              const stopPrice = signalSide === 'long'
+                ? midPrice * (1 - slPercent)
+                : midPrice * (1 + slPercent);
+              const formattedStop = service.formatPriceCached(stopPrice, metadata);
+              const slResp = await service.placeStopLoss(
+                { coin: symbol, triggerPrice: formattedStop, size: service.formatSizeCached(numericSize, metadata), isBuy: signalSide === 'short' },
+                metadata,
+              );
+              const oid = (slResp as any)?.response?.data?.statuses?.[0]?.resting?.oid;
+              safetyStopOrderId = oid != null ? String(oid) : null;
+            } catch (slErr) {
+              const slErrMsg = slErr instanceof Error ? slErr.message : String(slErr);
+              set((prev) => ({
+                logs: [
+                  { id: createLogId(), timestamp: Date.now(), symbol, indicator: botSettings.indicator, action: 'error' as const, message: `[SL] Failed to place safety stop for ${symbol}: ${slErrMsg}` },
+                  ...prev.logs,
+                ].slice(0, MAX_LOGS),
+              }));
+            }
           }
 
           set((prev) => ({
@@ -985,6 +1181,7 @@ export const useBotTradingStore = create<BotTradingStore>()(
                 entryPrice: midPrice,
                 openedAt: Date.now(),
                 notional: midPrice * numericSize,
+                safetyStopOrderId,
               },
             },
             dailyStats: {
@@ -1022,6 +1219,12 @@ export const useBotTradingStore = create<BotTradingStore>()(
         }
         if (!isPaperMode) {
           const metadata = await service.getMetadataCache(symbol);
+          // Cancel safety stop before closing position to prevent double-fill
+          if (currentPosition.safetyStopOrderId) {
+            try {
+              await service.cancelOrder(symbol, Number(currentPosition.safetyStopOrderId), metadata);
+            } catch { /* order may already be filled/gone — safe to ignore */ }
+          }
           const closeSize = service.formatSizeCached(currentPosition.size, metadata);
           if (currentPosition.side === 'long') {
             await service.placeMarketSell(symbol, closeSize, String(closePrice), metadata);
@@ -1084,6 +1287,169 @@ export const useBotTradingStore = create<BotTradingStore>()(
           get().stop();
           break;
         }
+
+        // Re-enter immediately in the opposite direction so reversal happens in one cycle.
+        // NOTE: Close has already succeeded at this point. If the open below fails, the bot
+        // will be flat on both exchange and local state — safe, but operator should verify
+        // exchange position manually if an error is logged below.
+        const openPrice = Number.parseFloat(await service.getMidPrice(symbol));
+        if (!Number.isFinite(openPrice) || openPrice <= 0) {
+          // Record reversal timestamp even without re-entry so cooldown is respected.
+          set((prev) => ({ lastReversalAt: { ...prev.lastReversalAt, [symbol]: Date.now() } }));
+          continue;
+        }
+        const reversalSlippageBps = closePrice > 0
+          ? (Math.abs(openPrice - closePrice) / closePrice) * 10000
+          : 0;
+
+        const leverage = botSettings.leverageByExchange[botSettings.exchange];
+        const openNotional = botSettings.initialMarginUsdt * leverage;
+        const openRawSize = openNotional / openPrice;
+        let openNumericSize = openRawSize;
+        let reversalSafetyStopOrderId: string | null = null;
+
+        if (!isPaperMode) {
+          let openOrderFailed = false;
+          try {
+            const metadata = await service.getMetadataCache(symbol);
+            await service.setLeverage(symbol, leverage, metadata);
+            const { size } = service.ensureMinNotional(openRawSize, openPrice, metadata, 10);
+            if (signalSide === 'long') {
+              await service.placeMarketBuy(symbol, size, String(openPrice), metadata);
+            } else {
+              await service.placeMarketSell(symbol, size, String(openPrice), metadata);
+            }
+            openNumericSize = Number.parseFloat(size);
+            // Place safety STOP_MARKET for the new position (non-blocking)
+            try {
+              const slPercent = botSettings.safetyStopLossPercent / 100;
+              const stopPrice = signalSide === 'long'
+                ? openPrice * (1 - slPercent)
+                : openPrice * (1 + slPercent);
+              const formattedStop = service.formatPriceCached(stopPrice, metadata);
+              const slResp = await service.placeStopLoss(
+                { coin: symbol, triggerPrice: formattedStop, size: service.formatSizeCached(openNumericSize, metadata), isBuy: signalSide === 'short' },
+                metadata,
+              );
+              const oid = (slResp as any)?.response?.data?.statuses?.[0]?.resting?.oid;
+              reversalSafetyStopOrderId = oid != null ? String(oid) : null;
+            } catch (slErr) {
+              const slErrMsg = slErr instanceof Error ? slErr.message : String(slErr);
+              set((prev) => ({
+                logs: [
+                  { id: createLogId(), timestamp: Date.now(), symbol, indicator: botSettings.indicator, action: 'error' as const, message: `[SL] Failed to place safety stop after reversal open for ${symbol}: ${slErrMsg}` },
+                  ...prev.logs,
+                ].slice(0, MAX_LOGS),
+              }));
+            }
+          } catch (openErr) {
+            openOrderFailed = true;
+            const openErrMsg = openErr instanceof Error ? openErr.message : 'Unknown error';
+            let reconciledPosition: BotTrackedPosition | null = null;
+            let reconcileErrorMessage = '';
+
+            try {
+              const maybeInvalidate = service as ExchangeTradingService & { invalidateAccountCache?: () => void };
+              if (typeof maybeInvalidate.invalidateAccountCache === 'function') {
+                maybeInvalidate.invalidateAccountCache();
+              }
+
+              const exchangePositions = await service.getOpenPositions();
+              const exchangePosition = exchangePositions.find((pos) => getRawPositionSymbol(pos) === symbol);
+
+              if (exchangePosition) {
+                const signedSize = getRawPositionSignedSize(exchangePosition);
+                const size = Math.abs(signedSize);
+                const payload = (exchangePosition as { position?: { entryPx?: string; entryPrice?: string } }).position;
+                const entryPrice = Number.parseFloat(String(payload?.entryPx ?? payload?.entryPrice ?? '0'));
+                if (size > 0 && Number.isFinite(entryPrice) && entryPrice > 0) {
+                  reconciledPosition = {
+                    symbol,
+                    side: signedSize >= 0 ? 'long' : 'short',
+                    size,
+                    entryPrice,
+                    openedAt: Date.now(),
+                    notional: size * entryPrice,
+                    safetyStopOrderId: null,
+                  };
+                }
+              }
+            } catch (reconcileErr) {
+              reconcileErrorMessage = reconcileErr instanceof Error ? reconcileErr.message : 'Unknown reconciliation error';
+            }
+
+            set((prev) => ({
+              positions: reconciledPosition
+                ? { ...prev.positions, [symbol]: reconciledPosition }
+                : prev.positions,
+              lastReversalAt: { ...prev.lastReversalAt, [symbol]: Date.now() },
+              reversalPendingVerification: {
+                ...prev.reversalPendingVerification,
+                [symbol]: !reconciledPosition,
+              },
+              logs: [
+                {
+                  id: createLogId(),
+                  timestamp: Date.now(),
+                  symbol,
+                  indicator: botSettings.indicator,
+                  action: 'error' as const,
+                  message: reconciledPosition
+                    ? `REVERSAL OPEN FAILED then reconciled from exchange (local position restored). Error: ${openErrMsg}`
+                    : `REVERSAL OPEN FAILED after close succeeded — bot remains flat. verify ${symbol} on exchange manually. Error: ${openErrMsg}${reconcileErrorMessage ? ` | Reconcile error: ${reconcileErrorMessage}` : ''}`,
+                },
+                ...prev.logs,
+              ].slice(0, MAX_LOGS),
+            }));
+            toast.error(
+              reconciledPosition
+                ? `Reversal open failed for ${symbol}, recovered by exchange reconciliation`
+                : `Reversal open failed for ${symbol} — bot is flat, check exchange position`,
+            );
+          }
+          if (openOrderFailed) continue;
+        }
+
+        set((prev) => ({
+          positions: {
+            ...prev.positions,
+            [symbol]: {
+              symbol,
+              side: signalSide,
+              size: openNumericSize,
+              entryPrice: openPrice,
+              openedAt: Date.now(),
+              notional: openPrice * openNumericSize,
+              safetyStopOrderId: reversalSafetyStopOrderId,
+            },
+          },
+          lastReversalAt: { ...prev.lastReversalAt, [symbol]: Date.now() },
+          reversalPendingVerification: { ...prev.reversalPendingVerification, [symbol]: false },
+          dailyStats: {
+            ...prev.dailyStats,
+            totalTradedNotional: prev.dailyStats.totalTradedNotional + openPrice * openNumericSize,
+          },
+          logs: [
+            {
+              id: createLogId(),
+              timestamp: Date.now(),
+              symbol,
+              indicator: botSettings.indicator,
+              action: 'open' as const,
+              side: signalSide,
+              signal,
+              price: openPrice,
+              size: openNumericSize,
+              closePrice,
+              openPrice,
+              slippageBps: reversalSlippageBps,
+              message: isPaperMode
+                ? `[PAPER] Reversed to ${signalSide.toUpperCase()} in same cycle (slippage ${reversalSlippageBps.toFixed(1)} bps)`
+                : `Reversed to ${signalSide.toUpperCase()} in same cycle (slippage ${reversalSlippageBps.toFixed(1)} bps)`,
+            },
+            ...prev.logs,
+          ].slice(0, MAX_LOGS),
+        }));
       }
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Unknown bot error';

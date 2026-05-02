@@ -1342,23 +1342,58 @@ export class ScannerService {
         const lastIndex = ritchiResult.buySignals.length - 1;
         if (lastIndex < 0) continue;
 
-        // Check last 3 bars for signals
-        const recentBuy = ritchiResult.buySignals.slice(-3).some(Boolean);
-        const recentSell = ritchiResult.sellSignals.slice(-3).some(Boolean);
+        // Widen crossover capture window to reduce missed entries when scan ticks drift.
+        // With pivLen=5 (default), this becomes max(7, 10) = 10 bars on 1m.
+        const signalLookback = Math.max((config.pivLen ?? 5) + 2, 10);
 
+        // Phase 1: check for a fresh crossover signal within the lookback window
+        const recentBuy = ritchiResult.buySignals.slice(-signalLookback).some(Boolean);
+        const recentSell = ritchiResult.sellSignals.slice(-signalLookback).some(Boolean);
+
+        const directionValue = ritchiResult.direction[lastIndex];
+
+        // Phase 2: fallback — enter on established trend direction when no fresh crossover signal.
+        // Require both mature trend age and recent direction stability to avoid sideways churning.
+        let isTrendFallback = false;
+        let trendFallbackBuy = false;
+        let trendFallbackSell = false;
         if (!recentBuy && !recentSell) {
+          const trendLen = config.trendLen ?? 100;
+          const trendAge = ritchiResult.trendAge[lastIndex] ?? 0;
+          // Dynamic threshold: require at least 20% maturity for default trendLen=100.
+          // For shorter trendLen, threshold increases slightly; for longer trendLen, caps at 20%.
+          const minTrendAgeForFallback = Math.max(0.2, Math.min(0.35, 20 / trendLen));
+
+          const stableBars = 4;
+          const directionWindow = ritchiResult.direction.slice(Math.max(0, lastIndex - stableBars + 1), lastIndex + 1);
+          const directionStable = directionWindow.length === stableBars
+            && directionValue !== undefined
+            && directionWindow.every((v) => v === directionValue);
+
+          if (trendAge >= minTrendAgeForFallback && directionStable) {
+            trendFallbackBuy = directionValue === true;
+            trendFallbackSell = directionValue === false;
+            isTrendFallback = true;
+          }
+        }
+
+        const useBuy = recentBuy || trendFallbackBuy;
+        const useSell = recentSell || trendFallbackSell;
+
+        if (!useBuy && !useSell) {
           continue;
         }
 
-        const directionValue = ritchiResult.direction[lastIndex];
-        const signalType = recentBuy ? 'bullish' : 'bearish';
+        const signalType = useBuy ? 'bullish' : 'bearish';
         
-        // Find the actual signal index
+        // Find the signal index — prefer a recent crossover bar, else use current bar
         let signalIndex = lastIndex;
-        for (let i = lastIndex; i >= Math.max(0, lastIndex - 3); i--) {
-          if ((recentBuy && ritchiResult.buySignals[i]) || (recentSell && ritchiResult.sellSignals[i])) {
-            signalIndex = i;
-            break;
+        if (!isTrendFallback) {
+          for (let i = lastIndex; i >= Math.max(0, lastIndex - signalLookback); i--) {
+            if ((useBuy && ritchiResult.buySignals[i]) || (useSell && ritchiResult.sellSignals[i])) {
+              signalIndex = i;
+              break;
+            }
           }
         }
 
@@ -1369,21 +1404,23 @@ export class ScannerService {
         const ritchiTrendValue: RitchiTrendValue = {
           direction: directionValue ? 'bullish' : 'bearish',
           timeframe,
-          buySignal: recentBuy,
-          sellSignal: recentSell,
+          buySignal: useBuy,
+          sellSignal: useSell,
           price,
           stopLoss,
           takeProfit,
         };
 
+        const signalSource = isTrendFallback ? 'trend-direction' : 'crossover';
         return {
           symbol,
           ritchiTrends: [ritchiTrendValue],
           matchedAt: Date.now(),
           signalType: signalType as 'bullish' | 'bearish',
-          description: `Ritchi Trend ${signalType === 'bullish' ? 'BUY' : 'SELL'} signal on ${timeframe}`,
+          description: `Ritchi Trend ${signalType === 'bullish' ? 'BUY' : 'SELL'} signal on ${timeframe} (${signalSource})`,
           scanType: 'ritchiTrend',
           closePrices,
+          isFallback: isTrendFallback,
         };
       } catch (error) {
         console.error(`Error scanning Ritchi Trend for ${symbol} on ${timeframe}:`, error);

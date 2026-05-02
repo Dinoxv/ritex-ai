@@ -160,6 +160,7 @@ export default function BotTradingView() {
     desiredAutoSymbols,
     positions,
     lastSignals,
+    reversalPendingVerification,
     dailyStats,
     logs,
     isBacktesting,
@@ -1038,7 +1039,12 @@ export default function BotTradingView() {
           <div className="space-y-1 text-xs font-mono">
             {trackedSymbols.map((symbol) => (
               <div key={symbol} className="flex justify-between">
-                <span>{symbol}</span>
+                <span className="flex items-center gap-1">
+                  {symbol}
+                  {reversalPendingVerification[symbol] && (
+                    <span className="text-yellow-400 text-[10px]" title="Reversal open failed — pending verification">⚠</span>
+                  )}
+                </span>
                 <span>{lastSignals[symbol] || '-'}</span>
               </div>
             ))}
@@ -1094,6 +1100,13 @@ export default function BotTradingView() {
                     {typeof log.price === 'number' ? `price ${log.price.toFixed(4)} ` : ''}
                     {typeof log.size === 'number' ? `size ${log.size.toFixed(4)} ` : ''}
                     {typeof log.realizedPnl === 'number' ? `pnl ${log.realizedPnl.toFixed(4)}` : ''}
+                  </div>
+                )}
+                {typeof log.slippageBps === 'number' && (
+                  <div className="text-yellow-400/80">
+                    {typeof log.closePrice === 'number' ? `close ${log.closePrice.toFixed(4)} ` : ''}
+                    {typeof log.openPrice === 'number' ? `open ${log.openPrice.toFixed(4)} ` : ''}
+                    {`slip ${log.slippageBps.toFixed(1)} bps`}
                   </div>
                 )}
               </div>

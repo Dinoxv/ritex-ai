@@ -117,6 +117,7 @@ export interface ScanResult {
   scanType: ScanType;
   closePrices?: number[];
   realtimeVolumeTrigger?: boolean;  // true when realtime volume engine detected a spike
+  isFallback?: boolean;  // true when signal came from trend-direction fallback (not crossover)
 }
 
 export interface ScannerStatus {

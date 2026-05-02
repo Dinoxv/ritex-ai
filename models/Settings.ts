@@ -305,6 +305,7 @@ export interface BotTradingSettings {
   };
   symbolMode: BotSymbolMode;
   manualSymbols: string[];
+  safetyStopLossPercent: number;
 }
 
 export interface AppSettings {
@@ -600,6 +601,7 @@ export const DEFAULT_SETTINGS: AppSettings = {
     },
     symbolMode: 'auto',
     manualSymbols: [],
+    safetyStopLossPercent: 1.5,
   },
   pinnedSymbols: [],
 };
