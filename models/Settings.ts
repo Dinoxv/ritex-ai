@@ -306,6 +306,16 @@ export interface BotTradingSettings {
   symbolMode: BotSymbolMode;
   manualSymbols: string[];
   safetyStopLossPercent: number;
+  /** ATR multiplier for dynamic SL distance. Default: 1.5 */
+  atrMultiplier: number;
+  /** % of equity to risk per trade. 0 = use initialMarginUsdt fixed mode. Default: 1.0 */
+  riskPercent: number;
+  /** Telegram bot token for trade alerts */
+  telegramBotToken?: string;
+  /** Telegram chat ID for trade alerts */
+  telegramChatId?: string;
+  /** Webhook URL for trade alerts */
+  alertWebhookUrl?: string;
 }
 
 export interface AppSettings {
@@ -602,6 +612,8 @@ export const DEFAULT_SETTINGS: AppSettings = {
     symbolMode: 'auto',
     manualSymbols: [],
     safetyStopLossPercent: 1.5,
+    atrMultiplier: 1.5,
+    riskPercent: 1.0,
   },
   pinnedSymbols: [],
 };

@@ -1,5 +1,19 @@
 module.exports = {
-  apps: [{
+  apps: [
+  {
+    name: 'hyperscalper-bot-engine',
+    cwd: '/root/hyperscalper',
+    script: 'node_modules/.bin/tsx',
+    args: 'lib/bot-engine/index.ts',
+    autorestart: true,
+    watch: false,
+    max_memory_restart: '256M',
+    env: {
+      NODE_ENV: 'production',
+      BOT_DB_PATH: './data/bot.db',
+    },
+  },
+  {
     name: 'hyperscalper-frontend',
     cwd: '/root/hyperscalper',
     script: 'node_modules/.bin/next',

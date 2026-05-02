@@ -16,6 +16,7 @@
     "@nktkas/hyperliquid": "^0.32.2",
     "@tanstack/react-virtual": "^3.13.12",
     "@vercel/analytics": "^1.5.0",
+    "better-sqlite3": "^12.9.0",
     "chart.js": "^4.5.1",
     "lightweight-charts": "^4.2.0",
     "next": "^16.1.6",
@@ -31,6 +32,7 @@
   "devDependencies": {
     "@playwright/test": "^1.59.1",
     "@tailwindcss/postcss": "^4",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
