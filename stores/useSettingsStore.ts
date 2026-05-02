@@ -433,6 +433,11 @@ const mergeSettings = (storedSettings: any): AppSettings => {
           ? storedSettings.bot.manualSymbols.filter((symbol: unknown): symbol is string => typeof symbol === 'string')
           : DEFAULT_SETTINGS.bot.manualSymbols,
         safetyStopLossPercent: storedSettings.bot?.safetyStopLossPercent ?? DEFAULT_SETTINGS.bot.safetyStopLossPercent,
+        atrMultiplier: storedSettings.bot?.atrMultiplier ?? DEFAULT_SETTINGS.bot.atrMultiplier,
+        riskPercent: storedSettings.bot?.riskPercent ?? DEFAULT_SETTINGS.bot.riskPercent,
+        telegramBotToken: storedSettings.bot?.telegramBotToken,
+        telegramChatId: storedSettings.bot?.telegramChatId,
+        alertWebhookUrl: storedSettings.bot?.alertWebhookUrl,
       },
       pinnedSymbols: sanitizedPinnedSymbols,
     };
