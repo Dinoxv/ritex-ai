@@ -9,6 +9,9 @@ import { ConditionalServiceProvider } from "@/components/providers/ConditionalSe
 import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "react-hot-toast";
 
+const enableVercelAnalytics =
+  process.env.VERCEL === '1' || process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === 'true';
+
 const binancePlex = localFont({
   src: [
     { path: "./font/BinancePlex-Light.woff2", weight: "300", style: "normal" },
@@ -24,8 +27,8 @@ const siteUrl = "https://ritexai.com";
 const ogImage = `${siteUrl}/landing/hero.png`;
 
 export const metadata: Metadata = {
-  title: "RITEX AI | Advanced Trading Terminal for Hyperliquid DEX",
-  description: "Professional trading terminal for Hyperliquid. Real-time charts, market scanner, divergence detection & instant execution. 100% client-side — your keys never leave your browser.",
+  title: "RITEX AI | Advanced Multi-Exchange Trading Terminal",
+  description: "Professional multi-exchange trading terminal. Real-time charts, market scanner, divergence detection & instant execution. 100% client-side — your credentials never leave your browser.",
   metadataBase: new URL(siteUrl),
   alternates: {
     canonical: "/",
@@ -41,8 +44,8 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website",
     url: siteUrl,
-    title: "RITEX AI — Advanced Trading Terminal for Hyperliquid",
-    description: "Professional trading terminal for Hyperliquid DEX. Real-time charts, market scanner, divergence detection & instant order execution. 100% client-side.",
+    title: "RITEX AI — Advanced Multi-Exchange Trading Terminal",
+    description: "Professional multi-exchange trading terminal. Real-time charts, market scanner, divergence detection & instant order execution. 100% client-side.",
     siteName: "RITEX AI",
     images: [
       {
@@ -55,23 +58,24 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "RITEX AI — Trading Terminal for Hyperliquid",
-    description: "Real-time charts, market scanner, divergence detection & instant execution. 100% client-side — your keys never leave your browser.",
+    title: "RITEX AI — Multi-Exchange Trading Terminal",
+    description: "Real-time charts, market scanner, divergence detection & instant execution. 100% client-side — your credentials never leave your browser.",
     images: [ogImage],
   },
   authors: [{ name: "RITEX AI", url: "https://ritexai.com" }],
   keywords: [
     "Hyperliquid",
+    "Binance",
     "trading terminal",
     "RITEX AI",
     "crypto trading",
-    "DEX trading",
+    "CEX/DEX trading",
     "technical analysis",
     "market scanner",
     "trading signals",
     "scalping",
     "DeFi",
-    "Hyperliquid DEX",
+    "multi-exchange trading",
     "perpetual trading",
     "crypto terminal",
     "real-time charts",
@@ -80,7 +84,7 @@ export const metadata: Metadata = {
     "multi-timeframe analysis",
   ],
   other: {
-    "ai-content-declaration": "RITEX AI is a professional trading terminal for Hyperliquid DEX. Visit https://ritexai.com for more information.",
+    "ai-content-declaration": "RITEX AI is a professional multi-exchange trading terminal. Visit https://ritexai.com for more information.",
   },
 };
 
@@ -111,7 +115,7 @@ export default function RootLayout({
               "@type": "WebApplication",
               name: "RITEX AI",
               url: siteUrl,
-              description: "Professional trading terminal for Hyperliquid DEX with real-time charts, market scanner, and instant order execution.",
+              description: "Professional multi-exchange trading terminal with real-time charts, market scanner, and instant order execution.",
               applicationCategory: "FinanceApplication",
               operatingSystem: "Web",
               author: {
@@ -166,7 +170,7 @@ export default function RootLayout({
             },
           }}
         />
-        <Analytics />
+        {enableVercelAnalytics ? <Analytics /> : null}
       </body>
     </html>
   );

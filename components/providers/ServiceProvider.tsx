@@ -14,6 +14,7 @@ import { useScannerStore } from '@/stores/useScannerStore';
 import { useSymbolVolatilityStore } from '@/stores/useSymbolVolatilityStore';
 import { useGlobalPollingStore } from '@/stores/useGlobalPollingStore';
 import { useSymbolCandlesStore } from '@/stores/useSymbolCandlesStore';
+import { useBotTradingStore } from '@/stores/useBotTradingStore';
 import type { ExchangeTradingService } from '@/lib/services/types';
 
 export function ServiceProvider({ children }: { children: React.ReactNode }) {
@@ -32,6 +33,8 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
   const setVolatilityService = useSymbolVolatilityStore((state) => state.setService);
   const setGlobalPollingService = useGlobalPollingStore((state) => state.setService);
   const setSymbolCandlesService = useSymbolCandlesStore((state) => state.setService);
+  const setBotService = useBotTradingStore((state) => state.setService);
+  const ensureBotAutoResume = useBotTradingStore((state) => state.ensureAutoResume);
 
   useEffect(() => {
     console.log('[ServiceProvider] Service changed, updating all stores');
@@ -53,6 +56,8 @@ export function ServiceProvider({ children }: { children: React.ReactNode }) {
     setVolatilityService(exchangeService);
     setGlobalPollingService(exchangeService);
     setSymbolCandlesService(exchangeService);
+    setBotService(exchangeService);
+    void ensureBotAutoResume();
 
     fetchMetadata();
     fetchAndStoreAllOpenPositions();

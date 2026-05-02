@@ -1,6 +1,16 @@
 import { create } from 'zustand';
 import { AIAnalysisResult, IndicatorSnapshot } from '@/lib/ai/types';
 import { useSettingsStore } from './useSettingsStore';
+import { useDexStore } from './useDexStore';
+import { AIStrategyConfig } from '@/models/Settings';
+
+type AiExchange = 'hyperliquid' | 'binance';
+
+type AiTelegramConfig = {
+  enabled: boolean;
+  botToken: string;
+  chatId: string;
+};
 
 interface AIStrategyStore {
   isAnalyzing: boolean;
@@ -24,6 +34,8 @@ export const useAIStrategyStore = create<AIStrategyStore>()((set, get) => ({
 
   analyzeSignal: async (signal: IndicatorSnapshot) => {
     const ai = useSettingsStore.getState().settings.ai;
+    const selectedExchange = useDexStore.getState().selectedExchange as AiExchange;
+    const telegramConfig = resolveAiTelegramConfig(ai, selectedExchange);
     if (!ai.enabled || !ai.claudeApiKey) return;
 
     // Rate limiting
@@ -72,9 +84,9 @@ export const useAIStrategyStore = create<AIStrategyStore>()((set, get) => ({
 
       // Auto-send Telegram if conditions met
       if (
-        ai.telegramEnabled &&
-        ai.telegramBotToken &&
-        ai.telegramChatId &&
+        telegramConfig.enabled &&
+        telegramConfig.botToken &&
+        telegramConfig.chatId &&
         result.action !== 'WAIT' &&
         result.confidence >= ai.confidenceThreshold
       ) {
@@ -87,7 +99,9 @@ export const useAIStrategyStore = create<AIStrategyStore>()((set, get) => ({
 
   sendTelegramAlert: async (result: AIAnalysisResult) => {
     const ai = useSettingsStore.getState().settings.ai;
-    if (!ai.telegramBotToken || !ai.telegramChatId) return;
+    const selectedExchange = useDexStore.getState().selectedExchange as AiExchange;
+    const telegramConfig = resolveAiTelegramConfig(ai, selectedExchange);
+    if (!telegramConfig.botToken || !telegramConfig.chatId) return;
 
     const emoji = result.action === 'BUY' ? '🟢' : '🔴';
     const confidence = (result.confidence * 100).toFixed(0);
@@ -103,6 +117,7 @@ export const useAIStrategyStore = create<AIStrategyStore>()((set, get) => ({
       ``,
       `💡 ${result.reasoning}`,
       ``,
+      `🏦 Exchange: ${selectedExchange.toUpperCase()}`,
       `⚡ Strategy: Stochastic Reversal Scalp`,
       `🕐 ${new Date(result.timestamp).toLocaleTimeString()}`,
     ]
@@ -114,8 +129,8 @@ export const useAIStrategyStore = create<AIStrategyStore>()((set, get) => ({
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          botToken: ai.telegramBotToken,
-          chatId: ai.telegramChatId,
+          botToken: telegramConfig.botToken,
+          chatId: telegramConfig.chatId,
           message,
         }),
       });
@@ -126,3 +141,13 @@ export const useAIStrategyStore = create<AIStrategyStore>()((set, get) => ({
 
   clearHistory: () => set({ history: [], lastResult: null }),
 }));
+
+function resolveAiTelegramConfig(ai: AIStrategyConfig, exchange: AiExchange): AiTelegramConfig {
+  const exchangeConfig = ai.telegramByExchange?.[exchange];
+
+  return {
+    enabled: exchangeConfig?.enabled ?? ai.telegramEnabled ?? false,
+    botToken: exchangeConfig?.botToken ?? ai.telegramBotToken ?? '',
+    chatId: exchangeConfig?.chatId ?? ai.telegramChatId ?? '',
+  };
+}

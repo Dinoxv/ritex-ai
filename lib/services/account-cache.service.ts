@@ -2,8 +2,7 @@ import type { AccountBalance, ExchangeTradingService } from './types';
 
 export class AccountBalanceCache {
   private static instance: AccountBalanceCache;
-  private balance: AccountBalance | null = null;
-  private lastFetch: number = 0;
+  private balances: Map<string, { balance: AccountBalance; lastFetch: number }> = new Map();
   private readonly TTL = 5000;
 
   private constructor() {}
@@ -16,18 +15,19 @@ export class AccountBalanceCache {
   }
 
   async getBalance(service: ExchangeTradingService, user?: string): Promise<AccountBalance> {
-    if (this.balance && Date.now() - this.lastFetch < this.TTL) {
-      return this.balance;
+    const cacheKey = `${service.getExchangeKey()}:${user || '__default__'}`;
+    const cached = this.balances.get(cacheKey);
+    if (cached && Date.now() - cached.lastFetch < this.TTL) {
+      return cached.balance;
     }
 
-    this.balance = await service.getAccountBalance(user);
-    this.lastFetch = Date.now();
-    return this.balance;
+    const balance = await service.getAccountBalance(user);
+    this.balances.set(cacheKey, { balance, lastFetch: Date.now() });
+    return balance;
   }
 
   invalidate(): void {
-    this.balance = null;
-    this.lastFetch = 0;
+    this.balances.clear();
   }
 }
 

@@ -14,6 +14,7 @@ import { playNotificationSound } from '@/lib/sound-utils';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { KeyBinding } from '@/lib/keyboard-utils';
 import { useSettingsStore } from '@/stores/useSettingsStore';
+import { useDexStore } from '@/stores/useDexStore';
 import { useSymbolMetaStore } from '@/stores/useSymbolMetaStore';
 import { calculateAverageCandleHeight } from '@/lib/trading-utils';
 import { getCandleTimeWindow } from '@/lib/time-utils';
@@ -38,7 +39,17 @@ function SymbolView({ coin }: SymbolViewProps) {
   const isPanelOpen = useSettingsStore((state) => state.isPanelOpen);
   const isMultiChartView = useSettingsStore((state) => state.isMultiChartView);
   const playTradeSound = useSettingsStore((state) => state.settings.theme.playTradeSound);
-  const orderSettings = useSettingsStore((state) => state.settings.orders);
+  const settingsOrders = useSettingsStore((state) => state.settings.orders);
+  const selectedExchange = useDexStore((state) => state.selectedExchange);
+  const orderSettings = useMemo(() => {
+    const byExchange = settingsOrders.byExchange?.[selectedExchange];
+    return byExchange ?? {
+      cloudPercentage: settingsOrders.cloudPercentage,
+      smallPercentage: settingsOrders.smallPercentage,
+      bigPercentage: settingsOrders.bigPercentage,
+      leverage: settingsOrders.leverage,
+    };
+  }, [settingsOrders, selectedExchange]);
   const invertedMode = useSettingsStore((state) => state.settings.chart.invertedMode);
 
   const position = usePositionStore((state) => state.positions[coin]);

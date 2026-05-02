@@ -42,6 +42,12 @@ interface CredentialsContextType {
   hasHyperliquidCredentials: boolean;
   hasBinanceCredentials: boolean;
   migrationInfo: CredentialsMigrationInfo | null;
+  updateHyperliquidCredentials: (
+    privateKey: string,
+    walletAddress: string,
+    isTestnet: boolean,
+    password?: string
+  ) => Promise<void>;
   saveCredentials: (
     privateKey: string,
     walletAddress: string,
@@ -59,27 +65,100 @@ interface CredentialsContextType {
 
 const CredentialsContext = createContext<CredentialsContextType | undefined>(undefined);
 
+// Keep bootstrap state outside React to avoid infinite loading if provider remounts.
+let credentialsBootstrapComplete = false;
+let credentialsBootstrapCache: Credentials | null = null;
+
+function safeGetStorageItem(key: string): string | null {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  try {
+    return window.localStorage.getItem(key);
+  } catch {
+    return null;
+  }
+}
+
+function safeSetStorageItem(key: string, value: string): boolean {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  try {
+    window.localStorage.setItem(key, value);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+function safeRemoveStorageItem(key: string): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.removeItem(key);
+  } catch {
+  }
+}
+
+function safeParseJson<T>(raw: string): T | null {
+  try {
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+
 export function CredentialsProvider({ children }: { children: ReactNode }) {
-  const [credentials, setCredentials] = useState<Credentials | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [credentials, setCredentials] = useState<Credentials | null>(credentialsBootstrapCache);
+  const [isLoaded, setIsLoaded] = useState(credentialsBootstrapComplete);
   const [migrationInfo, setMigrationInfo] = useState<CredentialsMigrationInfo | null>(null);
 
   useEffect(() => {
-    loadCredentials().catch(() => {
+    if (credentialsBootstrapComplete) {
       setIsLoaded(true);
-    });
-    // Safety timeout: if credentials loading hangs, force loaded state
-    const timeout = setTimeout(() => {
+      if (credentialsBootstrapCache !== null) {
+        setCredentials(credentialsBootstrapCache);
+      }
+      return;
+    }
+
+    let cancelled = false;
+
+    const bootstrap = async () => {
+      const timeoutMs = 4000;
+
+      await Promise.race([
+        loadCredentials().catch(() => false),
+        new Promise<boolean>((resolve) => {
+          window.setTimeout(() => resolve(false), timeoutMs);
+        }),
+      ]);
+
+      if (cancelled) {
+        return;
+      }
+
+      credentialsBootstrapComplete = true;
       setIsLoaded(true);
-    }, 3000);
-    return () => clearTimeout(timeout);
+    };
+
+    bootstrap();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
   const getDeviceKey = (): string => {
-    let deviceKey = localStorage.getItem(DEVICE_KEY_STORAGE);
+    let deviceKey = safeGetStorageItem(DEVICE_KEY_STORAGE);
     if (!deviceKey) {
       deviceKey = generateDeviceKey();
-      localStorage.setItem(DEVICE_KEY_STORAGE, deviceKey);
+      safeSetStorageItem(DEVICE_KEY_STORAGE, deviceKey);
     }
     return deviceKey;
   };
@@ -105,39 +184,61 @@ export function CredentialsProvider({ children }: { children: ReactNode }) {
   const saveEncryptedSection = async (key: string, value: object, password?: string): Promise<void> => {
     const encryptionKey = password || getDeviceKey();
     const encrypted = await encryptData(JSON.stringify(value), encryptionKey);
-    localStorage.setItem(key, JSON.stringify(encrypted));
+    if (!safeSetStorageItem(key, JSON.stringify(encrypted))) {
+      throw new Error(`Unable to persist credentials for ${key}`);
+    }
   };
 
   const loadEncryptedSection = async <T,>(key: string, password?: string): Promise<T | null> => {
-    const stored = localStorage.getItem(key);
+    const stored = safeGetStorageItem(key);
     if (!stored) {
       return null;
     }
 
     const encryptionKey = password || getDeviceKey();
-    const encrypted = JSON.parse(stored);
+    const encrypted = safeParseJson<Parameters<typeof decryptData>[0]>(stored);
+    if (!encrypted) {
+      safeRemoveStorageItem(key);
+      return null;
+    }
     const decrypted = await decryptData(encrypted, encryptionKey);
-    return JSON.parse(decrypted) as T;
+    const parsed = safeParseJson<T>(decrypted);
+    if (!parsed) {
+      safeRemoveStorageItem(key);
+      return null;
+    }
+
+    return parsed;
   };
 
   const setCredentialsFromParts = (
     hyperliquid: Partial<HyperliquidCredentials> | null,
     binance: Partial<BinanceCredentials> | null
   ): void => {
-    setCredentials(buildMergedCredentials(hyperliquid, binance));
+    const merged = buildMergedCredentials(hyperliquid, binance);
+    credentialsBootstrapCache = merged;
+    setCredentials(merged);
   };
 
   const migrateLegacyCredentials = async (password?: string): Promise<Credentials | null> => {
-    const stored = localStorage.getItem(LEGACY_STORAGE_KEY);
+    const stored = safeGetStorageItem(LEGACY_STORAGE_KEY);
     if (!stored) {
       return null;
     }
 
     try {
       const encryptionKey = password || getDeviceKey();
-      const encrypted = JSON.parse(stored);
+      const encrypted = safeParseJson<Parameters<typeof decryptData>[0]>(stored);
+      if (!encrypted) {
+        safeRemoveStorageItem(LEGACY_STORAGE_KEY);
+        return null;
+      }
       const decrypted = await decryptData(encrypted, encryptionKey);
-      const raw = JSON.parse(decrypted) as Partial<Credentials>;
+      const raw = safeParseJson<Partial<Credentials>>(decrypted);
+      if (!raw) {
+        safeRemoveStorageItem(LEGACY_STORAGE_KEY);
+        return null;
+      }
 
       const hyperliquid: HyperliquidCredentials = {
         privateKey: raw.privateKey || '',
@@ -167,8 +268,9 @@ export function CredentialsProvider({ children }: { children: ReactNode }) {
         binanceMigrated,
       });
 
-      localStorage.removeItem(LEGACY_STORAGE_KEY);
+      safeRemoveStorageItem(LEGACY_STORAGE_KEY);
       const merged = buildMergedCredentials(hyperliquid, binance);
+      credentialsBootstrapCache = merged;
       setCredentials(merged);
       return merged;
     } catch (error) {
@@ -204,6 +306,30 @@ export function CredentialsProvider({ children }: { children: ReactNode }) {
     setCredentialsFromParts(hyperliquidData, binanceData);
   };
 
+  const updateHyperliquidCredentials = async (
+    privateKey: string,
+    walletAddress: string,
+    isTestnet: boolean,
+    password?: string
+  ): Promise<void> => {
+    const hyperliquidData: HyperliquidCredentials = {
+      privateKey,
+      walletAddress,
+      isTestnet,
+    };
+
+    await saveEncryptedSection(HYPERLIQUID_STORAGE_KEY, hyperliquidData, password);
+
+    const binanceData: BinanceCredentials | null = credentials
+      ? {
+          binanceApiKey: credentials.binanceApiKey || '',
+          binanceApiSecret: credentials.binanceApiSecret || '',
+        }
+      : await loadEncryptedSection<BinanceCredentials>(BINANCE_STORAGE_KEY, password).catch(() => null);
+
+    setCredentialsFromParts(hyperliquidData, binanceData);
+  };
+
   const loadCredentials = async (password?: string): Promise<boolean> => {
     try {
       const hyperliquid = await loadEncryptedSection<HyperliquidCredentials>(HYPERLIQUID_STORAGE_KEY, password);
@@ -214,31 +340,41 @@ export function CredentialsProvider({ children }: { children: ReactNode }) {
       if (!merged) {
         merged = await migrateLegacyCredentials(password);
       } else {
+        credentialsBootstrapCache = merged;
         setCredentials(merged);
       }
 
+      credentialsBootstrapComplete = true;
       setIsLoaded(true);
       return Boolean(merged);
     } catch (error) {
       console.error('Failed to load credentials:', error);
+      credentialsBootstrapComplete = true;
       setIsLoaded(true);
       return false;
     }
   };
 
   const clearCredentials = (): void => {
-    clearStoredCredentials(localStorage, 'all');
+    if (typeof window !== 'undefined') {
+      clearStoredCredentials(window.localStorage, 'all');
+    }
+    credentialsBootstrapCache = null;
     setCredentials(null);
   };
 
   const clearHyperliquidCredentials = async (): Promise<void> => {
-    clearStoredCredentials(localStorage, 'hyperliquid');
+    if (typeof window !== 'undefined') {
+      clearStoredCredentials(window.localStorage, 'hyperliquid');
+    }
     const binance = await loadEncryptedSection<BinanceCredentials>(BINANCE_STORAGE_KEY).catch(() => null);
     setCredentialsFromParts(null, binance);
   };
 
   const clearBinanceCredentials = async (): Promise<void> => {
-    clearStoredCredentials(localStorage, 'binance');
+    if (typeof window !== 'undefined') {
+      clearStoredCredentials(window.localStorage, 'binance');
+    }
     const hyperliquid = await loadEncryptedSection<HyperliquidCredentials>(HYPERLIQUID_STORAGE_KEY).catch(() => null);
     setCredentialsFromParts(hyperliquid, null);
   };
@@ -292,6 +428,7 @@ export function CredentialsProvider({ children }: { children: ReactNode }) {
         hasHyperliquidCredentials,
         hasBinanceCredentials,
         migrationInfo,
+        updateHyperliquidCredentials,
         saveCredentials,
         loadCredentials,
         clearCredentials,

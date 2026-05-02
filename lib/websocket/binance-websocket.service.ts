@@ -39,7 +39,7 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
   private streamRefs = new Map<string, number>();
 
   constructor(isTestnet: boolean = false) {
-    this.wsUrl = isTestnet ? 'wss://stream.binancefuture.com/ws' : 'wss://fstream.binance.com/ws';
+    this.wsUrl = isTestnet ? 'wss://testnet.binance.vision/ws' : 'wss://stream.binance.com:9443/ws';
   }
 
   private ensureConnected(): void {
@@ -104,18 +104,24 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
 
   private handleMessage(raw: string): void {
     try {
+      if (typeof raw !== 'string') return;
       const msg = JSON.parse(raw);
+      const normalizedMsg = msg?.data?.e ? msg.data : msg;
 
       // We only process event payloads
-      if (!msg.e) return;
+      if (!normalizedMsg.e) {
+        return;
+      }
 
-      if (msg.e === 'kline') {
-        const symbol = fromStreamSymbol(msg.s || '');
-        const stream = `${toStreamSymbol(symbol)}@kline_${msg.k?.i || '1m'}`;
+      if (normalizedMsg.e === 'kline') {
+        const symbol = fromStreamSymbol(normalizedMsg.s || '');
+        const stream = `${toStreamSymbol(symbol)}@kline_${normalizedMsg.k?.i || '1m'}`;
+        let matchedSubscriptions = 0;
         this.subscriptions.forEach((sub) => {
           if (sub.type !== 'candle' || sub.stream !== stream) return;
+          matchedSubscriptions++;
 
-          const k = msg.k;
+          const k = normalizedMsg.k;
           if (!k) return;
 
           const open = parseFloat(k.o);
@@ -145,20 +151,20 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
         return;
       }
 
-      if (msg.e === 'aggTrade') {
-        const symbol = fromStreamSymbol(msg.s || '');
+      if (normalizedMsg.e === 'aggTrade') {
+        const symbol = fromStreamSymbol(normalizedMsg.s || '');
         const stream = `${toStreamSymbol(symbol)}@aggTrade`;
 
         this.subscriptions.forEach((sub) => {
           if (sub.type !== 'trade' || sub.stream !== stream) return;
 
-          const price = parseFloat(msg.p || '0');
-          const size = parseFloat(msg.q || '0');
-          const side: 'buy' | 'sell' = msg.m ? 'sell' : 'buy';
+          const price = parseFloat(normalizedMsg.p || '0');
+          const size = parseFloat(normalizedMsg.q || '0');
+          const side: 'buy' | 'sell' = normalizedMsg.m ? 'sell' : 'buy';
           const decimals = useSymbolMetaStore.getState().getDecimals(symbol);
 
           const trade: TradeData = {
-            time: Number(msg.T || Date.now()),
+            time: Number(normalizedMsg.T || Date.now()),
             price,
             size,
             side,
@@ -171,9 +177,9 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
         return;
       }
 
-      if (msg.e === 'markPriceUpdate' && msg.s) {
+      if (normalizedMsg.e === 'markPriceUpdate' && normalizedMsg.s) {
         const mids: AllMidsData = {};
-        mids[fromStreamSymbol(msg.s)] = parseFloat(msg.p || '0');
+        mids[fromStreamSymbol(normalizedMsg.s)] = parseFloat(normalizedMsg.p || '0');
 
         this.subscriptions.forEach((sub) => {
           if (sub.type !== 'allMids' || sub.stream !== '!markPrice@arr') return;

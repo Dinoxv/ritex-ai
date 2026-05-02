@@ -5,6 +5,7 @@ import CrosshairIcon from '@/components/icons/CrosshairIcon';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useCrosshairStore } from '@/stores/useCrosshairStore';
 import { usePositionStore } from '@/stores/usePositionStore';
+import { useBotTradingStore } from '@/stores/useBotTradingStore';
 import { formatPnlSchmeckles } from '@/lib/format-utils';
 import type { Position } from '@/models/Position';
 import type { Order } from '@/models/Order';
@@ -79,10 +80,15 @@ function RightTradingPanel({
   }, [orders, position]);
 
   const schmecklesMode = useSettingsStore((state) => state.settings.chart.schmecklesMode);
+  const botSettings = useSettingsStore((state) => state.settings.bot);
   const crosshairActive = useCrosshairStore((state) => state.active);
   const crosshairType = useCrosshairStore((state) => state.type);
   const setMode = useCrosshairStore((state) => state.setMode);
   const positions = usePositionStore((state) => state.positions);
+  const botIsRunning = useBotTradingStore((state) => state.isRunning);
+  const botIsExecuting = useBotTradingStore((state) => state.isExecuting);
+  const startBot = useBotTradingStore((state) => state.start);
+  const stopBot = useBotTradingStore((state) => state.stop);
 
   const totalPnl = useMemo(() => {
     return Object.values(positions).reduce((sum, pos) => {
@@ -212,6 +218,41 @@ function RightTradingPanel({
                     <span className="text-lg tracking-wide">Sell / Short</span>
                   </div>
                 </button>
+              </div>
+
+              <div className="pt-2 border-t border-border-frame/60 mt-2 space-y-1.5">
+                <div className="text-[9px] text-primary-muted uppercase tracking-wider flex items-center justify-between">
+                  <span>Bot Control</span>
+                  <span className={botSettings.paperMode ? 'text-bullish' : 'text-bearish'}>
+                    {botSettings.paperMode ? 'PAPER' : 'LIVE'}
+                  </span>
+                </div>
+                <div className="grid grid-cols-2 gap-1.5">
+                  <button
+                    className="w-full py-2 px-2 bg-bullish/20 border border-bullish/50 text-bullish font-bold text-[10px] hover:bg-bullish/30 hover:border-bullish/70 active:scale-95 transition-all rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                  onClick={() => {
+                    // #region agent log
+                    fetch('/debug-log/',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({sessionId:'354f27',runId:'pre-fix',hypothesisId:'H13',location:'components/symbol/RightTradingPanel.tsx:start-button',message:'right panel start bot clicked',data:{botEnabled:botSettings.enabled,botIsRunning},timestamp:Date.now()})}).catch(()=>{});
+                    // #endregion
+                    void startBot();
+                  }}
+                    disabled={!botSettings.enabled || botIsRunning}
+                    title="Start bot trading"
+                  >
+                    START BOT
+                  </button>
+                  <button
+                    className="w-full py-2 px-2 bg-bearish/20 border border-bearish/50 text-bearish font-bold text-[10px] hover:bg-bearish/30 hover:border-bearish/70 active:scale-95 transition-all rounded-sm disabled:opacity-40 disabled:cursor-not-allowed"
+                    onClick={stopBot}
+                    disabled={!botIsRunning}
+                    title="Stop bot trading"
+                  >
+                    STOP BOT
+                  </button>
+                </div>
+                <div className="text-[9px] font-mono text-primary-muted">
+                  BOT: {botIsRunning ? 'RUNNING' : 'STOPPED'} {botIsExecuting ? '| CYCLE...' : ''}
+                </div>
               </div>
             </div>
           </div>

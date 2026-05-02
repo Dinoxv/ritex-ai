@@ -124,6 +124,14 @@ Hoặc restart frontend:
 pm2 restart hyperscalper-frontend
 ```
 
+Deploy an toàn hơn cho rollout production:
+
+```bash
+npm run deploy:pm2
+```
+
+Script này sẽ tạo `NEXT_DEPLOYMENT_ID` mới cho mỗi lần deploy, build lại app, rồi restart PM2 với đúng deployment ID đó để client bundle và runtime cùng một phiên rollout.
+
 ## Cấu trúc chính
 
 - app: Next.js App Router

@@ -1,6 +1,6 @@
 'use client';
 
-import { use, ReactNode } from 'react';
+import { ReactNode } from 'react';
 import { usePathname } from 'next/navigation';
 import AppShell from '@/components/layout/AppShell';
 
@@ -9,9 +9,8 @@ interface AddressLayoutProps {
   params: Promise<{ address: string }>;
 }
 
-export default function AddressLayout({ children, params }: AddressLayoutProps) {
-  const { address } = use(params);
-  const pathname = usePathname();
+export default function AddressLayout({ children }: AddressLayoutProps) {
+  const pathname = usePathname() || '';
 
   const isChartPopup = pathname.includes('/chart-popup/');
 

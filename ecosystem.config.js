@@ -10,6 +10,8 @@ module.exports = {
     watch: false,
     env: {
       NODE_ENV: 'production',
+      NEXT_DEPLOYMENT_ID: process.env.NEXT_DEPLOYMENT_ID || '',
+      BINANCE_WHITELIST_IP: '103.200.20.162',
     },
   }],
 };

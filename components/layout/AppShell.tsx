@@ -16,7 +16,9 @@ import { useSymbolMetaStore } from '@/stores/useSymbolMetaStore';
 import { useSettingsStore } from '@/stores/useSettingsStore';
 import { useCandleStore } from '@/stores/useCandleStore';
 import { useTradingStore } from '@/stores/useTradingStore';
+import { useDexStore } from '@/stores/useDexStore';
 import { useAddressFromUrl } from '@/lib/hooks/use-address-from-url';
+import { BINANCE_ROUTE_SLUG } from '@/lib/constants/routing';
 import { calculateAverageCandleHeight } from '@/lib/trading-utils';
 import { playNotificationSound } from '@/lib/sound-utils';
 
@@ -32,14 +34,33 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
   const address = useAddressFromUrl();
   const isTradesView = pathname?.includes('/trades');
   const isWatchlistView = pathname?.includes('/watchlist');
+  const isBotView = pathname?.includes('/bot');
 
   const position = usePositionStore((state) => state.positions[coin]);
   const allPositions = usePositionStore((state) => state.positions);
   const orders = useOrderStore((state) => state.orders[coin]) || [];
   const getDecimals = useSymbolMetaStore((state) => state.getDecimals);
   const decimals = useMemo(() => getDecimals(coin), [getDecimals, coin]);
-  const orderSettings = useSettingsStore((state) => state.settings.orders);
-  const scannerEnabled = useSettingsStore((state) => state.settings.scanner.enabled);
+  const settingsOrders = useSettingsStore((state) => state.settings.orders);
+  const scannerSettings = useSettingsStore((state) => state.settings.scanner);
+  const selectedExchange = useDexStore((state) => state.selectedExchange);
+  const orderSettings = useMemo(() => {
+    const byExchange = settingsOrders.byExchange?.[selectedExchange];
+    return byExchange ?? {
+      cloudPercentage: settingsOrders.cloudPercentage,
+      smallPercentage: settingsOrders.smallPercentage,
+      bigPercentage: settingsOrders.bigPercentage,
+      leverage: settingsOrders.leverage,
+    };
+  }, [settingsOrders, selectedExchange]);
+  const scannerRuntime = scannerSettings.runtimeByExchange?.[selectedExchange] ?? {
+    enabled: scannerSettings.enabled,
+    scanInterval: scannerSettings.scanInterval,
+    topMarkets: scannerSettings.topMarkets,
+    playSound: scannerSettings.playSound,
+  };
+  const scannerEnabled = scannerRuntime.enabled;
+  const exchangeTitle = selectedExchange.toUpperCase();
   const invertedMode = useSettingsStore((state) => state.settings.chart.invertedMode);
   const togglePanel = useSettingsStore((state) => state.togglePanel);
   const mobileActiveTab = useSettingsStore((state) => state.mobileActiveTab);
@@ -292,16 +313,9 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
       <header className="border-b-2 border-border-frame flex items-center justify-between px-2 md:px-4 py-1.5 w-full max-w-full overflow-hidden">
         {/* Left: Title */}
         <div className="text-primary text-sm font-bold tracking-wider terminal-text flex items-center gap-2 min-w-0 flex-shrink overflow-hidden">
-          <span className="whitespace-nowrap overflow-hidden text-ellipsis">█ HYPERLIQUID TERMINAL <span className="text-primary-muted font-normal text-xs hidden sm:inline">v1.0.0</span></span>
+          <span className="whitespace-nowrap overflow-hidden text-ellipsis">█ {exchangeTitle} TERMINAL <span className="text-primary-muted font-normal text-xs hidden sm:inline">v1.0.0</span></span>
           <span className="text-primary-muted font-normal text-xs hidden lg:inline">by</span>
-          <a
-            href="https://github.com/Dinoxv/ritex-ai"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-primary-muted font-normal text-xs hover:text-primary hover:underline transition-colors hidden lg:inline"
-          >
-            RITEX AI
-          </a>
+          <span className="text-primary-muted font-normal text-xs hidden lg:inline">RITEX AI</span>
         </div>
 
         {/* Right: Navigation Icons + Wallet Indicator */}
@@ -327,6 +341,17 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
             title="Wallet Watchlist"
           >
             <EyeIcon />
+          </button>
+          <button
+            onClick={() => router.push(`/${BINANCE_ROUTE_SLUG}/bot`)}
+            className={`hidden md:flex px-2 py-1.5 active:scale-95 cursor-pointer transition-all rounded-sm text-xs font-bold ${
+              isBotView
+                ? 'bg-primary/20 text-primary border-2 border-primary'
+                : 'bg-bg-secondary text-primary-muted border-2 border-frame hover:text-primary hover:bg-primary/10'
+            }`}
+            title="Bot Trading"
+          >
+            BOT
           </button>
           <button
             onClick={togglePanel}

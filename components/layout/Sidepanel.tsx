@@ -14,6 +14,7 @@ import { useSymbolMetaStore } from '@/stores/useSymbolMetaStore';
 import { useSymbolVolatilityStore } from '@/stores/useSymbolVolatilityStore';
 import { useSymbolCandlesStore } from '@/stores/useSymbolCandlesStore';
 import { useGlobalPollingStore } from '@/stores/useGlobalPollingStore';
+import { useDexStore } from '@/stores/useDexStore';
 import { formatPrice } from '@/lib/format-utils';
 import { useAddressFromUrl } from '@/lib/hooks/use-address-from-url';
 import { usePriceVolumeAnimation } from '@/hooks/usePriceVolumeAnimation';
@@ -40,6 +41,21 @@ interface SymbolPriceProps {
   symbol: string;
   closePrices?: number[];
 }
+
+const PinIcon = ({ className = 'w-3 h-3' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 17v5" />
+    <path d="M8 3h8l-1 6 3 3H6l3-3-1-6z" />
+  </svg>
+);
+
+const PinOffIcon = ({ className = 'w-4 h-4' }: { className?: string }) => (
+  <svg className={className} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M12 17v5" />
+    <path d="M8 3h8l-1 6 3 3H6l3-3-1-6z" />
+    <path d="M4 4l16 16" />
+  </svg>
+);
 
 const SymbolPrice = memo(({ symbol, closePrices }: SymbolPriceProps) => {
   const price = useSidebarPricesStore((state) => state.prices[symbol]);
@@ -162,17 +178,30 @@ SymbolItemSkeleton.displayName = 'SymbolItemSkeleton';
 export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView = 'all' }: SidepanelProps) {
   const router = useRouter();
   const address = useAddressFromUrl();
+  const [symbolsTab, setSymbolsTab] = useState<'all' | 'favourite'>('all');
   const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [symbolSearchQuery, setSymbolSearchQuery] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { results, status, scannerMetrics, runScan, startAutoScanWithDelay, stopAutoScan } = useScannerStore();
   const { settings, pinSymbol, unpinSymbol } = useSettingsStore();
+  const selectedExchange = useDexStore((state) => state.selectedExchange);
+  const scannerRuntime = settings.scanner.runtimeByExchange?.[selectedExchange] ?? {
+    enabled: settings.scanner.enabled,
+    scanInterval: settings.scanner.scanInterval,
+    topMarkets: settings.scanner.topMarkets,
+    playSound: settings.scanner.playSound,
+  };
   const invertedMode = settings.chart.invertedMode;
   const topSymbols = useTopSymbolsStore((state) => state.symbols);
   const isLoadingTopSymbols = useTopSymbolsStore((state) => state.isLoading);
   const startAutoRefresh = useTopSymbolsStore((state) => state.startAutoRefresh);
   const stopAutoRefresh = useTopSymbolsStore((state) => state.stopAutoRefresh);
   const fetchTopSymbols = useTopSymbolsStore((state) => state.fetchTopSymbols);
-  const pinnedSymbols = settings.pinnedSymbols;
+  const pinnedSymbols = Array.isArray(settings.pinnedSymbols)
+    ? settings.pinnedSymbols.filter((symbol): symbol is string => typeof symbol === 'string')
+    : [];
   const subscribe = useSidebarPricesStore((state) => state.subscribe);
   const unsubscribe = useSidebarPricesStore((state) => state.unsubscribe);
   const startPollingMultiple = usePositionStore((state) => state.startPollingMultiple);
@@ -220,8 +249,15 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
       .sort();
   }, [topSymbols]);
 
+  const filteredNonTop20Symbols = useMemo(() => {
+    if (!symbolSearchQuery.trim()) return nonTop20Symbols;
+
+    const query = symbolSearchQuery.trim().toUpperCase();
+    return nonTop20Symbols.filter((symbol) => symbol.includes(query));
+  }, [nonTop20Symbols, symbolSearchQuery]);
+
   useEffect(() => {
-    if (settings.scanner.enabled) {
+    if (scannerRuntime.enabled) {
       startAutoScanWithDelay();
     } else {
       stopAutoScan();
@@ -230,7 +266,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
     return () => {
       stopAutoScan();
     };
-  }, [settings.scanner.enabled, settings.scanner.scanInterval]);
+  }, [scannerRuntime.enabled, scannerRuntime.scanInterval, selectedExchange]);
 
   useEffect(() => {
     startAutoRefresh();
@@ -273,6 +309,24 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
       return () => clearInterval(intervalId);
     }
   }, [allSymbolsString, lastCandlePollTime]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+        setIsDropdownOpen(false);
+        setSymbolSearchQuery('');
+      }
+    }
+
+    if (isDropdownOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      searchInputRef.current?.focus();
+    }
+
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, [isDropdownOpen]);
 
   const formatTimeSince = (timestamp: number | null) => {
     if (!timestamp) return 'Never';
@@ -321,10 +375,29 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
     return symbols;
   }, [allSymbolsToShow]);
 
+  const displayedSymbols = useMemo(() => {
+    if (symbolsTab === 'favourite') {
+      return sortedSymbols.filter((symbol) => pinnedSymbols.includes(symbol));
+    }
+    return sortedSymbols;
+  }, [sortedSymbols, pinnedSymbols, symbolsTab]);
+
+  useEffect(() => {
+    // #region agent log
+    fetch('http://localhost:7746/ingest/e5416380-9097-4690-accf-259c2a55fbab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3d1932'},body:JSON.stringify({sessionId:'3d1932',runId:'fav-debug',hypothesisId:'H1',location:'components/layout/Sidepanel.tsx:386',message:'sidepanel symbol list computed',data:{symbolsTab,displayedCount:displayedSymbols.length,pinnedCount:pinnedSymbols.length,firstThree:displayedSymbols.slice(0,3)},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, [symbolsTab, displayedSymbols, pinnedSymbols.length]);
+
+  useEffect(() => {
+    // #region agent log
+    fetch('http://localhost:7746/ingest/e5416380-9097-4690-accf-259c2a55fbab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3d1932'},body:JSON.stringify({sessionId:'3d1932',runId:'fav-debug',hypothesisId:'H4',location:'components/layout/Sidepanel.tsx:392',message:'browser runtime environment',data:{href:window.location.href,host:window.location.host,pathname:window.location.pathname},timestamp:Date.now()})}).catch(()=>{});
+    // #endregion
+  }, []);
+
   const parentRef = useRef<HTMLDivElement>(null);
 
   const rowVirtualizer = useVirtualizer({
-    count: sortedSymbols.length,
+    count: displayedSymbols.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => 62,
     overscan: 5,
@@ -480,7 +553,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
   return (
     <div className="p-2 h-full flex gap-2 overflow-hidden">
       {/* Left Column - Scanner */}
-      {settings.scanner.enabled && (mobileView === 'all' || mobileView === 'scanner') && (
+      {scannerRuntime.enabled && (mobileView === 'all' || mobileView === 'scanner') && (
         <div className={`${mobileView === 'scanner' ? 'w-full' : 'w-[200px]'} flex flex-col overflow-hidden flex-shrink-0`}>
           <div className="terminal-border p-2 mb-2 flex-shrink-0">
             <div className="flex items-center justify-between mb-2">
@@ -660,21 +733,70 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
                 </button>
               </div>
               <DexSelector />
+              <div className="mt-2 flex items-center gap-2">
+                <span className="px-1.5 py-0.5 text-[9px] font-mono rounded border border-yellow-300 text-yellow-300 bg-yellow-300/10">
+                  FAV-V2
+                </span>
+                <button
+                  onClick={() => setSymbolsTab('all')}
+                  className={`px-2 py-1 text-xs font-bold border rounded transition-all active:scale-95 ${
+                    symbolsTab === 'all'
+                      ? 'bg-primary/20 text-primary border-primary'
+                      : 'bg-bg-secondary text-primary-muted border-frame hover:bg-primary/10 hover:text-primary'
+                  }`}
+                  title="Show all symbols"
+                >
+                  █ SYMBOLS
+                </button>
+                <button
+                  onClick={() => setSymbolsTab('favourite')}
+                  className={`px-2 py-1 text-xs font-bold border rounded transition-all active:scale-95 flex items-center gap-1 ${
+                    symbolsTab === 'favourite'
+                      ? 'bg-primary/20 text-primary border-primary'
+                      : 'bg-bg-secondary text-primary-muted border-frame hover:bg-primary/10 hover:text-primary'
+                  }`}
+                  title="Favourite symbols saved to your watchlist"
+                >
+                  <PinIcon className="w-3 h-3" />
+                  <span>█ FAVOURITE</span>
+                  <span
+                    className={`px-1.5 py-0.5 rounded text-[10px] leading-none border ${
+                      pinnedSymbols.length > 0
+                        ? 'bg-bullish/15 text-bullish border-bullish/40'
+                        : 'bg-bg-secondary text-primary-muted border-frame'
+                    }`}
+                    title={
+                      pinnedSymbols.length > 0
+                        ? `${pinnedSymbols.length} token(s) in your favourites`
+                        : 'No favourite token yet'
+                    }
+                  >
+                    {pinnedSymbols.length}
+                  </span>
+                </button>
+              </div>
             </div>
 
-            {sortedSymbols.length === 0 && !isLoadingTopSymbols && (
+            {displayedSymbols.length === 0 && !isLoadingTopSymbols && (
               <div className="terminal-border p-4 text-center">
-                <span className="text-primary-muted text-xs font-mono">No active tokens in this DEX</span>
+                <span className="text-primary-muted text-xs font-mono">
+                  {symbolsTab === 'favourite' ? 'No favourite symbols yet' : 'No active tokens in this DEX'}
+                </span>
               </div>
             )}
 
-            {sortedSymbols.length > 0 && (
+            {displayedSymbols.length > 0 && (
             <>
 
             {/* Add Symbols Dropdown */}
-            <div className="flex-shrink-0 mb-2">
+            <div ref={dropdownRef} className="flex-shrink-0 mb-2 relative">
             <button
-              onClick={() => setIsDropdownOpen(!isDropdownOpen)}
+              onClick={() => {
+                setIsDropdownOpen(!isDropdownOpen);
+                if (isDropdownOpen) {
+                  setSymbolSearchQuery('');
+                }
+              }}
               className="w-full terminal-border p-2 hover:bg-primary/5 active:bg-primary/10 active:scale-[0.99] cursor-pointer transition-all"
             >
               <div className="flex items-center justify-between">
@@ -684,14 +806,25 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
             </button>
 
             {isDropdownOpen && (
-              <div className="mt-1 terminal-border bg-bg-primary max-h-60 overflow-y-auto scrollbar-thin scrollbar-thumb-primary-dark scrollbar-track-transparent">
-                {nonTop20Symbols.length === 0 ? (
+              <div className="mt-1 terminal-border bg-bg-primary max-h-80 overflow-hidden scrollbar-thin scrollbar-thumb-primary-dark scrollbar-track-transparent">
+                <div className="p-2 border-b border-frame">
+                  <input
+                    ref={searchInputRef}
+                    type="text"
+                    value={symbolSearchQuery}
+                    onChange={(e) => setSymbolSearchQuery(e.target.value)}
+                    placeholder="Search symbols..."
+                    className="w-full px-2 py-1 bg-bg-secondary terminal-border text-primary text-sm font-mono focus:outline-none focus:border-primary/50"
+                  />
+                </div>
+
+                {filteredNonTop20Symbols.length === 0 ? (
                   <div className="p-3 text-center text-primary-muted text-xs font-mono">
-                    No additional symbols available
+                    {symbolSearchQuery.trim() ? 'No symbols found' : 'No additional symbols available'}
                   </div>
                 ) : (
-                  <div className="divide-y divide-frame">
-                    {nonTop20Symbols.map((symbol) => {
+                  <div className="divide-y divide-frame max-h-64 overflow-y-auto">
+                    {filteredNonTop20Symbols.map((symbol) => {
                       const isPinned = pinnedSymbols.includes(symbol);
 
                       return (
@@ -726,9 +859,9 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
                               }
                             }}
                             className="p-2 text-primary-muted hover:text-primary active:scale-90 cursor-pointer transition-all duration-150"
-                            title={isPinned ? 'Unpin symbol' : 'Pin symbol'}
+                            title={isPinned ? 'Remove from favourite list' : 'Save to favourite list'}
                           >
-                            <span className="text-lg font-bold">{isPinned ? '−' : '+'}</span>
+                            {isPinned ? <PinOffIcon className="w-4 h-4" /> : <PinIcon className="w-4 h-4" />}
                           </button>
                         </div>
                       );
@@ -755,7 +888,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
                   }}
                 >
                   {rowVirtualizer.getVirtualItems().map((virtualRow) => {
-                    const symbol = sortedSymbols[virtualRow.index];
+                    const symbol = displayedSymbols[virtualRow.index];
                     const isPinned = pinnedSymbols.includes(symbol);
                     const top20Data = topSymbols.find(s => s.name === symbol);
                     const isTop20 = !!top20Data;
@@ -782,7 +915,16 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
                           isTop20={isTop20}
                           volumeInMillions={volumeInMillions}
                           closePrices={symbolClosePrices || undefined}
-                          unpinSymbol={unpinSymbol}
+                          onToggleFavourite={(targetSymbol, pinned) => {
+                            // #region agent log
+                            fetch('http://localhost:7746/ingest/e5416380-9097-4690-accf-259c2a55fbab',{method:'POST',headers:{'Content-Type':'application/json','X-Debug-Session-Id':'3d1932'},body:JSON.stringify({sessionId:'3d1932',runId:'fav-debug',hypothesisId:'H5',location:'components/layout/Sidepanel.tsx:920',message:'sidepanel onToggleFavourite invoked',data:{targetSymbol,pinned},timestamp:Date.now()})}).catch(()=>{});
+                            // #endregion
+                            if (pinned) {
+                              unpinSymbol(targetSymbol);
+                            } else {
+                              pinSymbol(targetSymbol);
+                            }
+                          }}
                           SymbolPrice={SymbolPrice}
                           SymbolVolume={SymbolVolume}
                           invertedMode={invertedMode}

@@ -6,6 +6,7 @@ export interface Translations {
     beta: string;
     tagline: string;
     subtitle: string;
+    exchangeLabel: string;
     description: string;
     viewDemo: string;
     launchTerminal: string;
@@ -63,7 +64,6 @@ export interface Translations {
     // Footer
     readyToTrade: string;
     readyToTradeDesc: string;
-    openSourceOnGithub: string;
     builtBy: string;
     betaWarning: string;
     // Stats
@@ -181,12 +181,27 @@ export interface Translations {
     ordersTab: string;
     uiTab: string;
     credentialsTab: string;
+    aiTab: string;
     // Scanner
     enableScanner: string;
     scanInterval: string;
     topMarkets: string;
     candleCacheDuration: string;
+    mediumDurationWarning: string;
+    highDurationWarning: string;
     playSoundOnResults: string;
+    scannerTelegramAlerts: string;
+    exchangeHyperliquid: string;
+    exchangeBinance: string;
+    enableExchangeAlerts: string;
+    botToken: string;
+    chatId: string;
+    signalFilter: string;
+    allSignals: string;
+    bullishOnly: string;
+    bearishOnly: string;
+    showTpSlInMessage: string;
+    scannerTelegramNote: string;
     // Stochastic
     stochasticScanner: string;
     enableStochastic: string;
@@ -202,6 +217,24 @@ export interface Translations {
     lookbackPeriod: string;
     barsToCheck: string;
     lookbackNote: string;
+    usesChartEmaSettings: string;
+    usesEnabledStochasticVariants: string;
+    detectsMacdCross: string;
+    detectsRsiZones: string;
+    currentAverage: string;
+    minimum: string;
+    avgVolumeCalculatedFromLast: string;
+    detectsVolumeAndPriceChange: string;
+    alertWhenWithinOfLevel: string;
+    minimumTouchesLabel: string;
+    enableKalmanTrendScanner: string;
+    enableRitchiTrendScanner: string;
+    detectsKalmanTrendReversals: string;
+    detectsRitchiTrendReversals: string;
+    parameters: string;
+    pivotLength: string;
+    smaMin: string;
+    smaMax: string;
     // Divergence
     divergenceScanner: string;
     enableDivergence: string;
@@ -250,6 +283,21 @@ export interface Translations {
     fastPeriod: string;
     slowPeriod: string;
     signalPeriod: string;
+    kalmanVolumeTrend: string;
+    ritchiTrend: string;
+    enabled: string;
+    showBuySellSignals: string;
+    volumeConfirmation: string;
+    processNoise: string;
+    measurementNoise: string;
+    bandMultiplier: string;
+    volThreshold: string;
+    pivotAndSma: string;
+    smaMultiplier: string;
+    trendAndRisk: string;
+    trendLengthColor: string;
+    atrMultSl: string;
+    tpMultiplier: string;
     // Orders
     positionSize: string;
     positionSizeDesc: string;

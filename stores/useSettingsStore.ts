@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, KalmanTrendSettings, SieuXuHuongSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings, AIStrategyConfig } from '@/models/Settings';
+import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, KalmanTrendSettings, SieuXuHuongSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings, AIStrategyConfig, BotTradingSettings } from '@/models/Settings';
 
 type TabType = 'scanner' | 'indicators' | 'orders' | 'ui' | 'credentials' | 'ai';
 type MobileTabType = 'scanner' | 'symbols' | 'chart' | 'actions' | 'orders-positions';
@@ -27,6 +27,7 @@ interface SettingsStore {
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
   updateThemeSettings: (settings: Partial<ThemeSettings>) => void;
   updateAISettings: (settings: Partial<AIStrategyConfig>) => void;
+  updateBotSettings: (settings: Partial<BotTradingSettings>) => void;
   updateSettings: (settings: Partial<AppSettings>) => void;
   pinSymbol: (symbol: string) => void;
   unpinSymbol: (symbol: string) => void;
@@ -39,6 +40,10 @@ const mergeSettings = (storedSettings: any): AppSettings => {
   }
 
   try {
+    const sanitizedPinnedSymbols = Array.isArray(storedSettings?.pinnedSymbols)
+      ? storedSettings.pinnedSymbols.filter((symbol: unknown): symbol is string => typeof symbol === 'string')
+      : DEFAULT_SETTINGS.pinnedSymbols;
+
     return {
       indicators: {
         stochastic: {
@@ -171,6 +176,36 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         scanInterval: storedSettings.scanner?.scanInterval ?? DEFAULT_SETTINGS.scanner.scanInterval,
         topMarkets: storedSettings.scanner?.topMarkets ?? DEFAULT_SETTINGS.scanner.topMarkets,
         playSound: storedSettings.scanner?.playSound ?? DEFAULT_SETTINGS.scanner.playSound,
+        runtimeByExchange: {
+          hyperliquid: {
+            enabled: storedSettings.scanner?.runtimeByExchange?.hyperliquid?.enabled
+              ?? storedSettings.scanner?.enabled
+              ?? DEFAULT_SETTINGS.scanner.runtimeByExchange.hyperliquid.enabled,
+            scanInterval: storedSettings.scanner?.runtimeByExchange?.hyperliquid?.scanInterval
+              ?? storedSettings.scanner?.scanInterval
+              ?? DEFAULT_SETTINGS.scanner.runtimeByExchange.hyperliquid.scanInterval,
+            topMarkets: storedSettings.scanner?.runtimeByExchange?.hyperliquid?.topMarkets
+              ?? storedSettings.scanner?.topMarkets
+              ?? DEFAULT_SETTINGS.scanner.runtimeByExchange.hyperliquid.topMarkets,
+            playSound: storedSettings.scanner?.runtimeByExchange?.hyperliquid?.playSound
+              ?? storedSettings.scanner?.playSound
+              ?? DEFAULT_SETTINGS.scanner.runtimeByExchange.hyperliquid.playSound,
+          },
+          binance: {
+            enabled: storedSettings.scanner?.runtimeByExchange?.binance?.enabled
+              ?? storedSettings.scanner?.enabled
+              ?? DEFAULT_SETTINGS.scanner.runtimeByExchange.binance.enabled,
+            scanInterval: storedSettings.scanner?.runtimeByExchange?.binance?.scanInterval
+              ?? storedSettings.scanner?.scanInterval
+              ?? DEFAULT_SETTINGS.scanner.runtimeByExchange.binance.scanInterval,
+            topMarkets: storedSettings.scanner?.runtimeByExchange?.binance?.topMarkets
+              ?? storedSettings.scanner?.topMarkets
+              ?? DEFAULT_SETTINGS.scanner.runtimeByExchange.binance.topMarkets,
+            playSound: storedSettings.scanner?.runtimeByExchange?.binance?.playSound
+              ?? storedSettings.scanner?.playSound
+              ?? DEFAULT_SETTINGS.scanner.runtimeByExchange.binance.playSound,
+          },
+        },
         candleCacheDuration: storedSettings.scanner?.candleCacheDuration ?? DEFAULT_SETTINGS.scanner.candleCacheDuration,
         mediumDurationWarningSec: storedSettings.scanner?.mediumDurationWarningSec ?? DEFAULT_SETTINGS.scanner.mediumDurationWarningSec,
         highDurationWarningSec: storedSettings.scanner?.highDurationWarningSec ?? DEFAULT_SETTINGS.scanner.highDurationWarningSec,
@@ -179,6 +214,37 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         telegramChatId: storedSettings.scanner?.telegramChatId ?? DEFAULT_SETTINGS.scanner.telegramChatId,
         telegramSignalFilter: storedSettings.scanner?.telegramSignalFilter ?? DEFAULT_SETTINGS.scanner.telegramSignalFilter,
         telegramShowTpSl: storedSettings.scanner?.telegramShowTpSl ?? DEFAULT_SETTINGS.scanner.telegramShowTpSl,
+        telegramByExchange: {
+          hyperliquid: {
+            enabled: storedSettings.scanner?.telegramByExchange?.hyperliquid?.enabled
+              ?? storedSettings.scanner?.telegramEnabled
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.hyperliquid.enabled,
+            botToken: storedSettings.scanner?.telegramByExchange?.hyperliquid?.botToken
+              ?? storedSettings.scanner?.telegramBotToken
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.hyperliquid.botToken,
+            chatId: storedSettings.scanner?.telegramByExchange?.hyperliquid?.chatId
+              ?? storedSettings.scanner?.telegramChatId
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.hyperliquid.chatId,
+            signalFilter: storedSettings.scanner?.telegramByExchange?.hyperliquid?.signalFilter
+              ?? storedSettings.scanner?.telegramSignalFilter
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.hyperliquid.signalFilter,
+            showTpSl: storedSettings.scanner?.telegramByExchange?.hyperliquid?.showTpSl
+              ?? storedSettings.scanner?.telegramShowTpSl
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.hyperliquid.showTpSl,
+          },
+          binance: {
+            enabled: storedSettings.scanner?.telegramByExchange?.binance?.enabled
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.binance.enabled,
+            botToken: storedSettings.scanner?.telegramByExchange?.binance?.botToken
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.binance.botToken,
+            chatId: storedSettings.scanner?.telegramByExchange?.binance?.chatId
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.binance.chatId,
+            signalFilter: storedSettings.scanner?.telegramByExchange?.binance?.signalFilter
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.binance.signalFilter,
+            showTpSl: storedSettings.scanner?.telegramByExchange?.binance?.showTpSl
+              ?? DEFAULT_SETTINGS.scanner.telegramByExchange.binance.showTpSl,
+          },
+        },
         stochasticScanner: {
           enabled: storedSettings.scanner?.stochasticScanner?.enabled ?? DEFAULT_SETTINGS.scanner.stochasticScanner.enabled,
           oversoldThreshold: storedSettings.scanner?.stochasticScanner?.oversoldThreshold ?? DEFAULT_SETTINGS.scanner.stochasticScanner.oversoldThreshold,
@@ -254,6 +320,10 @@ const mergeSettings = (storedSettings: any): AppSettings => {
           pivLen: storedSettings.scanner?.ritchiTrendScanner?.pivLen ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.pivLen,
           smaMin: storedSettings.scanner?.ritchiTrendScanner?.smaMin ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.smaMin,
           smaMax: storedSettings.scanner?.ritchiTrendScanner?.smaMax ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.smaMax,
+          smaMult: storedSettings.scanner?.ritchiTrendScanner?.smaMult ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.smaMult,
+          trendLen: storedSettings.scanner?.ritchiTrendScanner?.trendLen ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.trendLen,
+          atrMult: storedSettings.scanner?.ritchiTrendScanner?.atrMult ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.atrMult,
+          tpMult: storedSettings.scanner?.ritchiTrendScanner?.tpMult ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.tpMult,
         },
       },
       orders: {
@@ -261,6 +331,36 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         smallPercentage: storedSettings.orders?.smallPercentage ?? DEFAULT_SETTINGS.orders.smallPercentage,
         bigPercentage: storedSettings.orders?.bigPercentage ?? DEFAULT_SETTINGS.orders.bigPercentage,
         leverage: storedSettings.orders?.leverage ?? DEFAULT_SETTINGS.orders.leverage,
+        byExchange: {
+          hyperliquid: {
+            cloudPercentage: storedSettings.orders?.byExchange?.hyperliquid?.cloudPercentage
+              ?? storedSettings.orders?.cloudPercentage
+              ?? DEFAULT_SETTINGS.orders.byExchange.hyperliquid.cloudPercentage,
+            smallPercentage: storedSettings.orders?.byExchange?.hyperliquid?.smallPercentage
+              ?? storedSettings.orders?.smallPercentage
+              ?? DEFAULT_SETTINGS.orders.byExchange.hyperliquid.smallPercentage,
+            bigPercentage: storedSettings.orders?.byExchange?.hyperliquid?.bigPercentage
+              ?? storedSettings.orders?.bigPercentage
+              ?? DEFAULT_SETTINGS.orders.byExchange.hyperliquid.bigPercentage,
+            leverage: storedSettings.orders?.byExchange?.hyperliquid?.leverage
+              ?? storedSettings.orders?.leverage
+              ?? DEFAULT_SETTINGS.orders.byExchange.hyperliquid.leverage,
+          },
+          binance: {
+            cloudPercentage: storedSettings.orders?.byExchange?.binance?.cloudPercentage
+              ?? storedSettings.orders?.cloudPercentage
+              ?? DEFAULT_SETTINGS.orders.byExchange.binance.cloudPercentage,
+            smallPercentage: storedSettings.orders?.byExchange?.binance?.smallPercentage
+              ?? storedSettings.orders?.smallPercentage
+              ?? DEFAULT_SETTINGS.orders.byExchange.binance.smallPercentage,
+            bigPercentage: storedSettings.orders?.byExchange?.binance?.bigPercentage
+              ?? storedSettings.orders?.bigPercentage
+              ?? DEFAULT_SETTINGS.orders.byExchange.binance.bigPercentage,
+            leverage: storedSettings.orders?.byExchange?.binance?.leverage
+              ?? storedSettings.orders?.leverage
+              ?? DEFAULT_SETTINGS.orders.byExchange.binance.leverage,
+          },
+        },
       },
       theme: {
         selected: storedSettings.theme?.selected ?? DEFAULT_SETTINGS.theme.selected,
@@ -284,10 +384,57 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         telegramEnabled: storedSettings.ai?.telegramEnabled ?? DEFAULT_SETTINGS.ai.telegramEnabled,
         telegramBotToken: storedSettings.ai?.telegramBotToken ?? DEFAULT_SETTINGS.ai.telegramBotToken,
         telegramChatId: storedSettings.ai?.telegramChatId ?? DEFAULT_SETTINGS.ai.telegramChatId,
+        telegramByExchange: {
+          hyperliquid: {
+            enabled: storedSettings.ai?.telegramByExchange?.hyperliquid?.enabled
+              ?? storedSettings.ai?.telegramEnabled
+              ?? DEFAULT_SETTINGS.ai.telegramByExchange.hyperliquid.enabled,
+            botToken: storedSettings.ai?.telegramByExchange?.hyperliquid?.botToken
+              ?? storedSettings.ai?.telegramBotToken
+              ?? DEFAULT_SETTINGS.ai.telegramByExchange.hyperliquid.botToken,
+            chatId: storedSettings.ai?.telegramByExchange?.hyperliquid?.chatId
+              ?? storedSettings.ai?.telegramChatId
+              ?? DEFAULT_SETTINGS.ai.telegramByExchange.hyperliquid.chatId,
+          },
+          binance: {
+            enabled: storedSettings.ai?.telegramByExchange?.binance?.enabled
+              ?? DEFAULT_SETTINGS.ai.telegramByExchange.binance.enabled,
+            botToken: storedSettings.ai?.telegramByExchange?.binance?.botToken
+              ?? DEFAULT_SETTINGS.ai.telegramByExchange.binance.botToken,
+            chatId: storedSettings.ai?.telegramByExchange?.binance?.chatId
+              ?? DEFAULT_SETTINGS.ai.telegramByExchange.binance.chatId,
+          },
+        },
         strategy: storedSettings.ai?.strategy ?? DEFAULT_SETTINGS.ai.strategy,
         maxCallsPerHour: storedSettings.ai?.maxCallsPerHour ?? DEFAULT_SETTINGS.ai.maxCallsPerHour,
       },
-      pinnedSymbols: storedSettings.pinnedSymbols ?? DEFAULT_SETTINGS.pinnedSymbols,
+      bot: {
+        enabled: storedSettings.bot?.enabled ?? DEFAULT_SETTINGS.bot.enabled,
+        indicator: storedSettings.bot?.indicator ?? DEFAULT_SETTINGS.bot.indicator,
+        paperMode: storedSettings.bot?.paperMode ?? DEFAULT_SETTINGS.bot.paperMode,
+        exchange: storedSettings.bot?.exchange ?? DEFAULT_SETTINGS.bot.exchange,
+        timeframe: storedSettings.bot?.timeframe ?? DEFAULT_SETTINGS.bot.timeframe,
+        scanIntervalSec: storedSettings.bot?.scanIntervalSec ?? DEFAULT_SETTINGS.bot.scanIntervalSec,
+        autoTopSymbolsCount: Math.min(
+          10,
+          Math.max(
+            1,
+            Number(storedSettings.bot?.autoTopSymbolsCount ?? DEFAULT_SETTINGS.bot.autoTopSymbolsCount) || DEFAULT_SETTINGS.bot.autoTopSymbolsCount
+          )
+        ),
+        initialMarginUsdt: storedSettings.bot?.initialMarginUsdt ?? DEFAULT_SETTINGS.bot.initialMarginUsdt,
+        maxLossPercentPerDay: storedSettings.bot?.maxLossPercentPerDay ?? DEFAULT_SETTINGS.bot.maxLossPercentPerDay,
+        leverageByExchange: {
+          binance: storedSettings.bot?.leverageByExchange?.binance ?? DEFAULT_SETTINGS.bot.leverageByExchange.binance,
+          hyperliquid: storedSettings.bot?.leverageByExchange?.hyperliquid ?? DEFAULT_SETTINGS.bot.leverageByExchange.hyperliquid,
+        },
+        symbolMode: storedSettings.bot?.symbolMode ?? DEFAULT_SETTINGS.bot.symbolMode,
+        manualSymbols: Array.isArray(storedSettings.bot?.manualSymbols)
+          ? storedSettings.bot.manualSymbols.filter((symbol: unknown): symbol is string => typeof symbol === 'string')
+          : DEFAULT_SETTINGS.bot.manualSymbols,
+        safetyStopLossPercent: storedSettings.bot?.safetyStopLossPercent ?? DEFAULT_SETTINGS.bot.safetyStopLossPercent,
+      },
+      pinnedSymbols: sanitizedPinnedSymbols,
     };
   } catch (error) {
     return DEFAULT_SETTINGS;
@@ -423,6 +570,16 @@ export const useSettingsStore = create<SettingsStore>()(
             },
           },
         })),
+      updateBotSettings: (updates) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            bot: {
+              ...state.settings.bot,
+              ...updates,
+            },
+          },
+        })),
       updateSettings: (updates) =>
         set((state) => ({
           settings: {
@@ -432,23 +589,33 @@ export const useSettingsStore = create<SettingsStore>()(
         })),
       pinSymbol: (symbol) =>
         set((state) => {
-          if (state.settings.pinnedSymbols.includes(symbol)) {
+          const safePinnedSymbols = Array.isArray(state.settings.pinnedSymbols)
+            ? state.settings.pinnedSymbols.filter((item): item is string => typeof item === 'string')
+            : [];
+
+          if (safePinnedSymbols.includes(symbol)) {
             return state;
           }
           return {
             settings: {
               ...state.settings,
-              pinnedSymbols: [...state.settings.pinnedSymbols, symbol],
+              pinnedSymbols: [...safePinnedSymbols, symbol],
             },
           };
         }),
       unpinSymbol: (symbol) =>
-        set((state) => ({
-          settings: {
-            ...state.settings,
-            pinnedSymbols: state.settings.pinnedSymbols.filter((s) => s !== symbol),
-          },
-        })),
+        set((state) => {
+          const safePinnedSymbols = Array.isArray(state.settings.pinnedSymbols)
+            ? state.settings.pinnedSymbols.filter((item): item is string => typeof item === 'string')
+            : [];
+
+          return {
+            settings: {
+              ...state.settings,
+              pinnedSymbols: safePinnedSymbols.filter((s) => s !== symbol),
+            },
+          };
+        }),
       resetSettings: () => set({ settings: DEFAULT_SETTINGS }),
     }),
     {

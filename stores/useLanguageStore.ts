@@ -6,13 +6,35 @@ import { zh } from '@/lib/i18n/zh';
 
 const translations: Record<Locale, Translations> = { en, vi, zh };
 
-function getInitialLocale(): Locale {
-  if (typeof window === 'undefined') return 'en';
-  const stored = localStorage.getItem('locale');
-  if (stored && (stored === 'en' || stored === 'vi' || stored === 'zh')) {
-    return stored;
+function readStoredLocale(): Locale | null {
+  if (typeof window === 'undefined') {
+    return null;
   }
-  return 'en';
+
+  try {
+    const stored = window.localStorage.getItem('locale');
+    if (stored === 'en' || stored === 'vi' || stored === 'zh') {
+      return stored;
+    }
+  } catch {
+  }
+
+  return null;
+}
+
+function writeStoredLocale(locale: Locale): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  try {
+    window.localStorage.setItem('locale', locale);
+  } catch {
+  }
+}
+
+function getInitialLocale(): Locale {
+  return readStoredLocale() ?? 'en';
 }
 
 interface LanguageStore {
@@ -27,7 +49,7 @@ export const useLanguageStore = create<LanguageStore>((set) => {
     locale: initialLocale,
     t: translations[initialLocale],
     setLocale: (locale: Locale) => {
-      localStorage.setItem('locale', locale);
+      writeStoredLocale(locale);
       set({ locale, t: translations[locale] });
     },
   };

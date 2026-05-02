@@ -1,0 +1,6 @@
+window_start_utc=2026-04-30T12:11:02Z
+window_end_utc=2026-04-30T12:41:02Z
+order_requests=0
+order_successes=0
+order_failures=0
+reversal_events=0

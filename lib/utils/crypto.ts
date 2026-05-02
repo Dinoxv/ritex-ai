@@ -12,6 +12,14 @@ function isSecureContext(): boolean {
   return typeof crypto !== 'undefined' && typeof crypto.subtle !== 'undefined';
 }
 
+function getCryptoOrThrow(): Crypto {
+  if (typeof crypto === 'undefined') {
+    throw new Error('Web Crypto API is unavailable in this environment');
+  }
+
+  return crypto;
+}
+
 // --- XOR-based fallback for non-secure (HTTP) contexts ---
 
 function xorEncrypt(data: string, password: string): string {
@@ -61,18 +69,20 @@ async function deriveKey(password: string, salt: Uint8Array): Promise<CryptoKey>
 }
 
 export async function encryptData(data: string, password: string): Promise<EncryptedData> {
+  const cryptoApi = getCryptoOrThrow();
+
   if (!isSecureContext()) {
-    const salt = bufferToBase64(crypto.getRandomValues(new Uint8Array(SALT_LENGTH)));
-    const iv = bufferToBase64(crypto.getRandomValues(new Uint8Array(IV_LENGTH)));
+    const salt = bufferToBase64(cryptoApi.getRandomValues(new Uint8Array(SALT_LENGTH)));
+    const iv = bufferToBase64(cryptoApi.getRandomValues(new Uint8Array(IV_LENGTH)));
     return { encrypted: xorEncrypt(data, password), iv, salt };
   }
 
   const encoder = new TextEncoder();
-  const salt = crypto.getRandomValues(new Uint8Array(SALT_LENGTH));
-  const iv = crypto.getRandomValues(new Uint8Array(IV_LENGTH));
+  const salt = cryptoApi.getRandomValues(new Uint8Array(SALT_LENGTH));
+  const iv = cryptoApi.getRandomValues(new Uint8Array(IV_LENGTH));
   const key = await deriveKey(password, salt);
 
-  const encryptedBuffer = await crypto.subtle.encrypt(
+  const encryptedBuffer = await cryptoApi.subtle.encrypt(
     { name: 'AES-GCM', iv },
     key,
     encoder.encode(data)
@@ -89,6 +99,8 @@ export async function decryptData(
   encryptedData: EncryptedData,
   password: string
 ): Promise<string> {
+  const cryptoApi = getCryptoOrThrow();
+
   if (!isSecureContext()) {
     return xorDecrypt(encryptedData.encrypted, password);
   }
@@ -98,7 +110,7 @@ export async function decryptData(
   const encrypted = base64ToBuffer(encryptedData.encrypted);
   const key = await deriveKey(password, new Uint8Array(salt));
 
-  const decryptedBuffer = await crypto.subtle.decrypt(
+  const decryptedBuffer = await cryptoApi.subtle.decrypt(
     { name: 'AES-GCM', iv: new Uint8Array(iv) },
     key,
     encrypted
@@ -128,6 +140,6 @@ function base64ToBuffer(base64: string): ArrayBuffer {
 
 export function generateDeviceKey(): string {
   const array = new Uint8Array(32);
-  crypto.getRandomValues(array);
+  getCryptoOrThrow().getRandomValues(array);
   return bufferToBase64(array);
 }

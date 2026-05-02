@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useWatchlistStore } from '@/stores/useWatchlistStore';
+import { useDexStore } from '@/stores/useDexStore';
 
 interface AddWalletModalProps {
   onClose: () => void;
@@ -14,6 +15,7 @@ export default function AddWalletModal({ onClose }: AddWalletModalProps) {
 
   const addWallet = useWatchlistStore((state) => state.addWallet);
   const watchedWallets = useWatchlistStore((state) => state.watchedWallets);
+  const selectedExchange = useDexStore((state) => state.selectedExchange);
 
   const validateAddress = (addr: string): boolean => {
     const trimmed = addr.trim().toLowerCase();
@@ -139,7 +141,9 @@ export default function AddWalletModal({ onClose }: AddWalletModalProps) {
 
         <div className="mt-4 pt-3 border-t border-frame">
           <p className="text-primary-muted text-[9px] leading-relaxed">
-            Note: All wallet addresses on Hyperliquid are public. This feature tracks positions, orders, and trade history for any wallet address.
+            {selectedExchange === 'hyperliquid'
+              ? 'Note: All wallet addresses on Hyperliquid are public. This feature tracks positions, orders, and trade history for any wallet address.'
+              : 'Note: Wallet watchlist tracking is optimized for on-chain public addresses. For Binance, use API credentials for account-specific tracking.'}
           </p>
         </div>
       </div>
