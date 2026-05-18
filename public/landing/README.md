@@ -1,5 +1,8 @@
 # Landing Assets and Messaging - Toilabap.com
 
+![Toilabap Logo](../../docs/toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](../../docs/toilabap.com/toilabap.com-icon.svg)
+
 ## Muc tieu landing
 
 Trang landing phai khien trader cam nhan ro hai diem:
@@ -16,7 +19,7 @@ Trang landing phai khien trader cam nhan ro hai diem:
 
 - Uu tien logo dinh dang PNG trong landing/docs.
 - Khong dung logo SVG cho tai lieu thuong hieu.
-- Dung icon tham chieu: ../Ritchi-icon.png
+- Dung icon tham chieu: ../../docs/toilabap.com/toilabap.com-icon.svg
 
 ## Asset checklist
 

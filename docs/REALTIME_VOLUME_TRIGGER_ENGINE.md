@@ -1,5 +1,8 @@
 # Realtime Volume Trigger Engine
 
+![Toilabap Logo](toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](toilabap.com/toilabap.com-icon.svg)
+
 ## Muc tieu
 
 Phat hien som dong tien bat thuong de bo sung goc nhin cho setup SMC, khong doi den candle close.

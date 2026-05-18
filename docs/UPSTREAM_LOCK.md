@@ -1,5 +1,8 @@
 # Upstream Lock - Branch Governance
 
+![Toilabap Logo](toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](toilabap.com/toilabap.com-icon.svg)
+
 ## Muc tieu
 
 Dong bo nguon voi upstream nhung khong lam vo tan bo wiring da exchange cua Toilabap runtime.

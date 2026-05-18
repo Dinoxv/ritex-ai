@@ -1,5 +1,8 @@
 # AI Trading Logic - Toilabap Execution Playbook
 
+![Toilabap Logo](docs/toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](docs/toilabap.com/toilabap.com-icon.svg)
+
 ## Muc tieu
 
 Bien scanner signal thanh quyet dinh thuc thi theo format production:

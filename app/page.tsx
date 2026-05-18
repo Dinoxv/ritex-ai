@@ -129,6 +129,10 @@ export default function LandingPage() {
           <div className="absolute -bottom-20 -left-20 w-64 h-64 md:w-96 md:h-96 bg-primary/10 rounded-full blur-3xl z-0" style={{ transform: `translateY(${scrollY * 0.7}px)` }}></div>
 
           <div className="relative z-20 max-w-5xl mx-auto px-4 md:px-6 text-center">
+            <div className="flex items-center justify-center gap-3 mb-5">
+              <img src="/branding/toilabap.com-icon.svg" alt="Toilabap icon" className="h-10 w-10 md:h-12 md:w-12" />
+              <img src="/branding/toilabap.com-logo-dark.svg" alt="Toilabap logo" className="h-8 md:h-10 w-auto" />
+            </div>
             <div className="flex flex-col sm:flex-row items-center justify-center gap-3 md:gap-4 mb-6">
               <h1 className="text-4xl sm:text-5xl md:text-8xl font-bold tracking-tight bg-gradient-to-r from-white via-primary to-white bg-clip-text text-transparent animate-gradient bg-[length:200%_auto]">
                 RITEX AI

@@ -1,51 +1,59 @@
 # Toilabap.com x Hyperscalper
 
-![Toilabap x Ritchi icon](public/Ritchi-icon.png)
+![Toilabap Logo](docs/toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](docs/toilabap.com/toilabap.com-icon.svg)
 
-Toilabap.com la nen tang algo trading toan dien, va Hyperscalper la lop terminal realtime de scan, xac nhan, va thuc thi quyet dinh nhanh hon thi truong.
+Toilabap.com là nền tảng algo trading toàn diện. Hyperscalper là lớp terminal realtime giúp bạn đi từ quan sát thị trường đến hành động giao dịch nhanh hơn, rõ ràng hơn, kỷ luật hơn.
 
-Core philosophy:
+Thông điệp cốt lõi:
 
 Write strategy logic once. Run on any exchange, any asset class, without changing your core trading logic.
 
-## Slogan he thong (chinh thuc)
+## Định Vị Thương Hiệu
 
 - One codebase. Any exchange. Zero friction.
-- Tu prompt den lenh live trong 90 giay.
-- Ca Map hanh dong truoc. Ban vao lenh dung luc.
+- Từ prompt đến lệnh live trong 90 giây.
+- Cá Mập hành động trước. Bạn vào lệnh đúng lúc.
 
-## Van de thi truong ma chung ta giai
+Toilabap không bán một dashboard.
+Toilabap bán tốc độ tư duy và khả năng theo dấu dòng tiền lớn trong thị trường vận động liên tục.
 
-Truyen thong:
-- 2-4 gio chi de lay va normalize du lieu moi lan test y tuong.
-- Backtest va live la hai he thong code khac nhau.
-- Tu y tuong den deploy thuong cham hon nhịp doi chieu cua thi truong.
+## Vấn Đề Thị Trường
 
-Voi Toilabap x Hyperscalper:
-- Exchange abstraction: mot interface cho Stocks, Crypto, Forex, Futures.
-- Scanner + charting event-driven: test va verify setup ngay tren runtime.
-- Trend Matrix Strategy [Ritchi] la blueprint production-grade co san.
+Cách truyền thống thường khiến trader mất lợi thế:
+- Mất 2-4 giờ chỉ để lấy và normalize data mỗi lần test ý tưởng.
+- Backtest và live là hai hệ thống code khác nhau, dễ lệch hành vi.
+- Khi deploy xong, nhịp thị trường đã đổi chiều.
 
-## Flagship strategy: Trend Matrix [Ritchi] v3.1.1
+Với Toilabap x Hyperscalper:
+- Exchange abstraction: một interface cho Stocks, Crypto, Forex, Futures.
+- Scanner + charting event-driven: test và verify setup ngay trên runtime.
+- Trend Matrix Strategy [Ritchi] là blueprint production-grade tích hợp sẵn.
 
-4 lop confluence cot loi:
+## Flagship Strategy: Trend Matrix [Ritchi] v3.1.1
+
+4 lớp confluence cốt lõi:
 - Market structure shift (CHoCH / BOS).
 - Liquidity behavior (sweep, pending zones, FVG context).
 - Volatility-aware risk (ATR trailing stop).
 - Partial take-profit nhieu muc de toi uu phan phoi loi nhuan.
 
-Outcome mong muon:
-- Bat dung khoanh khac doi chieu.
-- Vao lenh cung chieu dong tien lon.
-- Giu ky luat rui ro o cap production.
+Kết quả mục tiêu:
+- Bắt đúng khoảnh khắc đổi chiều.
+- Vào lệnh cùng chiều dòng tiền lớn.
+- Giữ kỷ luật rủi ro ở chuẩn production.
 
-## Kien truc stack
+## Lời Hứa Sản Phẩm
+
+Từ hypothesis đến live execution, bạn không cần đổi tư duy, không cần viết lại core logic, không cần đánh đổi tốc độ vì hạ tầng.
+
+## Kiến Trúc Stack
 
 ```text
 YOUR STRATEGY LOGIC
-	-> TOILABAP FRAMEWORK LAYER (Backtest, Paper, Live)
-	-> EXCHANGE ABSTRACTION (Alpaca, Binance, OANDA, ...)
-	-> ASSET CLASSES (Stocks, Crypto, Forex, Futures)
+  -> TOILABAP FRAMEWORK LAYER (Backtest, Paper, Live)
+  -> EXCHANGE ABSTRACTION (Alpaca, Binance, OANDA, ...)
+  -> ASSET CLASSES (Stocks, Crypto, Forex, Futures)
 ```
 
 Trong Hyperscalper:
@@ -55,13 +63,13 @@ Trong Hyperscalper:
 
 ## Quickstart
 
-1. Cai dependencies
+1. Cài dependencies
 
 ```bash
 npm install
 ```
 
-2. Chay local
+2. Chạy local
 
 ```bash
 npm run dev
@@ -73,13 +81,13 @@ npm run dev
 npm run build
 ```
 
-4. Deploy voi PM2
+4. Deploy với PM2
 
 ```bash
 npm run deploy:pm2
 ```
 
-## Tai lieu
+## Tài Liệu
 
 - AI trading flow: AI_TRADING_LOGIC.md
 - Trend Matrix scanner: RITCHI_TREND_SCANNER.md
@@ -88,7 +96,7 @@ npm run deploy:pm2
 - Loading freeze runbook: docs/LOADING_FREEZE_RUNBOOK.md
 - Rebrand and messaging: REBRAND_PLAYBOOK.md
 
-## Brand message chot
+## Brand Message Chốt
 
-Toilabap.com khong ban mot dashboard.
-Toilabap.com ban toc do tu duy va kha nang theo dau Tien Lon trong thi truong van dong lien tuc.
+Thị trường không chờ ai.
+Toilabap giúp bạn rút ngắn khoảng cách từ Ý Tưởng đến Chiến Lược Thực Thi để vào lệnh với tốc độ của hệ thống, không phải tốc độ thao tác tay.

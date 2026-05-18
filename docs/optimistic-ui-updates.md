@@ -1,5 +1,8 @@
 # Optimistic UI Updates - Trading UX Policy
 
+![Toilabap Logo](toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](toilabap.com/toilabap.com-icon.svg)
+
 ## Muc tieu
 
 Giam do tre cam nhan khi trader thao tac, nhung van bao toan tinh dung cua trang thai he thong.

@@ -1,5 +1,8 @@
 # Trend Matrix Strategy [Ritchi] - Flagship Documentation
 
+![Toilabap Logo](docs/toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](docs/toilabap.com/toilabap.com-icon.svg)
+
 ## Vai tro chien luoc
 
 Trend Matrix la blueprint production-grade duoc tich hop san trong Toilabap:

@@ -1,5 +1,8 @@
 # Bot Trading Binance - Phase 1
 
+![Toilabap Logo](toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](toilabap.com/toilabap.com-icon.svg)
+
 ## Muc tieu phase 1
 
 Dat duoc mot bot flow on dinh, audit duoc, va tuan thu risk rails truoc khi scale sang exchanges khac.

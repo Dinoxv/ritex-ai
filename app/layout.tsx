@@ -35,6 +35,13 @@ export const metadata: Metadata = {
   alternates: {
     canonical: "/",
   },
+  icons: {
+    icon: [
+      { url: "/branding/toilabap.com-icon.svg", type: "image/svg+xml", sizes: "any" },
+    ],
+    shortcut: ["/branding/toilabap.com-icon.svg"],
+    apple: ["/branding/toilabap.com-icon.svg"],
+  },
   robots: {
     index: true,
     follow: true,

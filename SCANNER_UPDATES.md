@@ -1,5 +1,8 @@
 # Scanner Updates - Operating Notes
 
+![Toilabap Logo](docs/toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](docs/toilabap.com/toilabap.com-icon.svg)
+
 ## Muc tieu
 
 Scanner duoc nang cap theo 3 huong:

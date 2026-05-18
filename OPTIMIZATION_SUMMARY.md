@@ -1,5 +1,8 @@
 # Optimization Summary - Trend Matrix Runtime
 
+![Toilabap Logo](docs/toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](docs/toilabap.com/toilabap.com-icon.svg)
+
 ## Muc tieu toi uu
 
 He thong duoc toi uu theo 3 KPI cap chien luoc:

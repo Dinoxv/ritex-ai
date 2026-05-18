@@ -1,5 +1,8 @@
 # Rebrand Playbook - Toilabap.com
 
+![Toilabap Logo](docs/toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](docs/toilabap.com/toilabap.com-icon.svg)
+
 ## North star
 
 Toilabap.com khong ban tinh nang.

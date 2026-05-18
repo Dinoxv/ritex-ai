@@ -1,5 +1,8 @@
 # Theme and Visual Language - Decision First UI
 
+![Toilabap Logo](docs/toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](docs/toilabap.com/toilabap.com-icon.svg)
+
 ## Nguyen tac
 
 UI cua Hyperscalper khong duoc thiet ke de dep.

@@ -1,5 +1,8 @@
 # Loading Freeze Runbook
 
+![Toilabap Logo](toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](toilabap.com/toilabap.com-icon.svg)
+
 ## Trieu chung
 
 - App bi treo o loading state sau deploy/hard refresh.

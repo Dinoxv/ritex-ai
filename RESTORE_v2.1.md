@@ -1,5 +1,8 @@
 # Restore v2.1 - Runtime Recovery Procedure
 
+![Toilabap Logo](docs/toilabap.com/toilabap.com-logo-dark.svg)
+![Toilabap Icon](docs/toilabap.com/toilabap.com-icon.svg)
+
 ## Muc tieu
 
 Khoi phuc nhanh mot ban on dinh ma khong pha vo deployment guardrails.
