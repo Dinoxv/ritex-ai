@@ -10,27 +10,69 @@ Nen tang giao dich thuat toan toan dien cho trader, quant va team dev muon di tu
 
 Toilabap.com x Hyperscalper la nen tang algo trading, AI trading va smart money concept trading, ho tro backtest, paper trading va live trading tren Stocks, Crypto, Forex, Futures voi mot codebase duy nhat.
 
-SEO keywords:
-- algo trading platform
-- algorithmic trading Vietnam
-- AI trading platform
-- smart money concept strategy
-- CHoCH liquidity sweep FVG
-- trend matrix strategy
-- crypto trading bot
-- forex trading bot
-- stock trading automation
-- backtest engine
-- quantitative trading framework
-- cross exchange trading infrastructure
-- Next.js trading terminal
-- TypeScript trading dashboard
-- PM2 trading deployment
-- one codebase any exchange
-- trading strategy automation
-- risk management ATR trailing stop
-- confluence scoring system
-- trading bot lifecycle management
+## SEO Keywords (Song Ngu Viet-Anh)
+
+### 1) Developer Intent (Y dinh ky thuat / xay dung he thong)
+
+**VN keywords:**
+- nen tang giao dich thuat toan ma nguon mo
+- framework algo trading cho developer
+- backtest va live deploy tu mot codebase
+- he thong giao dich da san cross-exchange
+- terminal giao dich realtime Next.js TypeScript
+- bot trading PM2 deployment
+
+**EN keywords:**
+- open source algorithmic trading platform
+- quantitative trading framework for developers
+- backtest to live deployment trading stack
+- cross-exchange trading infrastructure
+- Next.js TypeScript trading terminal
+- PM2 trading bot deployment
+
+### 2) Trader Intent (Y dinh giao dich / tim edge)
+
+**VN keywords:**
+- chien luoc smart money concept
+- CHoCH liquidity sweep FVG strategy
+- trend matrix strategy ritchi
+- bot giao dich crypto forex stocks
+- tu dong hoa chien luoc giao dich
+- quan ly rui ro ATR trailing stop
+- he thong confluence scoring giao dich
+
+**EN keywords:**
+- smart money concept trading strategy
+- CHoCH liquidity sweep FVG setup
+- trend matrix trading strategy
+- crypto forex stocks trading bot
+- automated trading strategy execution
+- ATR trailing stop risk management
+- confluence scoring trading system
+
+### 3) Business Intent (Y dinh doanh nghiep / san pham)
+
+**VN keywords:**
+- nen tang giao dich cho team va startup fintech
+- giai phap ha tang giao dich dinh luong
+- giam thoi gian tu y tuong den lenh live
+- phan mem giao dich cho cong dong trader
+- san pham giao dich AI cho thi truong Viet Nam
+
+**EN keywords:**
+- algorithmic trading infrastructure for teams
+- fintech trading platform solution
+- reduce time from hypothesis to live trading
+- AI trading product for emerging markets
+- scalable trading platform for quant teams
+
+### High-Intent Long-Tail Queries
+
+- "how to build an algorithmic trading platform with backtest and live deploy"
+- "best open source smart money concept trading bot"
+- "nen tang algo trading cho crypto forex stocks tai Viet Nam"
+- "Next.js TypeScript real-time trading dashboard architecture"
+- "confluence score CHoCH liquidity sweep FVG strategy"
 
 ---
 
