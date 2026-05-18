@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev -p 3001",
-    "build": "next build",
+    "build": "node scripts/enforce-safe-build.mjs && node scripts/check-charting-library.mjs && next build",
+    "check:charting-library": "node scripts/check-charting-library.mjs",
     "start": "next start -p 3001",
     "deploy:pm2": "./deploy-pm2.sh",
     "lint": "eslint",
@@ -18,7 +19,7 @@
     "@vercel/analytics": "^1.5.0",
     "better-sqlite3": "^12.9.0",
     "chart.js": "^4.5.1",
-    "lightweight-charts": "^4.2.0",
+    "lightweight-charts": "^5.2.0",
     "next": "^16.1.6",
     "react": "19.2.0",
     "react-chartjs-2": "^5.3.1",

@@ -95,8 +95,19 @@ export interface RitchiTrendValue {
   takeProfit: number;
 }
 
+export interface TrendMatrixValue {
+  direction: 'bullish' | 'bearish';
+  timeframe: TimeInterval;
+  time: number;
+  buySignal: boolean;
+  sellSignal: boolean;
+  price: number;
+  stopLoss: number;
+  takeProfit: number;
+}
+
 export type SignalType = 'bullish' | 'bearish';
-export type ScanType = 'stochastic' | 'emaAlignment' | 'channel' | 'divergence' | 'macdReversal' | 'rsiReversal' | 'volumeSpike' | 'supportResistance' | 'kalmanTrend' | 'ritchiTrend';
+export type ScanType = 'stochastic' | 'emaAlignment' | 'channel' | 'divergence' | 'macdReversal' | 'rsiReversal' | 'volumeSpike' | 'supportResistance' | 'kalmanTrend' | 'ritchiTrend' | 'trendMatrix';
 
 export interface ScanResult {
   symbol: string;
@@ -111,6 +122,7 @@ export interface ScanResult {
   supportResistanceLevels?: SupportResistanceValue[];
   kalmanTrends?: KalmanTrendValue[];
   ritchiTrends?: RitchiTrendValue[];
+  trendMatrixSignals?: TrendMatrixValue[];
   matchedAt: number;
   signalType: SignalType;
   description: string;

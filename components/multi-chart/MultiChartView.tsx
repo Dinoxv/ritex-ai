@@ -19,9 +19,11 @@ export default function MultiChartView({ coin }: MultiChartViewProps) {
   const fetchCandles = useCandleStore((state) => state.fetchCandles);
   const subscribeToCandles = useCandleStore((state) => state.subscribeToCandles);
   const unsubscribeFromCandles = useCandleStore((state) => state.unsubscribeFromCandles);
-  const candles1m = useCandleStore((state) => state.candles[`${coin}-1m`] || []);
+  const candleService = useCandleStore((state) => state.service);
+  const candles1m = useCandleStore((state) => state.selectCandles(coin, '1m'));
 
   useEffect(() => {
+    if (!candleService) return;
     const { startTime, endTime } = getStandardTimeWindow();
     const intervals: TimeInterval[] = ['1m', '5m', '15m', '1h'];
 
@@ -35,7 +37,7 @@ export default function MultiChartView({ coin }: MultiChartViewProps) {
         unsubscribeFromCandles(coin, interval);
       });
     };
-  }, [coin, fetchCandles, subscribeToCandles, unsubscribeFromCandles]);
+  }, [coin, candleService, fetchCandles, subscribeToCandles, unsubscribeFromCandles]);
 
   useEffect(() => {
     if (candles1m.length > 0) {

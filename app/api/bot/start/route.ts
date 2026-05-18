@@ -15,12 +15,34 @@ interface StartPayload {
   isTestnet?: boolean;
 }
 
+function normalizeDaemonSettings(
+  settings: Partial<DaemonSettings> & { atrMult?: number }
+): Partial<DaemonSettings> & { atrMult?: number } {
+  const normalized = { ...settings };
+  const ritchiAtrMult = Number((settings as any).ritchiAtrMult);
+  const atrMultAlias = Number((settings as any).atrMult);
+
+  const resolvedAtrMult = Number.isFinite(ritchiAtrMult) && ritchiAtrMult > 0
+    ? ritchiAtrMult
+    : (Number.isFinite(atrMultAlias) && atrMultAlias > 0 ? atrMultAlias : undefined);
+
+  if (resolvedAtrMult !== undefined) {
+    (normalized as any).ritchiAtrMult = resolvedAtrMult;
+    normalized.atrMult = resolvedAtrMult;
+  }
+
+  return normalized;
+}
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as StartPayload;
 
     // Merge and persist settings
-    const merged: DaemonSettings = { ...DEFAULT_DAEMON_SETTINGS, ...(body.settings ?? {}) };
+    const merged = {
+      ...DEFAULT_DAEMON_SETTINGS,
+      ...normalizeDaemonSettings((body.settings ?? {}) as Partial<DaemonSettings> & { atrMult?: number }),
+    } as DaemonSettings & { atrMult?: number };
     setBotSettingsKey('daemon_settings', JSON.stringify(merged));
 
     // Persist tracked symbols

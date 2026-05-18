@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import type { ExchangeWebSocketService } from '@/lib/websocket/exchange-websocket.interface';
 import { useWebSocketStatusStore } from '@/stores/useWebSocketStatusStore';
-import { useDexStore } from './useDexStore';
+import { useCandleStore } from './useCandleStore';
 import { useWebSocketService } from '@/lib/websocket/websocket-singleton';
 
 interface SidebarPricesStore {
@@ -9,6 +9,7 @@ interface SidebarPricesStore {
   externalPrices: Record<string, number>;
   isSubscribed: boolean;
   subscriptionId: string | null;
+  subscribedExchange: 'hyperliquid' | 'binance';
   wsService: ExchangeWebSocketService | null;
 
   subscribe: () => void;
@@ -22,16 +23,23 @@ export const useSidebarPricesStore = create<SidebarPricesStore>((set, get) => ({
   externalPrices: {},
   isSubscribed: false,
   subscriptionId: null,
+  subscribedExchange: 'hyperliquid',
   wsService: null,
 
   subscribe: () => {
-    const { isSubscribed } = get();
+    const { isSubscribed, subscribedExchange } = get();
+    const currentService = useCandleStore.getState().service;
+    const exchangeKey = currentService?.getExchangeKey() || '';
+    const exchange: 'hyperliquid' | 'binance' = exchangeKey.startsWith('binance') ? 'binance' : 'hyperliquid';
 
-    if (isSubscribed) {
+    if (isSubscribed && subscribedExchange === exchange) {
       return;
     }
 
-    const exchange = useDexStore.getState().selectedExchange;
+    if (isSubscribed) {
+      get().unsubscribe();
+    }
+
     const { service: wsService } = useWebSocketService(exchange);
 
     const subscriptionId = wsService.subscribeToAllMids((mids) => {
@@ -41,7 +49,7 @@ export const useSidebarPricesStore = create<SidebarPricesStore>((set, get) => ({
     });
 
     useWebSocketStatusStore.getState().setStreamSubscriptionCount('prices', 1);
-    set({ isSubscribed: true, subscriptionId, wsService });
+    set({ isSubscribed: true, subscriptionId, wsService, subscribedExchange: exchange });
   },
 
   unsubscribe: () => {
@@ -52,13 +60,13 @@ export const useSidebarPricesStore = create<SidebarPricesStore>((set, get) => ({
     }
 
     if (!wsService) {
-      set({ isSubscribed: false, subscriptionId: null, prices: {} });
+      set({ isSubscribed: false, subscriptionId: null, prices: {}, subscribedExchange: 'hyperliquid' });
       return;
     }
 
     wsService.unsubscribe(subscriptionId);
     useWebSocketStatusStore.getState().setStreamSubscriptionCount('prices', 0);
-    set({ isSubscribed: false, subscriptionId: null, prices: {} });
+    set({ isSubscribed: false, subscriptionId: null, prices: {}, subscribedExchange: 'hyperliquid' });
   },
 
   getPrice: (coin: string) => {
@@ -69,7 +77,8 @@ export const useSidebarPricesStore = create<SidebarPricesStore>((set, get) => ({
     const { meta, assetCtxs } = data;
     const external: Record<string, number> = {};
     meta.universe.forEach((u: any, i: number) => {
-      const px = parseFloat(assetCtxs[i]?.midPx || assetCtxs[i]?.markPx || '0');
+      // Prefer markPx (futures mark price) over midPx (last trade price) for accuracy
+      const px = parseFloat(assetCtxs[i]?.markPx || assetCtxs[i]?.midPx || '0');
       if (px > 0) external[u.name] = px;
     });
     set((state) => ({

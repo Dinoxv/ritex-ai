@@ -16,6 +16,7 @@ interface ProcessedSignal {
   rsi: boolean;
   vol: boolean;
   kalman: boolean;
+  trendMatrix: boolean;
   channel: string | null;
   sr: 'support' | 'resistance' | null;
   srDistance: number | null;
@@ -116,6 +117,9 @@ const ScannerResultItem = ({
                     )}
                     {signals.kalman && (
                       <span className={`${badgeBg} text-bg-primary px-1.5 py-0.5 rounded font-bold`}>KLM</span>
+                    )}
+                    {signals.trendMatrix && (
+                      <span className={`${badgeBg} text-bg-primary px-1.5 py-0.5 rounded font-bold`}>TMX</span>
                     )}
                     {signals.channel && (
                       <span className={`${badgeBg} text-bg-primary px-1.5 py-0.5 rounded font-bold`}>{signals.channel}CH</span>

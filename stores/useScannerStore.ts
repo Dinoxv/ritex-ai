@@ -5,12 +5,11 @@ import type { ExchangeTradingService } from '@/lib/services/types';
 import type { ScannerSettings } from '@/models/Settings';
 import { useSettingsStore } from './useSettingsStore';
 import { useTopSymbolsStore } from './useTopSymbolsStore';
-import { useDexStore } from './useDexStore';
 import { playNotificationSound } from '@/lib/sound-utils';
 import { useAIStrategyStore } from './useAIStrategyStore';
 import type { IndicatorSnapshot } from '@/lib/ai/types';
 import { useRealtimeVolumeStore } from './useRealtimeVolumeStore';
-import { formatVietnamTimestamp } from '@/lib/time-utils';
+import { formatVietnamTimestamp, INTERVAL_TO_MS } from '@/lib/time-utils';
 
 const scannerLogger = {
   info: (message: string, ...args: unknown[]) => console.log('[ScannerStore][INFO]', message, ...args),
@@ -117,6 +116,9 @@ interface ScannerStore {
   scannerMetrics: ScannerMetrics;
   intervalId: NodeJS.Timeout | null;
   previousSymbols: Set<string>;
+  previousSignalKeys: Set<string>;
+  sessionBaselineReady: boolean;
+  scannerStartedAt: number | null;
   service: ExchangeTradingService | null;
   scannerService: ScannerService | null;
   setService: (service: ExchangeTradingService) => void;
@@ -138,6 +140,9 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
   scannerMetrics: createDefaultScannerMetrics(),
   intervalId: null,
   previousSymbols: new Set(),
+  previousSignalKeys: new Set(),
+  sessionBaselineReady: false,
+  scannerStartedAt: null,
   service: null,
   scannerService: null,
 
@@ -175,16 +180,24 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
     });
 
     try {
-      const settings = useSettingsStore.getState().settings.scanner;
-      const indicatorSettings = useSettingsStore.getState().settings.indicators;
-      const selectedExchange = useDexStore.getState().selectedExchange as ScannerExchange;
+      const appSettings = useSettingsStore.getState().settings;
+      const settings = appSettings.scanner;
+      const indicatorSettings = appSettings.indicators;
+      const serviceKey2 = get().service?.getExchangeKey() ?? '';
+      const selectedExchange = (serviceKey2.startsWith('binance') ? 'binance' : 'hyperliquid') as ScannerExchange;
       const scannerRuntime = resolveScannerRuntimeConfig(settings, selectedExchange);
       const telegramConfig = resolveScannerTelegramConfig(settings, selectedExchange);
 
       const topSymbolsStore = useTopSymbolsStore.getState();
-      const symbols = topSymbolsStore.symbols
-        .slice(0, scannerRuntime.topMarkets)
-        .map(s => s.name);
+      const activeTopSymbols = topSymbolsStore.symbols.map((s) => s.name);
+      const activeTopSymbolSet = new Set(activeTopSymbols);
+
+      const symbols = settings.symbolSource === 'favourite'
+        ? (Array.isArray(appSettings.pinnedSymbols)
+          ? appSettings.pinnedSymbols.filter((symbol): symbol is string => typeof symbol === 'string')
+          : [])
+            .filter((symbol) => activeTopSymbolSet.has(symbol))
+        : activeTopSymbols.slice(0, scannerRuntime.topMarkets);
 
       if (symbols.length === 0) {
         set({
@@ -192,7 +205,9 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
             ...get().status,
             isScanning: false,
             lastScanTime: Date.now(),
-            error: 'No symbols available to scan',
+            error: settings.symbolSource === 'favourite'
+              ? 'No favourite symbols available to scan'
+              : 'No symbols available to scan',
             progress: undefined,
           },
         });
@@ -229,6 +244,7 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
         !!settings.supportResistanceScanner?.enabled,
         !!settings.kalmanTrendScanner?.enabled,
         !!settings.ritchiTrendScanner?.enabled,
+        !!settings.trendMatrixScanner?.enabled,
       ].filter(Boolean).length;
       const totalScannerSteps = Math.max(enabledScannerCount, 1);
       let completedScannerSteps = 0;
@@ -388,6 +404,21 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
         markScannerProgress('Ritchi Trend');
       }
 
+      if (settings.trendMatrixScanner?.enabled) {
+        markScannerProgress('Trend Matrix');
+        const stepStartedAt = Date.now();
+        const trendMatrixResults = await scannerService.scanMultipleSymbolsForTrendMatrix(symbols, {
+          timeframes: settings.trendMatrixScanner.timeframes,
+          config: settings.trendMatrixScanner,
+          indicatorConfig: indicatorSettings.trendMatrix,
+        });
+        newResults.push(...trendMatrixResults);
+        scanTypeDurations.trendMatrix = Date.now() - stepStartedAt;
+        scanTypeSignals.trendMatrix = trendMatrixResults.length;
+        completedScannerSteps += 1;
+        markScannerProgress('Trend Matrix');
+      }
+
       // Augment results with realtime volume trigger signal
       for (const result of newResults) {
         result.exchange = selectedExchange;
@@ -397,29 +428,38 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
       }
 
       const newSymbols = new Set(newResults.map((r: ScanResult) => r.symbol));
+      const { previousSignalKeys, sessionBaselineReady, scannerStartedAt } = get();
+      const scannerSessionStart = scannerStartedAt ?? runStartedAt;
+      const postStartResults = newResults.filter((result) => getResultSignalTimestamp(result) > scannerSessionStart);
+      const currentSignalKeys = new Set(postStartResults.map(buildSignalKey));
+      const trulyNewResults = postStartResults.filter((result) => !previousSignalKeys.has(buildSignalKey(result)));
+      const shouldNotify = sessionBaselineReady;
 
-      if (newResults.length > 0 && scannerRuntime.playSound) {
-        const firstResult = newResults[0];
-        scannerLogger.info(`Scan completed with ${newResults.length} result(s): ${newResults.map(r => r.symbol).join(', ')} - Playing sound`);
+      if (shouldNotify && trulyNewResults.length > 0 && scannerRuntime.playSound) {
+        const firstResult = trulyNewResults[0];
+        scannerLogger.info(`Scan completed with ${trulyNewResults.length} new result(s): ${trulyNewResults.map(r => r.symbol).join(', ')} - Playing sound`);
         playNotificationSound(firstResult.signalType).catch(err =>
           scannerLogger.error('Error playing sound:', err)
         );
+      } else if (!shouldNotify && scannerRuntime.playSound) {
+        scannerLogger.info(`Baseline scan captured ${newResults.length} result(s) - skipping sound on first run after scanner ON`);
       } else if (scannerRuntime.playSound) {
-        scannerLogger.info('Scan completed with no results - skipping sound');
+        scannerLogger.info(`Scan completed with ${newResults.length} result(s), none new - skipping sound`);
       } else {
         scannerLogger.info('Sound disabled in settings');
       }
 
-      // Scanner Telegram Alerts
+      // Scanner Telegram Alerts - only send for truly new signals
       if (
-        newResults.length > 0 &&
+        shouldNotify &&
+        trulyNewResults.length > 0 &&
         telegramConfig.enabled &&
         telegramConfig.botToken &&
         telegramConfig.chatId
       ) {
         const filteredResults = telegramConfig.signalFilter === 'all'
-          ? newResults
-          : newResults.filter(r => r.signalType === telegramConfig.signalFilter);
+          ? trulyNewResults
+          : trulyNewResults.filter(r => r.signalType === telegramConfig.signalFilter);
 
         if (filteredResults.length > 0) {
           sendScannerTelegramAlerts(filteredResults, selectedExchange, telegramConfig.botToken, telegramConfig.chatId, telegramConfig.showTpSl).catch(err =>
@@ -444,6 +484,8 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
       set((state) => ({
         results: newResults,
         previousSymbols: newSymbols,
+        previousSignalKeys: currentSignalKeys,
+        sessionBaselineReady: true,
         status: {
           ...state.status,
           isScanning: false,
@@ -503,10 +545,22 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
 
     if (status.isRunning) return;
 
+    // Reset scanner session so baseline is rebuilt from scanner ON time
+    const scannerStartedAt = Date.now();
+
+    set({
+      results: [],
+      previousSymbols: new Set(),
+      previousSignalKeys: new Set(),
+      sessionBaselineReady: false,
+      scannerStartedAt,
+    });
+
     get().runScan();
 
     const settings = useSettingsStore.getState().settings.scanner;
-    const selectedExchange = useDexStore.getState().selectedExchange as ScannerExchange;
+    const serviceKey3 = get().service?.getExchangeKey() || '';
+    const selectedExchange = (serviceKey3.startsWith('binance') ? 'binance' : 'hyperliquid') as ScannerExchange;
     const scannerRuntime = resolveScannerRuntimeConfig(settings, selectedExchange);
     const intervalMs = scannerRuntime.scanInterval * 60 * 1000;
 
@@ -528,9 +582,21 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
 
     if (status.isRunning) return;
 
+    // Reset scanner session so baseline is rebuilt from scanner ON time
+    const scannerStartedAt = Date.now();
+
+    set({
+      results: [],
+      previousSymbols: new Set(),
+      previousSignalKeys: new Set(),
+      sessionBaselineReady: false,
+      scannerStartedAt,
+    });
+
     const settings = useSettingsStore.getState().settings.scanner;
-    const selectedExchange = useDexStore.getState().selectedExchange as ScannerExchange;
-    const scannerRuntime = resolveScannerRuntimeConfig(settings, selectedExchange);
+    const serviceKey4 = get().service?.getExchangeKey() ?? '';
+    const selectedExchange4 = (serviceKey4.startsWith('binance') ? 'binance' : 'hyperliquid') as ScannerExchange;
+    const scannerRuntime = resolveScannerRuntimeConfig(settings, selectedExchange4);
     const intervalMs = scannerRuntime.scanInterval * 60 * 1000;
 
     const newIntervalId = setInterval(() => {
@@ -563,7 +629,13 @@ export const useScannerStore = create<ScannerStore>((set, get) => ({
   },
 
   clearResults: () => {
-    set({ results: [], previousSymbols: new Set() });
+    set({
+      results: [],
+      previousSymbols: new Set(),
+      previousSignalKeys: new Set(),
+      sessionBaselineReady: false,
+      scannerStartedAt: null,
+    });
   },
 }));
 
@@ -578,6 +650,7 @@ const SCAN_TYPE_LABELS: Record<string, string> = {
   supportResistance: 'S/R Level',
   kalmanTrend: 'Kalman Trend',
   ritchiTrend: 'Ritchi Trend',
+  trendMatrix: 'Trend Matrix',
 };
 
 function formatPrice(price: number): string {
@@ -587,6 +660,7 @@ function formatPrice(price: number): string {
 }
 
 function getTimeframe(result: ScanResult): string {
+  if (result.trendMatrixSignals?.[0]) return result.trendMatrixSignals[0].timeframe.toUpperCase();
   if (result.kalmanTrends?.[0]) return result.kalmanTrends[0].timeframe.toUpperCase();
   if (result.ritchiTrends?.[0]) return result.ritchiTrends[0].timeframe.toUpperCase();
   if (result.stochastics?.[0]) return result.stochastics[0].timeframe.toUpperCase();
@@ -599,10 +673,33 @@ function getTimeframe(result: ScanResult): string {
   return '1M';
 }
 
+function getResultSignalTimestamp(result: ScanResult): number {
+  if (result.trendMatrixSignals?.[0]?.time) return result.trendMatrixSignals[0].time;
+  if (result.macdReversals?.[0]?.time) return result.macdReversals[0].time;
+  if (result.rsiReversals?.[0]?.time) return result.rsiReversals[0].time;
+  if (result.divergences?.[0]?.endTime) return result.divergences[0].endTime;
+
+  const ema = result.emaAlignments?.[0];
+  if (ema) {
+    const intervalMs = INTERVAL_TO_MS[ema.timeframe];
+    if (intervalMs) {
+      return result.matchedAt - (ema.barsAgo * intervalMs);
+    }
+  }
+
+  return result.matchedAt;
+}
+
+function buildSignalKey(result: ScanResult): string {
+  const signalTs = getResultSignalTimestamp(result);
+  return `${result.symbol}|${result.scanType}|${result.signalType}|${getTimeframe(result)}|${signalTs}`;
+}
+
 function getEntryPrice(result: ScanResult): number {
   if (result.closePrices && result.closePrices.length > 0) {
     return result.closePrices[result.closePrices.length - 1];
   }
+  if (result.trendMatrixSignals?.[0]) return result.trendMatrixSignals[0].price;
   if (result.ritchiTrends?.[0]) return result.ritchiTrends[0].price;
   if (result.macdReversals?.[0]) return result.macdReversals[0].price;
   if (result.rsiReversals?.[0]) return result.rsiReversals[0].price;
@@ -631,6 +728,7 @@ function getVolumeDelta(result: ScanResult): string {
 function getStrategyName(result: ScanResult): string {
   if (result.scanType === 'kalmanTrend') return 'Volume Trend Strategy [RitchiVietnam]';
   if (result.scanType === 'ritchiTrend') return 'Siêu Xu Hướng [Ritchi]';
+  if (result.scanType === 'trendMatrix') return 'Trend Matrix Strategy v3';
   return SCAN_TYPE_LABELS[result.scanType] || result.scanType;
 }
 

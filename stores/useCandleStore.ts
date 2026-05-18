@@ -7,7 +7,6 @@ import { MAX_CANDLES } from '@/lib/constants';
 import type { ExchangeTradingService, TransformedCandle } from '@/lib/services/types';
 import { downsampleCandles } from '@/lib/candle-utils';
 import { INTERVAL_TO_MS } from '@/lib/time-utils';
-import { useDexStore } from './useDexStore';
 
 interface CandleStore {
   candles: Record<string, CandleData[]>;
@@ -21,6 +20,9 @@ interface CandleStore {
 
   setService: (service: ExchangeTradingService) => void;
   setActiveSymbol: (coin: string | null) => void;
+  getCandleKey: (coin: string, interval: TimeInterval) => string;
+  selectCandles: (coin: string, interval: TimeInterval) => CandleData[];
+  selectLoading: (coin: string, interval: TimeInterval) => boolean;
   fetchCandles: (coin: string, interval: TimeInterval, startTime: number, endTime: number) => Promise<void>;
   fetchOlderCandles: (coin: string, interval: TimeInterval) => Promise<boolean>;
   subscribeToCandles: (coin: string, interval: TimeInterval) => void;
@@ -31,7 +33,46 @@ interface CandleStore {
   getClosePrices: (coin: string, interval: TimeInterval, count: number) => number[] | null;
 }
 
-const getCandleKey = (coin: string, interval: string): string => `${coin}-${interval}`;
+const EMPTY_CANDLES: CandleData[] = [];
+
+const isFiniteNumber = (value: unknown): value is number =>
+  typeof value === 'number' && Number.isFinite(value);
+
+const normalizeCandles = (candles: CandleData[]): CandleData[] => {
+  if (candles.length <= 1) {
+    return candles;
+  }
+
+  const sorted = candles
+    .filter((candle) =>
+      isFiniteNumber(candle.time) &&
+      isFiniteNumber(candle.open) &&
+      isFiniteNumber(candle.high) &&
+      isFiniteNumber(candle.low) &&
+      isFiniteNumber(candle.close) &&
+      isFiniteNumber(candle.volume)
+    )
+    .sort((a, b) => (a.time as number) - (b.time as number));
+
+  if (sorted.length <= 1) {
+    return sorted;
+  }
+
+  const deduped = new Map<number, CandleData>();
+  for (const candle of sorted) {
+    deduped.set(candle.time as number, candle);
+  }
+
+  return Array.from(deduped.values());
+};
+
+const getExchangeScope = (service: ExchangeTradingService | null): string => {
+  return service?.getExchangeKey() || 'unknown';
+};
+
+const getCandleKey = (coin: string, interval: string, exchangeScope: string): string => {
+  return `${exchangeScope}:${coin}-${interval}`;
+};
 
 export const useCandleStore = create<CandleStore>((set, get) => ({
   candles: {},
@@ -44,20 +85,56 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
   activeSymbol: null,
 
   setService: (service: ExchangeTradingService) => {
-    set({ service });
+    // Clean up all existing WS subscriptions before switching service.
+    // If we don't do this, the old exchange's WS keeps sending candle updates
+    // that overwrite the new exchange's REST-fetched candles (e.g., HL LAB at $0.93
+    // would overwrite Binance LABUSDT at $2.50).
+    const { subscriptions, wsService } = get();
+    Object.values(subscriptions).forEach((sub) => {
+      if (wsService) {
+        try { wsService.unsubscribe(sub.subscriptionId); } catch { /* ignore */ }
+      }
+      try { sub.cleanup(); } catch { /* ignore */ }
+    });
+
+    set({
+      service,
+      subscriptions: {},
+      candles: {},
+      loading: {},
+      loadingOlder: {},
+      errors: {},
+      wsService: null,
+    });
   },
 
   setActiveSymbol: (coin: string | null) => {
     set({ activeSymbol: coin });
   },
 
+  getCandleKey: (coin, interval) => {
+    const exchangeScope = getExchangeScope(get().service);
+    return getCandleKey(coin, interval, exchangeScope);
+  },
+
+  selectCandles: (coin, interval) => {
+    const key = get().getCandleKey(coin, interval);
+    return get().candles[key] || EMPTY_CANDLES;
+  },
+
+  selectLoading: (coin, interval) => {
+    const key = get().getCandleKey(coin, interval);
+    return get().loading[key] || false;
+  },
+
   fetchCandles: async (coin, interval, startTime, endTime) => {
-    const key = getCandleKey(coin, interval);
     const { loading, service } = get();
 
     if (!service) {
       return;
     }
+
+    const key = getCandleKey(coin, interval, getExchangeScope(service));
 
     if (loading[key]) {
       return;
@@ -76,7 +153,7 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
         endTime,
       });
 
-      const formattedData = data.map((candle) => formatCandle(candle, coin));
+      const formattedData = normalizeCandles(data.map((candle) => formatCandle(candle, coin)));
 
       set((state) => ({
         candles: { ...state.candles, [key]: formattedData },
@@ -91,8 +168,8 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
   },
 
   fetchOlderCandles: async (coin, interval) => {
-    const key = getCandleKey(coin, interval);
     const { loadingOlder, service, candles } = get();
+    const key = getCandleKey(coin, interval, getExchangeScope(service));
 
     if (!service || loadingOlder[key]) return false;
 
@@ -131,7 +208,7 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
         return false;
       }
 
-      const merged = [...newCandles, ...existing].sort((a, b) => (a.time as number) - (b.time as number));
+      const merged = normalizeCandles([...newCandles, ...existing]);
 
       set((state) => ({
         candles: { ...state.candles, [key]: merged },
@@ -146,8 +223,8 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
   },
 
   subscribeToCandles: (coin, interval) => {
-    const key = getCandleKey(coin, interval);
-    const { subscriptions } = get();
+    const { subscriptions, service } = get();
+    const key = getCandleKey(coin, interval, getExchangeScope(service));
 
     if (subscriptions[key]) {
       set((state) => ({
@@ -164,7 +241,15 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
 
     const initWebSocket = async () => {
       const { useWebSocketService } = await import('@/lib/websocket/websocket-singleton');
-      const exchange = useDexStore.getState().selectedExchange;
+
+      // Derive WS exchange type from the current service, NOT from useDexStore.selectedExchange.
+      // selectedExchange defaults to 'hyperliquid' even when the URL forces Binance via
+      // routeForcesBinance (e.g. /binance-apikey/LAB/). Using selectedExchange would connect
+      // to the Hyperliquid WebSocket instead of Binance, sending wrong candle prices.
+      const currentService = get().service;
+      const exchangeKey = currentService?.getExchangeKey() || '';
+      const exchange = exchangeKey.startsWith('binance') ? 'binance' : 'hyperliquid';
+
       const { service, trackSubscription } = useWebSocketService(exchange);
 
       const cleanup = trackSubscription();
@@ -224,8 +309,8 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
   },
 
   unsubscribeFromCandles: (coin, interval) => {
-    const key = getCandleKey(coin, interval);
-    const { subscriptions, wsService } = get();
+    const { subscriptions, wsService, service } = get();
+    const key = getCandleKey(coin, interval, getExchangeScope(service));
 
     const subscription = subscriptions[key];
     if (!subscription) {
@@ -261,20 +346,21 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
   },
 
   clearCandles: (coin, interval?) => {
-    const { candles, loading, errors } = get();
+    const { candles, loading, errors, service } = get();
     const newCandles = { ...candles };
     const newLoading = { ...loading };
     const newErrors = { ...errors };
+    const exchangeScope = getExchangeScope(service);
 
     if (interval) {
-      const key = getCandleKey(coin, interval);
+      const key = getCandleKey(coin, interval, exchangeScope);
       delete newCandles[key];
       delete newLoading[key];
       delete newErrors[key];
     } else {
       const intervals: TimeInterval[] = ['1m', '5m', '15m', '1h'];
       intervals.forEach(int => {
-        const key = getCandleKey(coin, int);
+        const key = getCandleKey(coin, int, exchangeScope);
         delete newCandles[key];
         delete newLoading[key];
         delete newErrors[key];
@@ -305,8 +391,8 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
   },
 
   getCandlesSync: (coin, interval) => {
-    const key = getCandleKey(coin, interval);
-    const { candles } = get();
+    const { candles, service } = get();
+    const key = getCandleKey(coin, interval, getExchangeScope(service));
     const cachedCandles = candles[key];
 
     if (!cachedCandles || cachedCandles.length === 0) {
@@ -317,8 +403,8 @@ export const useCandleStore = create<CandleStore>((set, get) => ({
   },
 
   getClosePrices: (coin, interval, count) => {
-    const key = getCandleKey(coin, interval);
-    const { candles } = get();
+    const { candles, service } = get();
+    const key = getCandleKey(coin, interval, getExchangeScope(service));
     const cachedCandles = candles[key];
 
     if (!cachedCandles || cachedCandles.length === 0) {

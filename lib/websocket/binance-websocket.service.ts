@@ -39,7 +39,8 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
   private streamRefs = new Map<string, number>();
 
   constructor(isTestnet: boolean = false) {
-    this.wsUrl = isTestnet ? 'wss://testnet.binance.vision/ws' : 'wss://stream.binance.com:9443/ws';
+    // USDⓈ-M Futures WebSocket — must use fstream.binance.com (NOT stream.binance.com which is Spot-only)
+    this.wsUrl = isTestnet ? 'wss://testnet.binancefuture.com/ws' : 'wss://fstream.binance.com/ws';
   }
 
   private ensureConnected(): void {
@@ -102,13 +103,47 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
     this.streamRefs.set(stream, current - 1);
   }
 
+  private processBulkMarkPriceArray(arr: any[]): void {
+    const mids: AllMidsData = {};
+    arr.forEach((it: any) => {
+      // Only USDT-margined futures mark prices; 'p' = mark price on Futures WS
+      if (it?.s && it?.p && String(it.s).endsWith('USDT')) {
+        mids[fromStreamSymbol(it.s)] = parseFloat(it.p);
+      }
+    });
+    if (Object.keys(mids).length > 0) {
+      this.subscriptions.forEach((sub) => {
+        if (sub.type !== 'allMids' || sub.stream !== '!markPrice@arr') return;
+        (sub.callback as AllMidsCallback)(mids);
+      });
+    }
+  }
+
   private handleMessage(raw: string): void {
     try {
       if (typeof raw !== 'string') return;
       const msg = JSON.parse(raw);
+
+      // Case 1: Direct JSON array — rare, only when connecting via combined stream URL
+      if (Array.isArray(msg)) {
+        this.processBulkMarkPriceArray(msg);
+        return;
+      }
+
+      // Case 2: SUBSCRIBE method on fstream.binance.com wraps !markPrice@arr as:
+      //   {"stream": "!markPrice@arr", "data": [{e: "markPriceUpdate", s: "BTCUSDT", p: "..."}, ...]}
+      // msg.data is an ARRAY here — must check BEFORE the `msg?.data?.e` logic below
+      if (Array.isArray(msg?.data)) {
+        this.processBulkMarkPriceArray(msg.data);
+        return;
+      }
+
+      // Case 3: Single-stream events (kline, aggTrade, individual markPriceUpdate)
+      // SUBSCRIBE method: {"stream": "btcusdt@kline_1m", "data": {"e": "kline", ...}}
+      // Raw format:        {"e": "kline", ...}
       const normalizedMsg = msg?.data?.e ? msg.data : msg;
 
-      // We only process event payloads
+      // Skip non-event messages (subscription confirmation: {"result": null, "id": 1})
       if (!normalizedMsg.e) {
         return;
       }
@@ -116,10 +151,9 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
       if (normalizedMsg.e === 'kline') {
         const symbol = fromStreamSymbol(normalizedMsg.s || '');
         const stream = `${toStreamSymbol(symbol)}@kline_${normalizedMsg.k?.i || '1m'}`;
-        let matchedSubscriptions = 0;
+
         this.subscriptions.forEach((sub) => {
           if (sub.type !== 'candle' || sub.stream !== stream) return;
-          matchedSubscriptions++;
 
           const k = normalizedMsg.k;
           if (!k) return;
@@ -128,6 +162,7 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
           const high = parseFloat(k.h);
           const low = parseFloat(k.l);
           const close = parseFloat(k.c);
+          // k.v = base asset volume (e.g. BTC), matches /fapi/v1/klines k[5]
           const volume = parseFloat(k.v || '0');
 
           const decimals = useSymbolMetaStore.getState().getDecimals(symbol);
@@ -160,6 +195,7 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
 
           const price = parseFloat(normalizedMsg.p || '0');
           const size = parseFloat(normalizedMsg.q || '0');
+          // m = is the buyer the market maker → buyer is maker → seller is aggressor → 'sell'
           const side: 'buy' | 'sell' = normalizedMsg.m ? 'sell' : 'buy';
           const decimals = useSymbolMetaStore.getState().getDecimals(symbol);
 
@@ -177,30 +213,17 @@ export class BinanceWebSocketService implements ExchangeWebSocketService {
         return;
       }
 
+      // Single-symbol mark price update (e.g. from btcusdt@markPrice stream, not !markPrice@arr)
       if (normalizedMsg.e === 'markPriceUpdate' && normalizedMsg.s) {
+        if (!String(normalizedMsg.s).endsWith('USDT')) return;
         const mids: AllMidsData = {};
+        // 'p' = mark price (USDⓈ-M Futures mark price, NOT spot price)
         mids[fromStreamSymbol(normalizedMsg.s)] = parseFloat(normalizedMsg.p || '0');
 
         this.subscriptions.forEach((sub) => {
           if (sub.type !== 'allMids' || sub.stream !== '!markPrice@arr') return;
           (sub.callback as AllMidsCallback)(mids);
         });
-      }
-
-      if (Array.isArray(msg)) {
-        const mids: AllMidsData = {};
-        msg.forEach((it: any) => {
-          if (it?.s && it?.p) {
-            mids[fromStreamSymbol(it.s)] = parseFloat(it.p);
-          }
-        });
-
-        if (Object.keys(mids).length > 0) {
-          this.subscriptions.forEach((sub) => {
-            if (sub.type !== 'allMids' || sub.stream !== '!markPrice@arr') return;
-            (sub.callback as AllMidsCallback)(mids);
-          });
-        }
       }
     } catch {
       // Ignore malformed message

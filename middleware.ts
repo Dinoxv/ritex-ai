@@ -7,15 +7,14 @@ export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
   const segments = pathname.split('/').filter(Boolean);
 
-  if (segments.length === 0) {
-    return NextResponse.next();
-  }
-
-  let firstSegment = segments[0].toLowerCase();
-  try {
-    firstSegment = decodeURIComponent(firstSegment).toLowerCase();
-  } catch {
+  let firstSegment = '';
+  if (segments.length > 0) {
     firstSegment = segments[0].toLowerCase();
+    try {
+      firstSegment = decodeURIComponent(firstSegment).toLowerCase();
+    } catch {
+      firstSegment = segments[0].toLowerCase();
+    }
   }
 
   if (firstSegment === LEGACY_BINANCE_FALLBACK_ADDRESS || firstSegment === LEGACY_BINANCE_ROUTE_SLUG) {
@@ -28,7 +27,12 @@ export function middleware(request: NextRequest) {
     return NextResponse.redirect(redirectUrl, 301);
   }
 
-  return NextResponse.next();
+  const response = NextResponse.next();
+  const deploymentId = process.env.NEXT_DEPLOYMENT_ID;
+  if (deploymentId) {
+    response.headers.set('X-Deployment-ID', deploymentId);
+  }
+  return response;
 }
 
 export const config = {

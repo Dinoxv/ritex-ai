@@ -7,16 +7,18 @@ import { useDexStore } from '@/stores/useDexStore';
 import { CredentialsSettings } from '@/components/settings/CredentialsSettings';
 import { LanguageSwitcher } from '@/components/settings/LanguageSwitcher';
 import { useLanguageStore } from '@/stores/useLanguageStore';
+import { DropdownSelect } from '@/components/ui/DropdownSelect';
 
 export default function SettingsPanel() {
-  const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateKalmanTrendSettings, updateSieuXuHuongSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings, updateAISettings } = useSettingsStore();
-  const { t } = useLanguageStore();
+  const { isPanelOpen, activeTab, closePanel, setActiveTab, settings, updateStochasticSettings, updateEmaSettings, updateMacdSettings, updateKalmanTrendSettings, updateSieuXuHuongSettings, updateTrendMatrixSettings, updateScannerSettings, updateOrderSettings, updateThemeSettings, updateAISettings } = useSettingsStore();
+  const t = useLanguageStore((state) => state.t);
   const selectedExchange = useDexStore((state) => state.selectedExchange);
   const [isStochasticExpanded, setIsStochasticExpanded] = useState(false);
   const [isEmaExpanded, setIsEmaExpanded] = useState(false);
   const [isMacdExpanded, setIsMacdExpanded] = useState(false);
   const [isKalmanExpanded, setIsKalmanExpanded] = useState(false);
   const [isRitchiExpanded, setIsRitchiExpanded] = useState(false);
+  const [isTrendMatrixExpanded, setIsTrendMatrixExpanded] = useState(false);
   const [isScannerStochExpanded, setIsScannerStochExpanded] = useState(false);
   const [isScannerEmaExpanded, setIsScannerEmaExpanded] = useState(false);
   const [isScannerDivExpanded, setIsScannerDivExpanded] = useState(false);
@@ -24,12 +26,66 @@ export default function SettingsPanel() {
   const [isScannerRsiExpanded, setIsScannerRsiExpanded] = useState(false);
   const [isScannerVolumeExpanded, setIsScannerVolumeExpanded] = useState(false);
   const [isScannerSRExpanded, setIsScannerSRExpanded] = useState(false);
+  const [isScannerTrendMatrixExpanded, setIsScannerTrendMatrixExpanded] = useState(false);
+
+  const INPUT_COMPACT_CLASS = 'w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs focus:outline-none focus:border-primary';
+  const INPUT_FIELD_CLASS = 'w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary';
+  const RANGE_FIELD_CLASS = 'w-full h-2 rounded-lg appearance-none cursor-pointer bg-bg-primary border border-frame';
+  const CHECKBOX_FIELD_CLASS = 'w-4 h-4 accent-primary cursor-pointer';
+  const LABEL_FIELD_CLASS = 'text-primary-muted font-mono block mb-1 text-xs';
+  const ROW_LABEL_CLASS = 'text-primary-muted text-xs font-mono';
+  const HELP_TEXT_CLASS = 'text-primary-muted text-[10px] font-mono';
+  const SECTION_HEADING_CLASS = 'text-primary font-mono text-xs font-bold';
+  const SUBHEADING_CLASS = 'text-primary text-xs font-mono';
+
+  const SettingLabel = ({ children, className = '' }: { children: React.ReactNode; className?: string }) => (
+    <label className={`${LABEL_FIELD_CLASS} ${className}`.trim()}>{children}</label>
+  );
+
+  const SettingCheckboxRow = ({
+    label,
+    checked,
+    onChange,
+    className = '',
+    labelClassName = '',
+  }: {
+    label: React.ReactNode;
+    checked: boolean;
+    onChange: (checked: boolean) => void;
+    className?: string;
+    labelClassName?: string;
+  }) => (
+    <label className={`flex items-center justify-between cursor-pointer ${className}`.trim()}>
+      {typeof label === 'string' || typeof label === 'number' ? (
+        <span className={`${ROW_LABEL_CLASS} ${labelClassName}`.trim()}>{label}</span>
+      ) : (
+        label
+      )}
+      <input
+        type="checkbox"
+        checked={checked}
+        onChange={(e) => onChange(e.target.checked)}
+        className={CHECKBOX_FIELD_CLASS}
+      />
+    </label>
+  );
 
   const clampScannerNumber = useCallback((value: number, min: number, max: number, fallback: number) => {
     if (Number.isNaN(value) || !Number.isFinite(value)) {
       return fallback;
     }
     return Math.max(min, Math.min(max, value));
+  }, []);
+
+  const parseKalmanNumber = useCallback((rawValue: string, min: number, max: number, fallback: number) => {
+    if (rawValue.trim() === '') {
+      return fallback;
+    }
+    const parsed = Number(rawValue);
+    if (!Number.isFinite(parsed)) {
+      return fallback;
+    }
+    return Math.max(min, Math.min(max, parsed));
   }, []);
 
   const scannerTelegramByExchange = settings.scanner.telegramByExchange ?? {
@@ -293,22 +349,18 @@ export default function SettingsPanel() {
           {activeTab === 'scanner' && (
             <div className="space-y-4 pb-8">
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-primary-muted text-xs font-mono">{t.settings.enableScanner}</span>
-                  <input
-                    type="checkbox"
-                    checked={activeScannerRuntime.enabled}
-                    onChange={(e) => updateScannerRuntimeExchange(selectedExchange, { enabled: e.target.checked })}
-                    className="w-4 h-4 accent-primary cursor-pointer"
-                  />
-                </label>
+                <SettingCheckboxRow
+                  label={t.settings.enableScanner}
+                  checked={activeScannerRuntime.enabled}
+                  onChange={(checked) => updateScannerRuntimeExchange(selectedExchange, { enabled: checked })}
+                />
               </div>
 
               {activeScannerRuntime.enabled && (
                 <>
                   <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.scanInterval} - {selectedExchange.toUpperCase()}</label>
+                      <SettingLabel>{t.settings.scanInterval} - {selectedExchange.toUpperCase()}</SettingLabel>
                       <input
                         type="number"
                         min="1"
@@ -317,26 +369,48 @@ export default function SettingsPanel() {
                         onChange={(e) => updateScannerRuntimeExchange(selectedExchange, {
                           scanInterval: clampScannerNumber(Number(e.target.value), 1, 60, 5)
                         })}
-                        className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                        className={INPUT_COMPACT_CLASS}
                       />
                     </div>
 
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.topMarkets} - {selectedExchange.toUpperCase()}</label>
+                      <SettingLabel>{t.settings.topMarkets} - {selectedExchange.toUpperCase()}</SettingLabel>
                       <input
                         type="number"
                         min="5"
                         max="500"
                         value={activeScannerRuntime.topMarkets}
+                        disabled={settings.scanner.symbolSource === 'favourite'}
                         onChange={(e) => updateScannerRuntimeExchange(selectedExchange, {
                           topMarkets: clampScannerNumber(Number(e.target.value), 5, 500, 50)
                         })}
-                        className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                        className={`${INPUT_COMPACT_CLASS} disabled:opacity-40 disabled:cursor-not-allowed`}
                       />
+                      {settings.scanner.symbolSource === 'favourite' && (
+                        <div className={` mt-1`}>
+                          Top Markets disabled while scanner scope is set to Favourite only.
+                        </div>
+                      )}
                     </div>
 
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.candleCacheDuration}</label>
+                      <DropdownSelect
+                        label="SCANNER SYMBOL SOURCE"
+                        value={settings.scanner.symbolSource}
+                        onChange={(value) => updateScannerSettings({ symbolSource: value as 'top' | 'favourite' })}
+                        options={[
+                          { value: 'top', label: `Top Markets (${selectedExchange.toUpperCase()})` },
+                          { value: 'favourite', label: 'Favourite Tokens Only' },
+                        ]}
+                        minWidth="min-w-72"
+                      />
+                      <div className={` mt-1`}>
+                        Favourite count: {Array.isArray(settings.pinnedSymbols) ? settings.pinnedSymbols.length : 0}
+                      </div>
+                    </div>
+
+                    <div>
+                      <SettingLabel>{t.settings.candleCacheDuration}</SettingLabel>
                       <input
                         type="number"
                         min="1"
@@ -345,12 +419,12 @@ export default function SettingsPanel() {
                         onChange={(e) => updateScannerSettings({
                           candleCacheDuration: clampScannerNumber(Number(e.target.value), 1, 10, 5)
                         })}
-                        className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                        className={INPUT_COMPACT_CLASS}
                       />
                     </div>
 
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.mediumDurationWarning}</label>
+                      <SettingLabel>{t.settings.mediumDurationWarning}</SettingLabel>
                       <input
                         type="number"
                         min="0.5"
@@ -360,12 +434,12 @@ export default function SettingsPanel() {
                         onChange={(e) => updateScannerSettings({
                           mediumDurationWarningSec: clampScannerNumber(Number(e.target.value), 0.5, 10, 1.5)
                         })}
-                        className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                        className={INPUT_COMPACT_CLASS}
                       />
                     </div>
 
                     <div>
-                      <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.highDurationWarning}</label>
+                      <SettingLabel>{t.settings.highDurationWarning}</SettingLabel>
                       <input
                         type="number"
                         min="0.5"
@@ -380,20 +454,16 @@ export default function SettingsPanel() {
                             mediumDurationWarningSec: Math.min(mediumValue, highValue),
                           });
                         }}
-                        className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                        className={INPUT_COMPACT_CLASS}
                       />
                     </div>
 
                     <div>
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary-muted text-xs font-mono">{t.settings.playSoundOnResults} - {selectedExchange.toUpperCase()}</span>
-                        <input
-                          type="checkbox"
-                          checked={activeScannerRuntime.playSound}
-                          onChange={(e) => updateScannerRuntimeExchange(selectedExchange, { playSound: e.target.checked })}
-                          className="w-4 h-4 accent-primary cursor-pointer"
-                        />
-                      </label>
+                      <SettingCheckboxRow
+                        label={`${t.settings.playSoundOnResults} - ${selectedExchange.toUpperCase()}`}
+                        checked={activeScannerRuntime.playSound}
+                        onChange={(checked) => updateScannerRuntimeExchange(selectedExchange, { playSound: checked })}
+                      />
                     </div>
                   </div>
 
@@ -404,132 +474,120 @@ export default function SettingsPanel() {
 
                       <div className="space-y-4">
                         <div className="border border-frame rounded p-3 bg-bg-primary/40">
-                          <div className="text-primary text-xs font-mono mb-2">{t.settings.exchangeHyperliquid}</div>
+                          <div className={` mb-2`}>{t.settings.exchangeHyperliquid}</div>
 
-                          <label className="flex items-center justify-between cursor-pointer mb-3">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableExchangeAlerts} {t.settings.exchangeHyperliquid}</span>
-                            <input
-                              type="checkbox"
-                              checked={scannerTelegramByExchange.hyperliquid.enabled}
-                              onChange={(e) => updateScannerTelegramExchange('hyperliquid', { enabled: e.target.checked })}
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            className="mb-3"
+                            label={`${t.settings.enableExchangeAlerts} ${t.settings.exchangeHyperliquid}`}
+                            checked={scannerTelegramByExchange.hyperliquid.enabled}
+                            onChange={(checked) => updateScannerTelegramExchange('hyperliquid', { enabled: checked })}
+                          />
 
                           {scannerTelegramByExchange.hyperliquid.enabled && (
                             <div className="space-y-3">
                               <div>
-                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.botToken}</label>
+                                <SettingLabel>{t.settings.botToken}</SettingLabel>
                                 <input
                                   type="password"
                                   value={scannerTelegramByExchange.hyperliquid.botToken}
                                   onChange={(e) => updateScannerTelegramExchange('hyperliquid', { botToken: e.target.value })}
                                   placeholder="123456:ABC-..."
-                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                                  className={INPUT_FIELD_CLASS}
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.chatId}</label>
+                                <SettingLabel>{t.settings.chatId}</SettingLabel>
                                 <input
                                   type="text"
                                   value={scannerTelegramByExchange.hyperliquid.chatId}
                                   onChange={(e) => updateScannerTelegramExchange('hyperliquid', { chatId: e.target.value })}
                                   placeholder="-100..."
-                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                                  className={INPUT_FIELD_CLASS}
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.signalFilter}</label>
-                                <select
+                                <DropdownSelect
+                                  label={t.settings.signalFilter}
                                   value={scannerTelegramByExchange.hyperliquid.signalFilter}
-                                  onChange={(e) => updateScannerTelegramExchange('hyperliquid', { signalFilter: e.target.value as 'all' | 'bullish' | 'bearish' })}
-                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary focus:outline-none focus:border-primary"
-                                >
-                                  <option value="all">{t.settings.allSignals}</option>
-                                  <option value="bullish">{t.settings.bullishOnly}</option>
-                                  <option value="bearish">{t.settings.bearishOnly}</option>
-                                </select>
+                                  onChange={(value) => updateScannerTelegramExchange('hyperliquid', { signalFilter: value as 'all' | 'bullish' | 'bearish' })}
+                                  options={[
+                                    { value: 'all', label: t.settings.allSignals },
+                                    { value: 'bullish', label: t.settings.bullishOnly },
+                                    { value: 'bearish', label: t.settings.bearishOnly },
+                                  ]}
+                                  minWidth="min-w-64"
+                                />
                               </div>
 
-                              <label className="flex items-center justify-between cursor-pointer">
-                                <span className="text-primary-muted text-xs font-mono">{t.settings.showTpSlInMessage}</span>
-                                <input
-                                  type="checkbox"
-                                  checked={scannerTelegramByExchange.hyperliquid.showTpSl}
-                                  onChange={(e) => updateScannerTelegramExchange('hyperliquid', { showTpSl: e.target.checked })}
-                                  className="w-4 h-4 accent-primary cursor-pointer"
-                                />
-                              </label>
+                              <SettingCheckboxRow
+                                label={t.settings.showTpSlInMessage}
+                                checked={scannerTelegramByExchange.hyperliquid.showTpSl}
+                                onChange={(checked) => updateScannerTelegramExchange('hyperliquid', { showTpSl: checked })}
+                              />
                             </div>
                           )}
                         </div>
 
                         <div className="border border-frame rounded p-3 bg-bg-primary/40">
-                          <div className="text-primary text-xs font-mono mb-2">{t.settings.exchangeBinance}</div>
+                          <div className={` mb-2`}>{t.settings.exchangeBinance}</div>
 
-                          <label className="flex items-center justify-between cursor-pointer mb-3">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableExchangeAlerts} {t.settings.exchangeBinance}</span>
-                            <input
-                              type="checkbox"
-                              checked={scannerTelegramByExchange.binance.enabled}
-                              onChange={(e) => updateScannerTelegramExchange('binance', { enabled: e.target.checked })}
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            className="mb-3"
+                            label={`${t.settings.enableExchangeAlerts} ${t.settings.exchangeBinance}`}
+                            checked={scannerTelegramByExchange.binance.enabled}
+                            onChange={(checked) => updateScannerTelegramExchange('binance', { enabled: checked })}
+                          />
 
                           {scannerTelegramByExchange.binance.enabled && (
                             <div className="space-y-3">
                               <div>
-                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.botToken}</label>
+                                <SettingLabel>{t.settings.botToken}</SettingLabel>
                                 <input
                                   type="password"
                                   value={scannerTelegramByExchange.binance.botToken}
                                   onChange={(e) => updateScannerTelegramExchange('binance', { botToken: e.target.value })}
                                   placeholder="123456:ABC-..."
-                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                                  className={INPUT_FIELD_CLASS}
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.chatId}</label>
+                                <SettingLabel>{t.settings.chatId}</SettingLabel>
                                 <input
                                   type="text"
                                   value={scannerTelegramByExchange.binance.chatId}
                                   onChange={(e) => updateScannerTelegramExchange('binance', { chatId: e.target.value })}
                                   placeholder="-100..."
-                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                                  className={INPUT_FIELD_CLASS}
                                 />
                               </div>
 
                               <div>
-                                <label className="block text-primary-muted text-xs font-mono mb-1">{t.settings.signalFilter}</label>
-                                <select
+                                <DropdownSelect
+                                  label={t.settings.signalFilter}
                                   value={scannerTelegramByExchange.binance.signalFilter}
-                                  onChange={(e) => updateScannerTelegramExchange('binance', { signalFilter: e.target.value as 'all' | 'bullish' | 'bearish' })}
-                                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary focus:outline-none focus:border-primary"
-                                >
-                                  <option value="all">{t.settings.allSignals}</option>
-                                  <option value="bullish">{t.settings.bullishOnly}</option>
-                                  <option value="bearish">{t.settings.bearishOnly}</option>
-                                </select>
+                                  onChange={(value) => updateScannerTelegramExchange('binance', { signalFilter: value as 'all' | 'bullish' | 'bearish' })}
+                                  options={[
+                                    { value: 'all', label: t.settings.allSignals },
+                                    { value: 'bullish', label: t.settings.bullishOnly },
+                                    { value: 'bearish', label: t.settings.bearishOnly },
+                                  ]}
+                                  minWidth="min-w-64"
+                                />
                               </div>
 
-                              <label className="flex items-center justify-between cursor-pointer">
-                                <span className="text-primary-muted text-xs font-mono">{t.settings.showTpSlInMessage}</span>
-                                <input
-                                  type="checkbox"
-                                  checked={scannerTelegramByExchange.binance.showTpSl}
-                                  onChange={(e) => updateScannerTelegramExchange('binance', { showTpSl: e.target.checked })}
-                                  className="w-4 h-4 accent-primary cursor-pointer"
-                                />
-                              </label>
+                              <SettingCheckboxRow
+                                label={t.settings.showTpSlInMessage}
+                                checked={scannerTelegramByExchange.binance.showTpSl}
+                                onChange={(checked) => updateScannerTelegramExchange('binance', { showTpSl: checked })}
+                              />
                             </div>
                           )}
                         </div>
 
-                        <div className="text-primary-muted font-mono text-[10px]">
+                        <div className={HELP_TEXT_CLASS}>
                           {t.settings.scannerTelegramNote}
                         </div>
                       </div>
@@ -550,30 +608,26 @@ export default function SettingsPanel() {
                     {isScannerStochExpanded && (
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableStochastic}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.scanner.stochasticScanner.enabled}
-                              onChange={(e) =>
-                                updateScannerSettings({
-                                  stochasticScanner: {
-                                    ...settings.scanner.stochasticScanner,
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.enableStochastic}
+                            checked={settings.scanner.stochasticScanner.enabled}
+                            onChange={(checked) =>
+                              updateScannerSettings({
+                                stochasticScanner: {
+                                  ...settings.scanner.stochasticScanner,
+                                  enabled: checked,
+                                },
+                              })
+                            }
+                          />
                         </div>
 
                         {settings.scanner.stochasticScanner.enabled && (
                           <div className="p-3 bg-bg-secondary border border-frame rounded">
-                            <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.thresholds}</div>
+                            <div className={` mb-3`}>{t.settings.thresholds}</div>
                             <div className="grid grid-cols-2 gap-3 text-xs">
                               <div>
-                                <label className="text-primary-muted font-mono block mb-1">OVERSOLD</label>
+                                <label className={LABEL_FIELD_CLASS}>OVERSOLD</label>
                                 <input
                                   type="number"
                                   min="0"
@@ -587,11 +641,11 @@ export default function SettingsPanel() {
                                       },
                                     })
                                   }
-                                  className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                  className={INPUT_COMPACT_CLASS}
                                 />
                               </div>
                               <div>
-                                <label className="text-primary-muted font-mono block mb-1">OVERBOUGHT</label>
+                                <label className={LABEL_FIELD_CLASS}>OVERBOUGHT</label>
                                 <input
                                   type="number"
                                   min="50"
@@ -605,11 +659,11 @@ export default function SettingsPanel() {
                                       },
                                     })
                                   }
-                                  className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                  className={INPUT_COMPACT_CLASS}
                                 />
                               </div>
                             </div>
-                            <div className="mt-3 text-primary-muted font-mono text-[10px]">
+                            <div className={HELP_TEXT_CLASS}>
                               {t.settings.stochasticNote}
                             </div>
                           </div>
@@ -632,37 +686,33 @@ export default function SettingsPanel() {
                     {isScannerEmaExpanded && (
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableEmaAlignment}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.scanner.emaAlignmentScanner.enabled}
-                              onChange={(e) =>
-                                updateScannerSettings({
-                                  emaAlignmentScanner: {
-                                    ...settings.scanner.emaAlignmentScanner,
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.enableEmaAlignment}
+                            checked={settings.scanner.emaAlignmentScanner.enabled}
+                            onChange={(checked) =>
+                              updateScannerSettings({
+                                emaAlignmentScanner: {
+                                  ...settings.scanner.emaAlignmentScanner,
+                                  enabled: checked,
+                                },
+                              })
+                            }
+                          />
                         </div>
 
                         {settings.scanner.emaAlignmentScanner.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary-muted text-xs font-mono mb-2">
+                              <div className={`${HELP_TEXT_CLASS} mb-2`}>
                                 {t.settings.usesChartEmaSettings} (EMA1: {settings.indicators.ema.ema1.period}, EMA2: {settings.indicators.ema.ema2.period}, EMA3: {settings.indicators.ema.ema3.period})
                               </div>
-                              <div className="text-primary-muted text-xs font-mono">
+                              <div className={HELP_TEXT_CLASS}>
                                 {t.settings.emaAlignmentNote}
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
+                              <div className={` mb-2`}>{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
                                   <label key={tf} className="flex items-center gap-2 cursor-pointer">
@@ -680,7 +730,7 @@ export default function SettingsPanel() {
                                           },
                                         });
                                       }}
-                                      className="w-4 h-4 accent-primary cursor-pointer"
+                                      className={CHECKBOX_FIELD_CLASS}
                                     />
                                     <span className="text-primary-muted font-mono text-xs">{tf.toUpperCase()}</span>
                                   </label>
@@ -689,9 +739,9 @@ export default function SettingsPanel() {
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.lookbackPeriod}</div>
+                              <div className={` mb-3`}>{t.settings.lookbackPeriod}</div>
                               <div>
-                                <label className="text-primary-muted font-mono block mb-1 text-xs">BARS TO CHECK</label>
+                                <label className={LABEL_FIELD_CLASS}>BARS TO CHECK</label>
                                 <input
                                   type="number"
                                   min="1"
@@ -705,9 +755,9 @@ export default function SettingsPanel() {
                                       },
                                     })
                                   }
-                                  className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                  className={INPUT_COMPACT_CLASS}
                                 />
-                                <div className="text-primary-muted text-xs font-mono mt-1">
+                                <div className={` mt-1`}>
                                   {t.settings.lookbackNote}
                                 </div>
                               </div>
@@ -732,82 +782,66 @@ export default function SettingsPanel() {
                     {isScannerDivExpanded && (
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableDivergence}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.scanner.divergenceScanner.enabled}
-                              onChange={(e) =>
-                                updateScannerSettings({
-                                  divergenceScanner: {
-                                    ...settings.scanner.divergenceScanner,
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.enableDivergence}
+                            checked={settings.scanner.divergenceScanner.enabled}
+                            onChange={(checked) =>
+                              updateScannerSettings({
+                                divergenceScanner: {
+                                  ...settings.scanner.divergenceScanner,
+                                  enabled: checked,
+                                },
+                              })
+                            }
+                          />
                         </div>
 
                         {settings.scanner.divergenceScanner.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.divergenceTypes}</div>
+                              <div className={` mb-3`}>{t.settings.divergenceTypes}</div>
                               <div className="space-y-2">
-                                <label className="flex items-center justify-between cursor-pointer">
-                                  <span className="text-primary-muted text-xs font-mono">{t.settings.bullishDivergence}</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={settings.scanner.divergenceScanner.scanBullish}
-                                    onChange={(e) =>
-                                      updateScannerSettings({
-                                        divergenceScanner: {
-                                          ...settings.scanner.divergenceScanner,
-                                          scanBullish: e.target.checked,
-                                        },
-                                      })
-                                    }
-                                    className="w-4 h-4 accent-primary cursor-pointer"
-                                  />
-                                </label>
-                                <label className="flex items-center justify-between cursor-pointer">
-                                  <span className="text-primary-muted text-xs font-mono">{t.settings.bearishDivergence}</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={settings.scanner.divergenceScanner.scanBearish}
-                                    onChange={(e) =>
-                                      updateScannerSettings({
-                                        divergenceScanner: {
-                                          ...settings.scanner.divergenceScanner,
-                                          scanBearish: e.target.checked,
-                                        },
-                                      })
-                                    }
-                                    className="w-4 h-4 accent-primary cursor-pointer"
-                                  />
-                                </label>
-                                <label className="flex items-center justify-between cursor-pointer">
-                                  <span className="text-primary-muted text-xs font-mono">{t.settings.hiddenDivergences}</span>
-                                  <input
-                                    type="checkbox"
-                                    checked={settings.scanner.divergenceScanner.scanHidden}
-                                    onChange={(e) =>
-                                      updateScannerSettings({
-                                        divergenceScanner: {
-                                          ...settings.scanner.divergenceScanner,
-                                          scanHidden: e.target.checked,
-                                        },
-                                      })
-                                    }
-                                    className="w-4 h-4 accent-primary cursor-pointer"
-                                  />
-                                </label>
+                                <SettingCheckboxRow
+                                  label={t.settings.bullishDivergence}
+                                  checked={settings.scanner.divergenceScanner.scanBullish}
+                                  onChange={(checked) =>
+                                    updateScannerSettings({
+                                      divergenceScanner: {
+                                        ...settings.scanner.divergenceScanner,
+                                        scanBullish: checked,
+                                      },
+                                    })
+                                  }
+                                />
+                                <SettingCheckboxRow
+                                  label={t.settings.bearishDivergence}
+                                  checked={settings.scanner.divergenceScanner.scanBearish}
+                                  onChange={(checked) =>
+                                    updateScannerSettings({
+                                      divergenceScanner: {
+                                        ...settings.scanner.divergenceScanner,
+                                        scanBearish: checked,
+                                      },
+                                    })
+                                  }
+                                />
+                                <SettingCheckboxRow
+                                  label={t.settings.hiddenDivergences}
+                                  checked={settings.scanner.divergenceScanner.scanHidden}
+                                  onChange={(checked) =>
+                                    updateScannerSettings({
+                                      divergenceScanner: {
+                                        ...settings.scanner.divergenceScanner,
+                                        scanHidden: checked,
+                                      },
+                                    })
+                                  }
+                                />
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary-muted text-xs font-mono">
+                              <div className={HELP_TEXT_CLASS}>
                                 {t.settings.usesEnabledStochasticVariants}
                               </div>
                             </div>
@@ -832,55 +866,49 @@ export default function SettingsPanel() {
                     {isScannerMacdExpanded && (
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableMacdReversal}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.scanner.macdReversalScanner.enabled}
-                              onChange={(e) =>
-                                updateScannerSettings({
-                                  macdReversalScanner: {
-                                    ...settings.scanner.macdReversalScanner,
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.enableMacdReversal}
+                            checked={settings.scanner.macdReversalScanner.enabled}
+                            onChange={(checked) =>
+                              updateScannerSettings({
+                                macdReversalScanner: {
+                                  ...settings.scanner.macdReversalScanner,
+                                  enabled: checked,
+                                },
+                              })
+                            }
+                          />
                         </div>
 
                         {settings.scanner.macdReversalScanner.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
+                              <div className={` mb-2`}>{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
-                                  <label key={tf} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={settings.scanner.macdReversalScanner.timeframes.includes(tf)}
-                                      onChange={(e) => {
-                                        const newTimeframes = e.target.checked
-                                          ? [...settings.scanner.macdReversalScanner.timeframes, tf]
-                                          : settings.scanner.macdReversalScanner.timeframes.filter((t) => t !== tf);
-                                        updateScannerSettings({
-                                          macdReversalScanner: {
-                                            ...settings.scanner.macdReversalScanner,
-                                            timeframes: newTimeframes,
-                                          },
-                                        });
-                                      }}
-                                      className="w-4 h-4 accent-primary cursor-pointer"
-                                    />
-                                    <span className="text-primary-muted text-xs font-mono">{tf.toUpperCase()}</span>
-                                  </label>
+                                  <SettingCheckboxRow
+                                    key={tf}
+                                    className="gap-2"
+                                    label={tf.toUpperCase()}
+                                    checked={settings.scanner.macdReversalScanner.timeframes.includes(tf)}
+                                    onChange={(checked) => {
+                                      const newTimeframes = checked
+                                        ? [...settings.scanner.macdReversalScanner.timeframes, tf]
+                                        : settings.scanner.macdReversalScanner.timeframes.filter((t) => t !== tf);
+                                      updateScannerSettings({
+                                        macdReversalScanner: {
+                                          ...settings.scanner.macdReversalScanner,
+                                          timeframes: newTimeframes,
+                                        },
+                                      });
+                                    }}
+                                  />
                                 ))}
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary-muted text-xs font-mono">
+                              <div className={HELP_TEXT_CLASS}>
                                 {t.settings.detectsMacdCross} (Fast: {settings.scanner.macdReversalScanner.fastPeriod}, Slow: {settings.scanner.macdReversalScanner.slowPeriod}, Signal: {settings.scanner.macdReversalScanner.signalPeriod})
                               </div>
                             </div>
@@ -905,55 +933,49 @@ export default function SettingsPanel() {
                     {isScannerRsiExpanded && (
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableRsiReversal}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.scanner.rsiReversalScanner.enabled}
-                              onChange={(e) =>
-                                updateScannerSettings({
-                                  rsiReversalScanner: {
-                                    ...settings.scanner.rsiReversalScanner,
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.enableRsiReversal}
+                            checked={settings.scanner.rsiReversalScanner.enabled}
+                            onChange={(checked) =>
+                              updateScannerSettings({
+                                rsiReversalScanner: {
+                                  ...settings.scanner.rsiReversalScanner,
+                                  enabled: checked,
+                                },
+                              })
+                            }
+                          />
                         </div>
 
                         {settings.scanner.rsiReversalScanner.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
+                              <div className={` mb-2`}>{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
-                                  <label key={tf} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={settings.scanner.rsiReversalScanner.timeframes.includes(tf)}
-                                      onChange={(e) => {
-                                        const newTimeframes = e.target.checked
-                                          ? [...settings.scanner.rsiReversalScanner.timeframes, tf]
-                                          : settings.scanner.rsiReversalScanner.timeframes.filter((t) => t !== tf);
-                                        updateScannerSettings({
-                                          rsiReversalScanner: {
-                                            ...settings.scanner.rsiReversalScanner,
-                                            timeframes: newTimeframes,
-                                          },
-                                        });
-                                      }}
-                                      className="w-4 h-4 accent-primary cursor-pointer"
-                                    />
-                                    <span className="text-primary-muted text-xs font-mono">{tf.toUpperCase()}</span>
-                                  </label>
+                                  <SettingCheckboxRow
+                                    key={tf}
+                                    className="gap-2"
+                                    label={tf.toUpperCase()}
+                                    checked={settings.scanner.rsiReversalScanner.timeframes.includes(tf)}
+                                    onChange={(checked) => {
+                                      const newTimeframes = checked
+                                        ? [...settings.scanner.rsiReversalScanner.timeframes, tf]
+                                        : settings.scanner.rsiReversalScanner.timeframes.filter((t) => t !== tf);
+                                      updateScannerSettings({
+                                        rsiReversalScanner: {
+                                          ...settings.scanner.rsiReversalScanner,
+                                          timeframes: newTimeframes,
+                                        },
+                                      });
+                                    }}
+                                  />
                                 ))}
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary-muted text-xs font-mono">
+                              <div className={HELP_TEXT_CLASS}>
                                 {t.settings.detectsRsiZones} ({'>'}{settings.scanner.rsiReversalScanner.overboughtLevel}) / ({'<'}{settings.scanner.rsiReversalScanner.oversoldLevel}) (Period: {settings.scanner.rsiReversalScanner.period})
                               </div>
                             </div>
@@ -978,58 +1000,52 @@ export default function SettingsPanel() {
                     {isScannerVolumeExpanded && (
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableVolumeSpike}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.scanner.volumeSpikeScanner.enabled}
-                              onChange={(e) =>
-                                updateScannerSettings({
-                                  volumeSpikeScanner: {
-                                    ...settings.scanner.volumeSpikeScanner,
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.enableVolumeSpike}
+                            checked={settings.scanner.volumeSpikeScanner.enabled}
+                            onChange={(checked) =>
+                              updateScannerSettings({
+                                volumeSpikeScanner: {
+                                  ...settings.scanner.volumeSpikeScanner,
+                                  enabled: checked,
+                                },
+                              })
+                            }
+                          />
                         </div>
 
                         {settings.scanner.volumeSpikeScanner.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
+                              <div className={` mb-2`}>{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
-                                  <label key={tf} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={settings.scanner.volumeSpikeScanner.timeframes.includes(tf)}
-                                      onChange={(e) => {
-                                        const newTimeframes = e.target.checked
-                                          ? [...settings.scanner.volumeSpikeScanner.timeframes, tf]
-                                          : settings.scanner.volumeSpikeScanner.timeframes.filter((t) => t !== tf);
-                                        updateScannerSettings({
-                                          volumeSpikeScanner: {
-                                            ...settings.scanner.volumeSpikeScanner,
-                                            timeframes: newTimeframes,
-                                          },
-                                        });
-                                      }}
-                                      className="w-4 h-4 accent-primary cursor-pointer"
-                                    />
-                                    <span className="text-primary-muted text-xs font-mono">{tf.toUpperCase()}</span>
-                                  </label>
+                                  <SettingCheckboxRow
+                                    key={tf}
+                                    className="gap-2"
+                                    label={tf.toUpperCase()}
+                                    checked={settings.scanner.volumeSpikeScanner.timeframes.includes(tf)}
+                                    onChange={(checked) => {
+                                      const newTimeframes = checked
+                                        ? [...settings.scanner.volumeSpikeScanner.timeframes, tf]
+                                        : settings.scanner.volumeSpikeScanner.timeframes.filter((t) => t !== tf);
+                                      updateScannerSettings({
+                                        volumeSpikeScanner: {
+                                          ...settings.scanner.volumeSpikeScanner,
+                                          timeframes: newTimeframes,
+                                        },
+                                      });
+                                    }}
+                                  />
                                 ))}
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.thresholds}</div>
+                              <div className={` mb-3`}>{t.settings.thresholds}</div>
                               <div className="grid grid-cols-2 gap-3 text-xs">
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">VOLUME MULTIPLIER</label>
+                                  <label className={LABEL_FIELD_CLASS}>VOLUME MULTIPLIER</label>
                                   <input
                                     type="number"
                                     min="1"
@@ -1044,14 +1060,14 @@ export default function SettingsPanel() {
                                         },
                                       })
                                     }
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
-                                  <div className="text-primary-muted font-mono text-[10px] mt-1">
+                                  <div className={`${HELP_TEXT_CLASS} mt-1`}>
                                     {t.settings.currentAverage}: {settings.scanner.volumeSpikeScanner.volumeThreshold}x
                                   </div>
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">PRICE CHANGE %</label>
+                                  <label className={LABEL_FIELD_CLASS}>PRICE CHANGE %</label>
                                   <input
                                     type="number"
                                     min="0.1"
@@ -1066,9 +1082,9 @@ export default function SettingsPanel() {
                                         },
                                       })
                                     }
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
-                                  <div className="text-primary-muted font-mono text-[10px] mt-1">
+                                  <div className={`${HELP_TEXT_CLASS} mt-1`}>
                                     {t.settings.minimum}: {settings.scanner.volumeSpikeScanner.priceChangeThreshold}%
                                   </div>
                                 </div>
@@ -1076,9 +1092,9 @@ export default function SettingsPanel() {
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.lookbackPeriod}</div>
+                              <div className={` mb-3`}>{t.settings.lookbackPeriod}</div>
                               <div>
-                                <label className="text-primary-muted font-mono block mb-1 text-xs">CANDLES FOR AVG VOLUME</label>
+                                <label className={LABEL_FIELD_CLASS}>CANDLES FOR AVG VOLUME</label>
                                 <input
                                   type="number"
                                   min="5"
@@ -1092,16 +1108,16 @@ export default function SettingsPanel() {
                                       },
                                     })
                                   }
-                                  className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                  className={INPUT_COMPACT_CLASS}
                                 />
-                                <div className="text-primary-muted font-mono text-[10px] mt-1">
+                                <div className={`${HELP_TEXT_CLASS} mt-1`}>
                                   {t.settings.avgVolumeCalculatedFromLast} {settings.scanner.volumeSpikeScanner.lookbackPeriod}
                                 </div>
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary-muted text-xs font-mono">
+                              <div className={HELP_TEXT_CLASS}>
                                 {t.settings.detectsVolumeAndPriceChange} ≥{settings.scanner.volumeSpikeScanner.volumeThreshold}x / ≥{settings.scanner.volumeSpikeScanner.priceChangeThreshold}%
                               </div>
                             </div>
@@ -1126,58 +1142,52 @@ export default function SettingsPanel() {
                     {isScannerSRExpanded && (
                       <div className="p-4 space-y-4 bg-bg-primary">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableSupportResistance}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.scanner.supportResistanceScanner?.enabled || false}
-                              onChange={(e) =>
-                                updateScannerSettings({
-                                  supportResistanceScanner: {
-                                    ...settings.scanner.supportResistanceScanner,
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.enableSupportResistance}
+                            checked={settings.scanner.supportResistanceScanner?.enabled || false}
+                            onChange={(checked) =>
+                              updateScannerSettings({
+                                supportResistanceScanner: {
+                                  ...settings.scanner.supportResistanceScanner,
+                                  enabled: checked,
+                                },
+                              })
+                            }
+                          />
                         </div>
 
                         {settings.scanner.supportResistanceScanner?.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
+                              <div className={` mb-2`}>{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
-                                  <label key={tf} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={settings.scanner.supportResistanceScanner?.timeframes.includes(tf) || false}
-                                      onChange={(e) => {
-                                        const newTimeframes = e.target.checked
-                                          ? [...(settings.scanner.supportResistanceScanner?.timeframes || []), tf]
-                                          : (settings.scanner.supportResistanceScanner?.timeframes || []).filter((t) => t !== tf);
-                                        updateScannerSettings({
-                                          supportResistanceScanner: {
-                                            ...settings.scanner.supportResistanceScanner,
-                                            timeframes: newTimeframes,
-                                          },
-                                        });
-                                      }}
-                                      className="w-4 h-4 accent-primary cursor-pointer"
-                                    />
-                                    <span className="text-primary-muted text-xs font-mono">{tf.toUpperCase()}</span>
-                                  </label>
+                                  <SettingCheckboxRow
+                                    key={tf}
+                                    className="gap-2"
+                                    label={tf.toUpperCase()}
+                                    checked={settings.scanner.supportResistanceScanner?.timeframes.includes(tf) || false}
+                                    onChange={(checked) => {
+                                      const newTimeframes = checked
+                                        ? [...(settings.scanner.supportResistanceScanner?.timeframes || []), tf]
+                                        : (settings.scanner.supportResistanceScanner?.timeframes || []).filter((t) => t !== tf);
+                                      updateScannerSettings({
+                                        supportResistanceScanner: {
+                                          ...settings.scanner.supportResistanceScanner,
+                                          timeframes: newTimeframes,
+                                        },
+                                      });
+                                    }}
+                                  />
                                 ))}
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary font-mono text-xs font-bold mb-3">{t.settings.thresholds}</div>
+                              <div className={` mb-3`}>{t.settings.thresholds}</div>
                               <div className="grid grid-cols-2 gap-3 text-xs">
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">DISTANCE THRESHOLD (%)</label>
+                                  <label className={LABEL_FIELD_CLASS}>DISTANCE THRESHOLD (%)</label>
                                   <input
                                     type="number"
                                     min="0.1"
@@ -1192,14 +1202,14 @@ export default function SettingsPanel() {
                                         },
                                       })
                                     }
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
-                                  <div className="text-primary-muted font-mono text-[10px] mt-1">
+                                  <div className={`${HELP_TEXT_CLASS} mt-1`}>
                                     {t.settings.alertWhenWithinOfLevel} {settings.scanner.supportResistanceScanner?.distanceThreshold || 1.0}%
                                   </div>
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">MIN TOUCHES</label>
+                                  <label className={LABEL_FIELD_CLASS}>MIN TOUCHES</label>
                                   <input
                                     type="number"
                                     min="2"
@@ -1213,9 +1223,9 @@ export default function SettingsPanel() {
                                         },
                                       })
                                     }
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
-                                  <div className="text-primary-muted font-mono text-[10px] mt-1">
+                                  <div className={`${HELP_TEXT_CLASS} mt-1`}>
                                     {t.settings.minimumTouchesLabel}: {settings.scanner.supportResistanceScanner?.minTouches || 3}
                                   </div>
                                 </div>
@@ -1223,7 +1233,7 @@ export default function SettingsPanel() {
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary-muted text-xs font-mono">
+                              <div className={HELP_TEXT_CLASS}>
                                 {t.settings.supportResistanceNote}
                               </div>
                             </div>
@@ -1236,55 +1246,49 @@ export default function SettingsPanel() {
                     {activeScannerRuntime.enabled && (
                       <div className="space-y-3">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableKalmanTrendScanner}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.scanner.kalmanTrendScanner?.enabled || false}
-                              onChange={(e) =>
-                                updateScannerSettings({
-                                  kalmanTrendScanner: {
-                                    ...settings.scanner.kalmanTrendScanner,
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.enableKalmanTrendScanner}
+                            checked={settings.scanner.kalmanTrendScanner?.enabled || false}
+                            onChange={(checked) =>
+                              updateScannerSettings({
+                                kalmanTrendScanner: {
+                                  ...settings.scanner.kalmanTrendScanner,
+                                  enabled: checked,
+                                },
+                              })
+                            }
+                          />
                         </div>
 
                         {settings.scanner.kalmanTrendScanner?.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
+                              <div className={` mb-2`}>{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
-                                  <label key={tf} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={settings.scanner.kalmanTrendScanner?.timeframes.includes(tf) || false}
-                                      onChange={(e) => {
-                                        const newTimeframes = e.target.checked
-                                          ? [...(settings.scanner.kalmanTrendScanner?.timeframes || []), tf]
-                                          : (settings.scanner.kalmanTrendScanner?.timeframes || []).filter((t: string) => t !== tf);
-                                        updateScannerSettings({
-                                          kalmanTrendScanner: {
-                                            ...settings.scanner.kalmanTrendScanner,
-                                            timeframes: newTimeframes,
-                                          },
-                                        });
-                                      }}
-                                      className="w-4 h-4 accent-primary cursor-pointer"
-                                    />
-                                    <span className="text-primary-muted text-xs font-mono">{tf.toUpperCase()}</span>
-                                  </label>
+                                  <SettingCheckboxRow
+                                    key={tf}
+                                    className="gap-2"
+                                    label={tf.toUpperCase()}
+                                    checked={settings.scanner.kalmanTrendScanner?.timeframes.includes(tf) || false}
+                                    onChange={(checked) => {
+                                      const newTimeframes = checked
+                                        ? [...(settings.scanner.kalmanTrendScanner?.timeframes || []), tf]
+                                        : (settings.scanner.kalmanTrendScanner?.timeframes || []).filter((t: string) => t !== tf);
+                                      updateScannerSettings({
+                                        kalmanTrendScanner: {
+                                          ...settings.scanner.kalmanTrendScanner,
+                                          timeframes: newTimeframes,
+                                        },
+                                      });
+                                    }}
+                                  />
                                 ))}
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded">
-                              <div className="text-primary-muted text-xs font-mono">
+                              <div className={HELP_TEXT_CLASS}>
                                 {t.settings.detectsKalmanTrendReversals}
                               </div>
                             </div>
@@ -1297,55 +1301,49 @@ export default function SettingsPanel() {
                     {activeScannerRuntime.enabled && (
                       <div className="space-y-3">
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted text-xs font-mono">{t.settings.enableRitchiTrendScanner}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.scanner.ritchiTrendScanner?.enabled || false}
-                              onChange={(e) =>
-                                updateScannerSettings({
-                                  ritchiTrendScanner: {
-                                    ...settings.scanner.ritchiTrendScanner,
-                                    enabled: e.target.checked,
-                                  },
-                                })
-                              }
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.enableRitchiTrendScanner}
+                            checked={settings.scanner.ritchiTrendScanner?.enabled || false}
+                            onChange={(checked) =>
+                              updateScannerSettings({
+                                ritchiTrendScanner: {
+                                  ...settings.scanner.ritchiTrendScanner,
+                                  enabled: checked,
+                                },
+                              })
+                            }
+                          />
                         </div>
 
                         {settings.scanner.ritchiTrendScanner?.enabled && (
                           <>
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.timeframesToScan}</div>
+                              <div className={` mb-2`}>{t.settings.timeframesToScan}</div>
                               <div className="grid grid-cols-2 gap-2">
                                 {(['1m', '5m'] as const).map((tf) => (
-                                  <label key={tf} className="flex items-center gap-2 cursor-pointer">
-                                    <input
-                                      type="checkbox"
-                                      checked={settings.scanner.ritchiTrendScanner?.timeframes.includes(tf) || false}
-                                      onChange={(e) => {
-                                        const newTimeframes = e.target.checked
-                                          ? [...(settings.scanner.ritchiTrendScanner?.timeframes || []), tf]
-                                          : (settings.scanner.ritchiTrendScanner?.timeframes || []).filter((t: string) => t !== tf);
-                                        updateScannerSettings({
-                                          ritchiTrendScanner: {
-                                            ...settings.scanner.ritchiTrendScanner,
-                                            timeframes: newTimeframes,
-                                          },
-                                        });
-                                      }}
-                                      className="w-4 h-4 accent-primary cursor-pointer"
-                                    />
-                                    <span className="text-primary-muted text-xs font-mono">{tf.toUpperCase()}</span>
-                                  </label>
+                                  <SettingCheckboxRow
+                                    key={tf}
+                                    className="gap-2"
+                                    label={tf.toUpperCase()}
+                                    checked={settings.scanner.ritchiTrendScanner?.timeframes.includes(tf) || false}
+                                    onChange={(checked) => {
+                                      const newTimeframes = checked
+                                        ? [...(settings.scanner.ritchiTrendScanner?.timeframes || []), tf]
+                                        : (settings.scanner.ritchiTrendScanner?.timeframes || []).filter((t: string) => t !== tf);
+                                      updateScannerSettings({
+                                        ritchiTrendScanner: {
+                                          ...settings.scanner.ritchiTrendScanner,
+                                          timeframes: newTimeframes,
+                                        },
+                                      });
+                                    }}
+                                  />
                                 ))}
                               </div>
                             </div>
 
                             <div className="p-3 bg-bg-secondary border border-frame rounded space-y-2">
-                              <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.parameters}</div>
+                              <div className={` mb-2`}>{t.settings.parameters}</div>
                               
                               <div className="space-y-1">
                                 <label className="text-primary-muted text-xs font-mono">{t.settings.pivotLength}</label>
@@ -1362,7 +1360,7 @@ export default function SettingsPanel() {
                                       },
                                     })
                                   }
-                                  className="w-full px-2 py-1 bg-bg-primary border border-frame text-primary text-xs font-mono rounded"
+                                  className={INPUT_COMPACT_CLASS}
                                 />
                               </div>
 
@@ -1381,7 +1379,7 @@ export default function SettingsPanel() {
                                       },
                                     })
                                   }
-                                  className="w-full px-2 py-1 bg-bg-primary border border-frame text-primary text-xs font-mono rounded"
+                                  className={INPUT_COMPACT_CLASS}
                                 />
                               </div>
 
@@ -1400,7 +1398,7 @@ export default function SettingsPanel() {
                                       },
                                     })
                                   }
-                                  className="w-full px-2 py-1 bg-bg-primary border border-frame text-primary text-xs font-mono rounded"
+                                  className={INPUT_COMPACT_CLASS}
                                 />
                               </div>
                             </div>
@@ -1414,6 +1412,97 @@ export default function SettingsPanel() {
                         )}
                       </div>
                     )}
+
+                    {/* Trend Matrix Scanner - Collapsible Section */}
+                    <div className="border border-frame rounded overflow-hidden">
+                      <button
+                        onClick={() => setIsScannerTrendMatrixExpanded(!isScannerTrendMatrixExpanded)}
+                        className="w-full p-3 bg-bg-secondary flex items-center justify-between hover:bg-primary/5 transition-colors"
+                      >
+                        <div className="flex items-center gap-2">
+                          <span className="text-primary font-mono text-xs font-bold">Trend Matrix Scanner</span>
+                        </div>
+                        <span className="text-primary text-base">{isScannerTrendMatrixExpanded ? '▼' : '▶'}</span>
+                      </button>
+
+                      {isScannerTrendMatrixExpanded && (
+                        <div className="p-4 space-y-4 bg-bg-primary">
+                          <div className="p-3 bg-bg-secondary border border-frame rounded">
+                            <SettingCheckboxRow
+                              label="Enable Trend Matrix Scanner"
+                              checked={settings.scanner.trendMatrixScanner?.enabled || false}
+                              onChange={(checked) =>
+                                updateScannerSettings({
+                                  trendMatrixScanner: {
+                                    ...settings.scanner.trendMatrixScanner,
+                                    enabled: checked,
+                                  },
+                                })
+                              }
+                            />
+                          </div>
+
+                          {settings.scanner.trendMatrixScanner?.enabled && (
+                            <>
+                              <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
+                                <div className={` mb-2`}>TIMEFRAMES TO SCAN</div>
+                                <div className="grid grid-cols-2 gap-2">
+                                  {(['1m', '5m'] as const).map((tf) => (
+                                    <label key={tf} className="flex items-center gap-2 cursor-pointer">
+                                      <input
+                                        type="checkbox"
+                                        checked={settings.scanner.trendMatrixScanner?.timeframes.includes(tf) || false}
+                                        onChange={(e) => {
+                                          const newTimeframes = e.target.checked
+                                            ? [...(settings.scanner.trendMatrixScanner?.timeframes || []), tf]
+                                            : (settings.scanner.trendMatrixScanner?.timeframes || []).filter((t: string) => t !== tf);
+                                          updateScannerSettings({
+                                            trendMatrixScanner: {
+                                              ...settings.scanner.trendMatrixScanner,
+                                              timeframes: newTimeframes,
+                                            },
+                                          });
+                                        }}
+                                        className={CHECKBOX_FIELD_CLASS}
+                                      />
+                                      <span className="text-primary-muted text-xs font-mono">{tf.toUpperCase()}</span>
+                                    </label>
+                                  ))}
+                                </div>
+                              </div>
+
+                              <div className="p-3 bg-bg-secondary border border-frame rounded">
+                                <div className={` mb-2`}>SIGNAL LOOKBACK (BARS)</div>
+                                <input
+                                  type="number"
+                                  min="1"
+                                  max="30"
+                                  value={settings.scanner.trendMatrixScanner?.signalLookback || 10}
+                                  onChange={(e) =>
+                                    updateScannerSettings({
+                                      trendMatrixScanner: {
+                                        ...settings.scanner.trendMatrixScanner,
+                                        signalLookback: clampScannerNumber(Number(e.target.value), 1, 30, 10),
+                                      },
+                                    })
+                                  }
+                                  className={INPUT_COMPACT_CLASS}
+                                />
+                                <div className={`${HELP_TEXT_CLASS} mt-1`}>
+                                  Scan signal within last {settings.scanner.trendMatrixScanner?.signalLookback || 10} bars.
+                                </div>
+                              </div>
+
+                              <div className="p-3 bg-bg-secondary border border-frame rounded">
+                              <div className={HELP_TEXT_CLASS}>
+                                  Uses Trend Matrix parameters from Indicators tab for signal calculation.
+                                </div>
+                              </div>
+                            </>
+                          )}
+                        </div>
+                      )}
+                    </div>
                   </div>
                 </>
               )}
@@ -1438,49 +1527,42 @@ export default function SettingsPanel() {
                   <div className="p-4 space-y-4 bg-bg-primary">
                     {/* Global Toggle */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary-muted text-xs font-mono">{t.settings.showStochasticVariants}</span>
-                        <input
-                          type="checkbox"
-                          checked={settings.indicators.stochastic.showMultiVariant}
-                          onChange={(e) => updateStochasticSettings({ showMultiVariant: e.target.checked })}
-                          className="w-4 h-4 accent-primary cursor-pointer"
-                        />
-                      </label>
+                      <SettingCheckboxRow
+                        label={t.settings.showStochasticVariants}
+                        checked={settings.indicators.stochastic.showMultiVariant}
+                        onChange={(checked) => updateStochasticSettings({ showMultiVariant: checked })}
+                      />
                     </div>
 
                     {/* Divergence Settings */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary-muted text-xs font-mono">{t.settings.showDivergenceLines}</span>
-                        <input
-                          type="checkbox"
-                          checked={settings.indicators.stochastic.showDivergence}
-                          onChange={(e) => updateStochasticSettings({ showDivergence: e.target.checked })}
-                          className="w-4 h-4 accent-primary cursor-pointer"
-                        />
-                      </label>
+                      <SettingCheckboxRow
+                        label={t.settings.showDivergenceLines}
+                        checked={settings.indicators.stochastic.showDivergence}
+                        onChange={(checked) => updateStochasticSettings({ showDivergence: checked })}
+                      />
 
                       {settings.indicators.stochastic.showDivergence && (
                         <div>
-                          <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.divergenceVariant}</label>
-                          <select
+                          <DropdownSelect
+                            label={t.settings.divergenceVariant}
                             value={settings.indicators.stochastic.divergenceVariant}
-                            onChange={(e) => updateStochasticSettings({ divergenceVariant: e.target.value as any })}
-                            className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
-                          >
-                            <option value="ultraFast">{t.settings.ultraFast}</option>
-                            <option value="fast">{t.settings.fast}</option>
-                            <option value="medium">{t.settings.medium}</option>
-                            <option value="slow">{t.settings.slow}</option>
-                          </select>
+                            onChange={(value) => updateStochasticSettings({ divergenceVariant: value as any })}
+                            options={[
+                              { value: 'ultraFast', label: t.settings.ultraFast },
+                              { value: 'fast', label: t.settings.fast },
+                              { value: 'medium', label: t.settings.medium },
+                              { value: 'slow', label: t.settings.slow },
+                            ]}
+                            minWidth="min-w-56"
+                          />
                         </div>
                       )}
                     </div>
 
                     {/* Variant Configuration */}
                     <div className="space-y-2">
-                      <div className="text-primary text-xs font-mono mb-2">{t.settings.variantConfiguration}</div>
+                      <div className={` mb-2`}>{t.settings.variantConfiguration}</div>
 
                       {(Object.keys(settings.indicators.stochastic.variants) as Array<keyof typeof settings.indicators.stochastic.variants>).map((variant) => {
                         const config = settings.indicators.stochastic.variants[variant];
@@ -1493,27 +1575,25 @@ export default function SettingsPanel() {
                           <div key={variant} className="p-3 bg-bg-secondary border border-frame rounded">
                             <div className="flex items-center justify-between mb-3">
                               <span className="text-primary font-mono text-xs font-bold">{variantLabel}</span>
-                              <label className="flex items-center cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={config.enabled}
-                                  onChange={(e) => {
-                                    updateStochasticSettings({
-                                      variants: {
-                                        ...settings.indicators.stochastic.variants,
-                                        [variant]: { ...config, enabled: e.target.checked },
-                                      },
-                                    });
-                                  }}
-                                  className="w-4 h-4 accent-primary cursor-pointer"
-                                />
-                              </label>
+                              <SettingCheckboxRow
+                                label=""
+                                checked={config.enabled}
+                                onChange={(checked) => {
+                                  updateStochasticSettings({
+                                    variants: {
+                                      ...settings.indicators.stochastic.variants,
+                                      [variant]: { ...config, enabled: checked },
+                                    },
+                                  });
+                                }}
+                                className="justify-end"
+                              />
                             </div>
 
                             {config.enabled && (
                               <div className="grid grid-cols-3 gap-3 text-xs">
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.period}</label>
+                                  <label className={LABEL_FIELD_CLASS}>{t.settings.period}</label>
                                   <input
                                     type="number"
                                     min="5"
@@ -1527,11 +1607,11 @@ export default function SettingsPanel() {
                                         },
                                       });
                                     }}
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.smoothK}</label>
+                                  <label className={LABEL_FIELD_CLASS}>{t.settings.smoothK}</label>
                                   <input
                                     type="number"
                                     min="1"
@@ -1545,11 +1625,11 @@ export default function SettingsPanel() {
                                         },
                                       });
                                     }}
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.smoothD}</label>
+                                  <label className={LABEL_FIELD_CLASS}>{t.settings.smoothD}</label>
                                   <input
                                     type="number"
                                     min="1"
@@ -1563,7 +1643,7 @@ export default function SettingsPanel() {
                                         },
                                       });
                                     }}
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
                                 </div>
                               </div>
@@ -1594,22 +1674,20 @@ export default function SettingsPanel() {
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-primary font-mono text-xs font-bold">{t.settings.ema1}</span>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={settings.indicators.ema.ema1.enabled}
-                            onChange={(e) => {
-                              updateEmaSettings({
-                                ema1: { ...settings.indicators.ema.ema1, enabled: e.target.checked },
-                              });
-                            }}
-                            className="w-4 h-4 accent-primary cursor-pointer"
-                          />
-                        </label>
+                        <SettingCheckboxRow
+                          label=""
+                          checked={settings.indicators.ema.ema1.enabled}
+                          onChange={(checked) => {
+                            updateEmaSettings({
+                              ema1: { ...settings.indicators.ema.ema1, enabled: checked },
+                            });
+                          }}
+                          className="justify-end"
+                        />
                       </div>
                       {settings.indicators.ema.ema1.enabled && (
                         <div>
-                          <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.period}</label>
+                          <SettingLabel>{t.settings.period}</SettingLabel>
                           <input
                             type="number"
                             min="2"
@@ -1620,7 +1698,7 @@ export default function SettingsPanel() {
                                 ema1: { ...settings.indicators.ema.ema1, period: Number(e.target.value) },
                               });
                             }}
-                            className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                            className={INPUT_COMPACT_CLASS}
                           />
                         </div>
                       )}
@@ -1630,22 +1708,20 @@ export default function SettingsPanel() {
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-primary font-mono text-xs font-bold">{t.settings.ema2}</span>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={settings.indicators.ema.ema2.enabled}
-                            onChange={(e) => {
-                              updateEmaSettings({
-                                ema2: { ...settings.indicators.ema.ema2, enabled: e.target.checked },
-                              });
-                            }}
-                            className="w-4 h-4 accent-primary cursor-pointer"
-                          />
-                        </label>
+                        <SettingCheckboxRow
+                          label=""
+                          checked={settings.indicators.ema.ema2.enabled}
+                          onChange={(checked) => {
+                            updateEmaSettings({
+                              ema2: { ...settings.indicators.ema.ema2, enabled: checked },
+                            });
+                          }}
+                          className="justify-end"
+                        />
                       </div>
                       {settings.indicators.ema.ema2.enabled && (
                         <div>
-                          <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.period}</label>
+                          <SettingLabel>{t.settings.period}</SettingLabel>
                           <input
                             type="number"
                             min="2"
@@ -1656,7 +1732,7 @@ export default function SettingsPanel() {
                                 ema2: { ...settings.indicators.ema.ema2, period: Number(e.target.value) },
                               });
                             }}
-                            className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                            className={INPUT_COMPACT_CLASS}
                           />
                         </div>
                       )}
@@ -1666,22 +1742,20 @@ export default function SettingsPanel() {
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
                       <div className="flex items-center justify-between mb-3">
                         <span className="text-primary font-mono text-xs font-bold">{t.settings.ema3}</span>
-                        <label className="flex items-center cursor-pointer">
-                          <input
-                            type="checkbox"
-                            checked={settings.indicators.ema.ema3.enabled}
-                            onChange={(e) => {
-                              updateEmaSettings({
-                                ema3: { ...settings.indicators.ema.ema3, enabled: e.target.checked },
-                              });
-                            }}
-                            className="w-4 h-4 accent-primary cursor-pointer"
-                          />
-                        </label>
+                        <SettingCheckboxRow
+                          label=""
+                          checked={settings.indicators.ema.ema3.enabled}
+                          onChange={(checked) => {
+                            updateEmaSettings({
+                              ema3: { ...settings.indicators.ema.ema3, enabled: checked },
+                            });
+                          }}
+                          className="justify-end"
+                        />
                       </div>
                       {settings.indicators.ema.ema3.enabled && (
                         <div>
-                          <label className="text-primary-muted font-mono block mb-1 text-xs">{t.settings.period}</label>
+                          <SettingLabel>{t.settings.period}</SettingLabel>
                           <input
                             type="number"
                             min="2"
@@ -1692,7 +1766,7 @@ export default function SettingsPanel() {
                                 ema3: { ...settings.indicators.ema.ema3, period: Number(e.target.value) },
                               });
                             }}
-                            className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                            className={INPUT_COMPACT_CLASS}
                           />
                         </div>
                       )}
@@ -1717,20 +1791,16 @@ export default function SettingsPanel() {
                   <div className="p-4 space-y-4 bg-bg-primary">
                     {/* Global Toggle */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary-muted text-xs font-mono">{t.settings.showMultiTimeframeMacd}</span>
-                        <input
-                          type="checkbox"
-                          checked={settings.indicators.macd.showMultiTimeframe}
-                          onChange={(e) => updateMacdSettings({ showMultiTimeframe: e.target.checked })}
-                          className="w-4 h-4 accent-primary cursor-pointer"
-                        />
-                      </label>
+                      <SettingCheckboxRow
+                        label={t.settings.showMultiTimeframeMacd}
+                        checked={settings.indicators.macd.showMultiTimeframe}
+                        onChange={(checked) => updateMacdSettings({ showMultiTimeframe: checked })}
+                      />
                     </div>
 
                     {/* Timeframe Configuration */}
                     <div className="space-y-2">
-                      <div className="text-primary text-xs font-mono mb-2">{t.settings.timeframeConfiguration}</div>
+                      <div className={` mb-2`}>{t.settings.timeframeConfiguration}</div>
 
                       {(Object.keys(settings.indicators.macd.timeframes) as Array<keyof typeof settings.indicators.macd.timeframes>).map((timeframe) => {
                         const config = settings.indicators.macd.timeframes[timeframe];
@@ -1738,27 +1808,25 @@ export default function SettingsPanel() {
                           <div key={timeframe} className="p-3 bg-bg-secondary border border-frame rounded">
                             <div className="flex items-center justify-between mb-3">
                               <span className="text-primary font-mono text-xs font-bold">{timeframe.toUpperCase()}</span>
-                              <label className="flex items-center cursor-pointer">
-                                <input
-                                  type="checkbox"
-                                  checked={config.enabled}
-                                  onChange={(e) => {
-                                    updateMacdSettings({
-                                      timeframes: {
-                                        ...settings.indicators.macd.timeframes,
-                                        [timeframe]: { ...config, enabled: e.target.checked },
-                                      },
-                                    });
-                                  }}
-                                  className="w-4 h-4 accent-primary cursor-pointer"
-                                />
-                              </label>
+                              <SettingCheckboxRow
+                                label=""
+                                checked={config.enabled}
+                                onChange={(checked) => {
+                                  updateMacdSettings({
+                                    timeframes: {
+                                      ...settings.indicators.macd.timeframes,
+                                      [timeframe]: { ...config, enabled: checked },
+                                    },
+                                  });
+                                }}
+                                className="justify-end"
+                              />
                             </div>
 
                             {config.enabled && (
                               <div className="grid grid-cols-3 gap-3 text-xs">
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.fastPeriod}</label>
+                                      <SettingLabel>{t.settings.fastPeriod}</SettingLabel>
                                   <input
                                     type="number"
                                     min="2"
@@ -1772,11 +1840,11 @@ export default function SettingsPanel() {
                                         },
                                       });
                                     }}
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.slowPeriod}</label>
+                                      <SettingLabel>{t.settings.slowPeriod}</SettingLabel>
                                   <input
                                     type="number"
                                     min="2"
@@ -1790,11 +1858,11 @@ export default function SettingsPanel() {
                                         },
                                       });
                                     }}
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
                                 </div>
                                 <div>
-                                  <label className="text-primary-muted font-mono block mb-1">{t.settings.signalPeriod}</label>
+                                      <SettingLabel>{t.settings.signalPeriod}</SettingLabel>
                                   <input
                                     type="number"
                                     min="2"
@@ -1808,7 +1876,7 @@ export default function SettingsPanel() {
                                         },
                                       });
                                     }}
-                                    className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                    className={INPUT_COMPACT_CLASS}
                                   />
                                 </div>
                               </div>
@@ -1837,95 +1905,84 @@ export default function SettingsPanel() {
                   <div className="p-4 space-y-3 bg-bg-primary">
                     {/* Enable Toggle */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary font-mono text-xs font-bold">{t.settings.enabled}</span>
-                        <input
-                          type="checkbox"
-                          checked={settings.indicators.kalmanTrend.enabled}
-                          onChange={(e) => updateKalmanTrendSettings({ enabled: e.target.checked })}
-                          className="w-4 h-4 accent-primary cursor-pointer"
-                        />
-                      </label>
+                      <SettingCheckboxRow
+                        label={t.settings.enabled}
+                        checked={settings.indicators.kalmanTrend.enabled}
+                        onChange={(checked) => updateKalmanTrendSettings({ enabled: checked })}
+                        labelClassName="font-bold font-mono"
+                      />
                     </div>
 
                     {settings.indicators.kalmanTrend.enabled && (
                       <div className="space-y-3">
                         {/* Show Signals */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted font-mono text-xs">{t.settings.showBuySellSignals}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.indicators.kalmanTrend.showSignals}
-                              onChange={(e) => updateKalmanTrendSettings({ showSignals: e.target.checked })}
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.showBuySellSignals}
+                            checked={settings.indicators.kalmanTrend.showSignals}
+                            onChange={(checked) => updateKalmanTrendSettings({ showSignals: checked })}
+                          />
                         </div>
 
                         {/* Volume Confirmation */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted font-mono text-xs">{t.settings.volumeConfirmation}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.indicators.kalmanTrend.volConfirm}
-                              onChange={(e) => updateKalmanTrendSettings({ volConfirm: e.target.checked })}
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.volumeConfirmation}
+                            checked={settings.indicators.kalmanTrend.volConfirm}
+                            onChange={(checked) => updateKalmanTrendSettings({ volConfirm: checked })}
+                          />
                         </div>
 
                         {/* Parameters */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                          <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.parameters}</div>
+                          <div className={` mb-2`}>{t.settings.parameters}</div>
                           <div className="grid grid-cols-2 gap-3 text-xs">
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.processNoise}</label>
+                              <SettingLabel>{t.settings.processNoise}</SettingLabel>
                               <input
                                 type="number"
                                 min="0.0001"
                                 max="0.01"
                                 step="0.0001"
                                 value={settings.indicators.kalmanTrend.processNoise}
-                                onChange={(e) => updateKalmanTrendSettings({ processNoise: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                onChange={(e) => updateKalmanTrendSettings({ processNoise: parseKalmanNumber(e.target.value, 0.0001, 0.01, settings.indicators.kalmanTrend.processNoise) })}
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.measurementNoise}</label>
+                              <SettingLabel>{t.settings.measurementNoise}</SettingLabel>
                               <input
                                 type="number"
                                 min="0.01"
                                 max="2.0"
                                 step="0.01"
                                 value={settings.indicators.kalmanTrend.measurementNoise}
-                                onChange={(e) => updateKalmanTrendSettings({ measurementNoise: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                onChange={(e) => updateKalmanTrendSettings({ measurementNoise: parseKalmanNumber(e.target.value, 0.01, 2.0, settings.indicators.kalmanTrend.measurementNoise) })}
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.bandMultiplier}</label>
+                              <SettingLabel>{t.settings.bandMultiplier}</SettingLabel>
                               <input
                                 type="number"
                                 min="0.5"
                                 max="5.0"
                                 step="0.1"
                                 value={settings.indicators.kalmanTrend.bandMultiplier}
-                                onChange={(e) => updateKalmanTrendSettings({ bandMultiplier: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                onChange={(e) => updateKalmanTrendSettings({ bandMultiplier: parseKalmanNumber(e.target.value, 0.5, 5.0, settings.indicators.kalmanTrend.bandMultiplier) })}
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.volThreshold}</label>
+                              <SettingLabel>{t.settings.volThreshold}</SettingLabel>
                               <input
                                 type="number"
                                 min="0.0"
                                 max="2.0"
                                 step="0.1"
                                 value={settings.indicators.kalmanTrend.volThreshold}
-                                onChange={(e) => updateKalmanTrendSettings({ volThreshold: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                onChange={(e) => updateKalmanTrendSettings({ volThreshold: parseKalmanNumber(e.target.value, 0.0, 2.0, settings.indicators.kalmanTrend.volThreshold) })}
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                           </div>
@@ -1952,38 +2009,31 @@ export default function SettingsPanel() {
                   <div className="p-4 space-y-3 bg-bg-primary">
                     {/* Enable Toggle */}
                     <div className="p-3 bg-bg-secondary border border-frame rounded">
-                      <label className="flex items-center justify-between cursor-pointer">
-                        <span className="text-primary font-mono text-xs font-bold">{t.settings.enabled}</span>
-                        <input
-                          type="checkbox"
-                          checked={settings.indicators.sieuXuHuong.enabled}
-                          onChange={(e) => updateSieuXuHuongSettings({ enabled: e.target.checked })}
-                          className="w-4 h-4 accent-primary cursor-pointer"
-                        />
-                      </label>
+                      <SettingCheckboxRow
+                        label={t.settings.enabled}
+                        checked={settings.indicators.sieuXuHuong.enabled}
+                        onChange={(checked) => updateSieuXuHuongSettings({ enabled: checked })}
+                        labelClassName="font-bold font-mono"
+                      />
                     </div>
 
                     {settings.indicators.sieuXuHuong.enabled && (
                       <div className="space-y-3">
                         {/* Show Signals */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded">
-                          <label className="flex items-center justify-between cursor-pointer">
-                            <span className="text-primary-muted font-mono text-xs">{t.settings.showBuySellSignals}</span>
-                            <input
-                              type="checkbox"
-                              checked={settings.indicators.sieuXuHuong.showSignals}
-                              onChange={(e) => updateSieuXuHuongSettings({ showSignals: e.target.checked })}
-                              className="w-4 h-4 accent-primary cursor-pointer"
-                            />
-                          </label>
+                          <SettingCheckboxRow
+                            label={t.settings.showBuySellSignals}
+                            checked={settings.indicators.sieuXuHuong.showSignals}
+                            onChange={(checked) => updateSieuXuHuongSettings({ showSignals: checked })}
+                          />
                         </div>
 
                         {/* Pivot & SMA Parameters */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                          <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.pivotAndSma}</div>
+                          <div className={` mb-2`}>{t.settings.pivotAndSma}</div>
                           <div className="grid grid-cols-2 gap-3 text-xs">
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.pivotLength}</label>
+                              <SettingLabel>{t.settings.pivotLength}</SettingLabel>
                               <input
                                 type="number"
                                 min="1"
@@ -1991,11 +2041,11 @@ export default function SettingsPanel() {
                                 step="1"
                                 value={settings.indicators.sieuXuHuong.pivLen}
                                 onChange={(e) => updateSieuXuHuongSettings({ pivLen: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.smaMin}</label>
+                              <SettingLabel>{t.settings.smaMin}</SettingLabel>
                               <input
                                 type="number"
                                 min="2"
@@ -2003,11 +2053,11 @@ export default function SettingsPanel() {
                                 step="1"
                                 value={settings.indicators.sieuXuHuong.smaMin}
                                 onChange={(e) => updateSieuXuHuongSettings({ smaMin: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.smaMax}</label>
+                              <SettingLabel>{t.settings.smaMax}</SettingLabel>
                               <input
                                 type="number"
                                 min="10"
@@ -2015,11 +2065,11 @@ export default function SettingsPanel() {
                                 step="1"
                                 value={settings.indicators.sieuXuHuong.smaMax}
                                 onChange={(e) => updateSieuXuHuongSettings({ smaMax: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.smaMultiplier}</label>
+                              <SettingLabel>{t.settings.smaMultiplier}</SettingLabel>
                               <input
                                 type="number"
                                 min="0.1"
@@ -2027,7 +2077,7 @@ export default function SettingsPanel() {
                                 step="0.1"
                                 value={settings.indicators.sieuXuHuong.smaMult}
                                 onChange={(e) => updateSieuXuHuongSettings({ smaMult: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                           </div>
@@ -2035,10 +2085,10 @@ export default function SettingsPanel() {
 
                         {/* Trend & Risk Parameters */}
                         <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
-                          <div className="text-primary font-mono text-xs font-bold mb-2">{t.settings.trendAndRisk}</div>
+                          <div className={` mb-2`}>{t.settings.trendAndRisk}</div>
                           <div className="grid grid-cols-2 gap-3 text-xs">
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.trendLengthColor}</label>
+                              <SettingLabel>{t.settings.trendLengthColor}</SettingLabel>
                               <input
                                 type="number"
                                 min="10"
@@ -2046,11 +2096,11 @@ export default function SettingsPanel() {
                                 step="10"
                                 value={settings.indicators.sieuXuHuong.trendLen}
                                 onChange={(e) => updateSieuXuHuongSettings({ trendLen: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.atrMultSl}</label>
+                              <SettingLabel>{t.settings.atrMultSl}</SettingLabel>
                               <input
                                 type="number"
                                 min="0.5"
@@ -2058,11 +2108,11 @@ export default function SettingsPanel() {
                                 step="0.1"
                                 value={settings.indicators.sieuXuHuong.atrMult}
                                 onChange={(e) => updateSieuXuHuongSettings({ atrMult: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                             <div>
-                              <label className="text-primary-muted font-mono block mb-1">{t.settings.tpMultiplier}</label>
+                              <SettingLabel>{t.settings.tpMultiplier}</SettingLabel>
                               <input
                                 type="number"
                                 min="0.5"
@@ -2070,12 +2120,98 @@ export default function SettingsPanel() {
                                 step="0.1"
                                 value={settings.indicators.sieuXuHuong.tpMult}
                                 onChange={(e) => updateSieuXuHuongSettings({ tpMult: Number(e.target.value) })}
-                                className="w-full bg-bg-primary border border-frame text-primary px-2 py-1 rounded font-mono text-xs"
+                                className={INPUT_COMPACT_CLASS}
                               />
                             </div>
                           </div>
                         </div>
                       </div>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Trend Matrix */}
+              <div className="border border-frame rounded overflow-hidden">
+                <button
+                  onClick={() => setIsTrendMatrixExpanded(!isTrendMatrixExpanded)}
+                  className="w-full flex items-center justify-between p-3 bg-bg-secondary hover:bg-bg-primary transition-colors"
+                >
+                  <div className="flex items-center gap-2">
+                    <span className="text-primary font-mono text-xs font-bold">█ TREND MATRIX</span>
+                  </div>
+                  <span className="text-primary text-base">{isTrendMatrixExpanded ? '▼' : '▶'}</span>
+                </button>
+
+                {isTrendMatrixExpanded && (
+                  <div className="p-4 space-y-3 bg-bg-primary">
+                    <div className="p-3 bg-bg-secondary border border-frame rounded">
+                      <SettingCheckboxRow
+                        label={t.settings.enabled}
+                        checked={settings.indicators.trendMatrix.enabled}
+                        onChange={(checked) => updateTrendMatrixSettings({ enabled: checked })}
+                        labelClassName="font-bold font-mono"
+                      />
+                    </div>
+
+                    {settings.indicators.trendMatrix.enabled && (
+                      <>
+                        <div className="p-3 bg-bg-secondary border border-frame rounded space-y-3">
+                          <div className={` mb-2`}>{t.settings.parameters}</div>
+                          <div className="grid grid-cols-2 gap-3 text-xs">
+                            <div>
+                              <SettingLabel>MS Len</SettingLabel>
+                              <input type="number" min="2" max="50" value={settings.indicators.trendMatrix.msLen} onChange={(e) => updateTrendMatrixSettings({ msLen: Number(e.target.value) || 2 })} className={INPUT_COMPACT_CLASS} />
+                            </div>
+                            <div>
+                              <SettingLabel>HTF EMA</SettingLabel>
+                              <input type="number" min="2" max="200" value={settings.indicators.trendMatrix.htfEmaLen} onChange={(e) => updateTrendMatrixSettings({ htfEmaLen: Number(e.target.value) || 2 })} className={INPUT_COMPACT_CLASS} />
+                            </div>
+                            <div>
+                              <SettingLabel>ATR Len</SettingLabel>
+                              <input type="number" min="1" max="100" value={settings.indicators.trendMatrix.atrLength} onChange={(e) => updateTrendMatrixSettings({ atrLength: Number(e.target.value) || 1 })} className={INPUT_COMPACT_CLASS} />
+                            </div>
+                            <div>
+                              <SettingLabel>ATR Mult</SettingLabel>
+                              <input type="number" min="0.1" max="20" step="0.1" value={settings.indicators.trendMatrix.atrMult} onChange={(e) => updateTrendMatrixSettings({ atrMult: Number(e.target.value) || 0.1 })} className={INPUT_COMPACT_CLASS} />
+                            </div>
+                            <div>
+                              <SettingLabel>TP Step</SettingLabel>
+                              <input type="number" min="0.1" max="20" step="0.1" value={settings.indicators.trendMatrix.targetStepMult} onChange={(e) => updateTrendMatrixSettings({ targetStepMult: Number(e.target.value) || 0.1 })} className={INPUT_COMPACT_CLASS} />
+                            </div>
+                            <div>
+                              <SettingLabel>Risk %</SettingLabel>
+                              <input type="number" min="0.1" max="100" step="0.1" value={settings.indicators.trendMatrix.riskPercent} onChange={(e) => updateTrendMatrixSettings({ riskPercent: Number(e.target.value) || 0.1 })} className={INPUT_COMPACT_CLASS} />
+                            </div>
+                            <div>
+                              <SettingLabel>Max Loss %</SettingLabel>
+                              <input type="number" min="0.1" max="100" step="0.1" value={settings.indicators.trendMatrix.maxLossPercent} onChange={(e) => updateTrendMatrixSettings({ maxLossPercent: Number(e.target.value) || 0.1 })} className={INPUT_COMPACT_CLASS} />
+                            </div>
+                            <div>
+                              <SettingLabel>Partial TP %</SettingLabel>
+                              <input type="number" min="0.1" max="100" step="0.1" value={settings.indicators.trendMatrix.partialTpPct} onChange={(e) => updateTrendMatrixSettings({ partialTpPct: Number(e.target.value) || 0.1 })} className={INPUT_COMPACT_CLASS} />
+                            </div>
+                            <div>
+                              <SettingLabel>Bull Color</SettingLabel>
+                              <input type="color" value={settings.indicators.trendMatrix.bullColor} onChange={(e) => updateTrendMatrixSettings({ bullColor: e.target.value })} className="w-full h-8 bg-bg-primary border border-frame rounded" />
+                            </div>
+                            <div>
+                              <SettingLabel>Bear Color</SettingLabel>
+                              <input type="color" value={settings.indicators.trendMatrix.bearColor} onChange={(e) => updateTrendMatrixSettings({ bearColor: e.target.value })} className="w-full h-8 bg-bg-primary border border-frame rounded" />
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="p-3 bg-bg-secondary border border-frame rounded">
+                          <div className="grid grid-cols-2 gap-2 text-xs">
+                            <SettingCheckboxRow label="Show Signal" checked={settings.indicators.trendMatrix.showSig} onChange={(checked) => updateTrendMatrixSettings({ showSig: checked })} labelClassName="font-mono" />
+                            <SettingCheckboxRow label="Show TP" checked={settings.indicators.trendMatrix.showTP} onChange={(checked) => updateTrendMatrixSettings({ showTP: checked })} labelClassName="font-mono" />
+                            <SettingCheckboxRow label="Show Stop" checked={settings.indicators.trendMatrix.showStop} onChange={(checked) => updateTrendMatrixSettings({ showStop: checked })} labelClassName="font-mono" />
+                            <SettingCheckboxRow label="Show HTF" checked={settings.indicators.trendMatrix.showHTF} onChange={(checked) => updateTrendMatrixSettings({ showHTF: checked })} labelClassName="font-mono" />
+                            <SettingCheckboxRow label="Show Pending" checked={settings.indicators.trendMatrix.showPending} onChange={(checked) => updateTrendMatrixSettings({ showPending: checked })} labelClassName="font-mono" />
+                          </div>
+                        </div>
+                      </>
                     )}
                   </div>
                 )}
@@ -2086,8 +2222,8 @@ export default function SettingsPanel() {
           {activeTab === 'orders' && (
             <div className="space-y-4 pb-8">
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.positionSize} - {selectedExchange.toUpperCase()}</div>
-                <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
+                <div className={` mb-3`}>█ {t.settings.positionSize} - {selectedExchange.toUpperCase()}</div>
+                <p className={`${HELP_TEXT_CLASS} mb-4 leading-relaxed`}>
                   {t.settings.positionSizeDesc}
                 </p>
                 <div className="space-y-4">
@@ -2103,7 +2239,7 @@ export default function SettingsPanel() {
                       step="1"
                       value={activeOrderSettings.cloudPercentage}
                       onChange={(e) => updateOrderSettingsExchange(selectedExchange, { cloudPercentage: Number(e.target.value) })}
-                      className="w-full h-2 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-accent-blue"
+                      className={`${RANGE_FIELD_CLASS} accent-accent-blue`}
                     />
                     <div className="flex justify-between text-[10px] text-primary-muted mt-1">
                       <span>1%</span>
@@ -2123,7 +2259,7 @@ export default function SettingsPanel() {
                       step="1"
                       value={activeOrderSettings.smallPercentage}
                       onChange={(e) => updateOrderSettingsExchange(selectedExchange, { smallPercentage: Number(e.target.value) })}
-                      className="w-full h-2 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-primary"
+                      className={`${RANGE_FIELD_CLASS} accent-primary`}
                     />
                     <div className="flex justify-between text-[10px] text-primary-muted mt-1">
                       <span>1%</span>
@@ -2143,7 +2279,7 @@ export default function SettingsPanel() {
                       step="1"
                       value={activeOrderSettings.bigPercentage}
                       onChange={(e) => updateOrderSettingsExchange(selectedExchange, { bigPercentage: Number(e.target.value) })}
-                      className="w-full h-2 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-accent-rose"
+                      className={`${RANGE_FIELD_CLASS} accent-accent-rose`}
                     />
                     <div className="flex justify-between text-[10px] text-primary-muted mt-1">
                       <span>1%</span>
@@ -2154,8 +2290,8 @@ export default function SettingsPanel() {
               </div>
 
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.leverage} - {selectedExchange.toUpperCase()}</div>
-                <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
+                <div className={` mb-3`}>█ {t.settings.leverage} - {selectedExchange.toUpperCase()}</div>
+                <p className={`${HELP_TEXT_CLASS} mb-4 leading-relaxed`}>
                   {t.settings.leverageDesc}
                 </p>
                 <div>
@@ -2170,7 +2306,7 @@ export default function SettingsPanel() {
                     step="1"
                     value={activeOrderSettings.leverage}
                     onChange={(e) => updateOrderSettingsExchange(selectedExchange, { leverage: Number(e.target.value) })}
-                    className="w-full h-2 bg-bg-primary rounded-lg appearance-none cursor-pointer accent-accent-yellow"
+                    className={`${RANGE_FIELD_CLASS} accent-accent-yellow`}
                   />
                   <div className="flex justify-between text-[10px] text-primary-muted mt-1">
                     <span>1x</span>
@@ -2181,7 +2317,7 @@ export default function SettingsPanel() {
               </div>
 
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary-muted text-[10px] leading-relaxed">
+                <div className={`${HELP_TEXT_CLASS} leading-relaxed`}>
                   {t.settings.leverageNote}
                 </div>
               </div>
@@ -2192,8 +2328,8 @@ export default function SettingsPanel() {
             <div className="space-y-4 pb-8">
               <LanguageSwitcher />
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.theme.toUpperCase()}</div>
-                <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
+                <div className={` mb-3`}>█ {t.settings.theme.toUpperCase()}</div>
+                <p className={`${HELP_TEXT_CLASS} mb-4 leading-relaxed`}>
                   {t.settings.themeDesc}
                 </p>
                 <div className="grid grid-cols-3 gap-2">
@@ -2217,91 +2353,123 @@ export default function SettingsPanel() {
               </div>
 
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.chart.toUpperCase()}</div>
-                <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
+                <div className={` mb-3`}>█ {t.settings.chart.toUpperCase()}</div>
+                <p className={`${HELP_TEXT_CLASS} mb-4 leading-relaxed`}>
                   {t.settings.chartDesc}
                 </p>
                 <div className="space-y-2">
                   <div className="p-3 bg-bg-primary border border-frame rounded">
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <div>
-                        <span className="text-primary-muted text-xs font-mono block">{t.settings.showPivotMarkers}</span>
-                        <span className="text-primary-muted text-[10px] block mt-1">
-                          {t.settings.showPivotMarkersDesc}
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(settings.chart?.showPivotMarkers ?? true)}
-                        onChange={(e) => {
-                          const { updateSettings } = useSettingsStore.getState();
-                          updateSettings({ chart: { ...settings.chart, showPivotMarkers: e.target.checked } });
-                        }}
-                        className="w-4 h-4 accent-primary cursor-pointer"
-                      />
-                    </label>
+                    <SettingCheckboxRow
+                      label={(
+                        <div>
+                          <span className={` block`}>{t.settings.showPivotMarkers}</span>
+                          <span className={`${HELP_TEXT_CLASS} block mt-1`}>
+                            {t.settings.showPivotMarkersDesc}
+                          </span>
+                        </div>
+                      )}
+                      checked={Boolean(settings.chart?.showPivotMarkers ?? true)}
+                      onChange={(checked) => {
+                        const { updateSettings } = useSettingsStore.getState();
+                        updateSettings({ chart: { ...settings.chart, showPivotMarkers: checked } });
+                      }}
+                    />
                   </div>
                   <div className="p-3 bg-bg-primary border border-frame rounded">
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <div>
-                        <span className="text-primary-muted text-xs font-mono block">{t.settings.schmecklesMode}</span>
-                        <span className="text-primary-muted text-[10px] block mt-1">
-                          {t.settings.schmecklesModeDesc}
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(settings.chart?.schmecklesMode ?? false)}
-                        onChange={(e) => {
-                          const { updateSettings } = useSettingsStore.getState();
-                          updateSettings({ chart: { ...settings.chart, schmecklesMode: e.target.checked } });
-                        }}
-                        className="w-4 h-4 accent-primary cursor-pointer"
-                      />
-                    </label>
+                    <SettingCheckboxRow
+                      label={(
+                        <div>
+                          <span className={` block`}>{t.settings.schmecklesMode}</span>
+                          <span className={`${HELP_TEXT_CLASS} block mt-1`}>
+                            {t.settings.schmecklesModeDesc}
+                          </span>
+                        </div>
+                      )}
+                      checked={Boolean(settings.chart?.schmecklesMode ?? false)}
+                      onChange={(checked) => {
+                        const { updateSettings } = useSettingsStore.getState();
+                        updateSettings({ chart: { ...settings.chart, schmecklesMode: checked } });
+                      }}
+                    />
                   </div>
                   <div className="p-3 bg-bg-primary border border-frame rounded">
-                    <label className="flex items-center justify-between cursor-pointer">
-                      <div>
-                        <span className="text-primary-muted text-xs font-mono block">{t.settings.invertedMode}</span>
-                        <span className="text-primary-muted text-[10px] block mt-1">
-                          {t.settings.invertedModeDesc}
-                        </span>
-                      </div>
-                      <input
-                        type="checkbox"
-                        checked={Boolean(settings.chart?.invertedMode ?? false)}
-                        onChange={(e) => {
+                    <SettingCheckboxRow
+                      label={(
+                        <div>
+                          <span className={` block`}>{t.settings.invertedMode}</span>
+                          <span className={`${HELP_TEXT_CLASS} block mt-1`}>
+                            {t.settings.invertedModeDesc}
+                          </span>
+                        </div>
+                      )}
+                      checked={Boolean(settings.chart?.invertedMode ?? false)}
+                      onChange={(checked) => {
+                        const { updateSettings } = useSettingsStore.getState();
+                        updateSettings({ chart: { ...settings.chart, invertedMode: checked } });
+                      }}
+                    />
+                  </div>
+                  <div className="p-3 bg-bg-primary border border-frame rounded">
+                    <div className="text-primary-muted text-xs font-mono font-bold mb-2">TradingView Charting Library</div>
+                    <p className={`${HELP_TEXT_CLASS} mb-3 leading-relaxed`}>
+                      Toggle the TradingView widget per exchange. When disabled (or library asset missing) the built-in ScalpingChart is used.
+                    </p>
+                    <div className="space-y-2">
+                      <SettingCheckboxRow
+                        label="Binance"
+                        checked={Boolean(settings.chart?.tradingViewByExchange?.binance ?? true)}
+                        onChange={(checked) => {
                           const { updateSettings } = useSettingsStore.getState();
-                          updateSettings({ chart: { ...settings.chart, invertedMode: e.target.checked } });
+                          updateSettings({
+                            chart: {
+                              ...settings.chart,
+                              tradingViewByExchange: {
+                                ...settings.chart.tradingViewByExchange,
+                                binance: checked,
+                              },
+                            },
+                          });
                         }}
-                        className="w-4 h-4 accent-primary cursor-pointer"
                       />
-                    </label>
+                      <SettingCheckboxRow
+                        label="Hyperliquid"
+                        checked={Boolean(settings.chart?.tradingViewByExchange?.hyperliquid ?? true)}
+                        onChange={(checked) => {
+                          const { updateSettings } = useSettingsStore.getState();
+                          updateSettings({
+                            chart: {
+                              ...settings.chart,
+                              tradingViewByExchange: {
+                                ...settings.chart.tradingViewByExchange,
+                                hyperliquid: checked,
+                              },
+                            },
+                          });
+                        }}
+                      />
+                    </div>
                   </div>
                 </div>
               </div>
 
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <div className="text-primary font-mono text-xs font-bold mb-3">█ {t.settings.sounds.toUpperCase()}</div>
-                <p className="text-primary-muted text-[10px] mb-4 leading-relaxed">
+                <div className={` mb-3`}>█ {t.settings.sounds.toUpperCase()}</div>
+                <p className={`${HELP_TEXT_CLASS} mb-4 leading-relaxed`}>
                   {t.settings.soundsDesc}
                 </p>
                 <div className="p-3 bg-bg-primary border border-frame rounded">
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <div>
-                      <span className="text-primary-muted text-xs font-mono block">{t.settings.playSoundOnTrades}</span>
-                      <span className="text-primary-muted text-[10px] block mt-1">
-                        {t.settings.playSoundOnTradesDesc}
-                      </span>
-                    </div>
-                    <input
-                      type="checkbox"
-                      checked={settings.theme.playTradeSound}
-                      onChange={(e) => updateThemeSettings({ playTradeSound: e.target.checked })}
-                      className="w-4 h-4 accent-primary cursor-pointer"
-                    />
-                  </label>
+                  <SettingCheckboxRow
+                    label={(
+                      <div>
+                        <span className={` block`}>{t.settings.playSoundOnTrades}</span>
+                        <span className={`${HELP_TEXT_CLASS} block mt-1`}>
+                          {t.settings.playSoundOnTradesDesc}
+                        </span>
+                      </div>
+                    )}
+                    checked={settings.theme.playTradeSound}
+                    onChange={(checked) => updateThemeSettings({ playTradeSound: checked })}
+                  />
                 </div>
               </div>
             </div>
@@ -2317,47 +2485,44 @@ export default function SettingsPanel() {
             <div className="space-y-4 pb-8">
               {/* Enable AI Strategy */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="flex items-center justify-between cursor-pointer">
-                  <span className="text-primary-muted text-xs font-mono">{t.ai.enableAI}</span>
-                  <input
-                    type="checkbox"
-                    checked={settings.ai.enabled}
-                    onChange={(e) => updateAISettings({ enabled: e.target.checked })}
-                    className="w-4 h-4 accent-primary cursor-pointer"
-                  />
-                </label>
+                <SettingCheckboxRow
+                  label={t.ai.enableAI}
+                  checked={settings.ai.enabled}
+                  onChange={(checked) => updateAISettings({ enabled: checked })}
+                />
               </div>
 
               {/* Claude API Key */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.claudeApiKey}</label>
+                <SettingLabel className="mb-2">{t.ai.claudeApiKey}</SettingLabel>
                 <input
                   type="password"
                   value={settings.ai.claudeApiKey}
                   onChange={(e) => updateAISettings({ claudeApiKey: e.target.value })}
                   placeholder="sk-ant-..."
-                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                  className={INPUT_FIELD_CLASS}
                 />
               </div>
 
               {/* Claude Model */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.claudeModel}</label>
-                <select
+                <DropdownSelect
+                  label={t.ai.claudeModel}
                   value={settings.ai.claudeModel}
-                  onChange={(e) => updateAISettings({ claudeModel: e.target.value })}
-                  className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary focus:outline-none focus:border-primary"
-                >
-                  <option value="claude-sonnet-4-20250514">Claude Sonnet 4</option>
-                  <option value="claude-haiku-4-20250514">Claude Haiku 4</option>
-                </select>
+                  onChange={(value) => updateAISettings({ claudeModel: value })}
+                  options={[
+                    { value: 'claude-sonnet-4-20250514', label: 'Claude Sonnet 4' },
+                    { value: 'claude-haiku-4-20250514', label: 'Claude Haiku 4' },
+                  ]}
+                  minWidth="min-w-64"
+                />
               </div>
 
               {/* Confidence Threshold */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="block text-primary-muted text-xs font-mono mb-2">
+                <SettingLabel className="mb-2">
                   {t.ai.confidenceThreshold}: {(settings.ai.confidenceThreshold * 100).toFixed(0)}%
-                </label>
+                </SettingLabel>
                 <input
                   type="range"
                   min="0.5"
@@ -2375,7 +2540,7 @@ export default function SettingsPanel() {
 
               {/* Strategy */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.strategy}</label>
+                <SettingLabel className="mb-2">{t.ai.strategy}</SettingLabel>
                 <div className="bg-bg-primary border border-frame rounded px-3 py-2">
                   <div className="text-xs font-mono text-primary">{t.ai.stochasticReversalScalp}</div>
                   <div className="text-[10px] font-mono text-primary-muted mt-1">
@@ -2386,9 +2551,9 @@ export default function SettingsPanel() {
 
               {/* Max Calls Per Hour */}
               <div className="p-3 bg-bg-secondary border border-frame rounded">
-                <label className="block text-primary-muted text-xs font-mono mb-2">
+                <SettingLabel className="mb-2">
                   {t.ai.maxCallsPerHour}: {settings.ai.maxCallsPerHour}
-                </label>
+                </SettingLabel>
                 <input
                   type="range"
                   min="5"
@@ -2405,36 +2570,32 @@ export default function SettingsPanel() {
                 <div className="text-primary text-xs font-mono mb-3 uppercase tracking-wider">{t.ai.telegramNotifications} - {selectedExchange.toUpperCase()}</div>
 
                 <div className="p-3 bg-bg-secondary border border-frame rounded mb-3">
-                  <label className="flex items-center justify-between cursor-pointer">
-                    <span className="text-primary-muted text-xs font-mono">{t.ai.enableTelegram} - {selectedExchange.toUpperCase()}</span>
-                    <input
-                      type="checkbox"
-                      checked={activeAiTelegramSettings.enabled}
-                      onChange={(e) => updateAiTelegramExchange(selectedExchange, { enabled: e.target.checked })}
-                      className="w-4 h-4 accent-primary cursor-pointer"
-                    />
-                  </label>
+                  <SettingCheckboxRow
+                    label={`${t.ai.enableTelegram} - ${selectedExchange.toUpperCase()}`}
+                    checked={activeAiTelegramSettings.enabled}
+                    onChange={(checked) => updateAiTelegramExchange(selectedExchange, { enabled: checked })}
+                  />
                 </div>
 
                 <div className="p-3 bg-bg-secondary border border-frame rounded mb-3">
-                  <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.botToken}</label>
+                  <SettingLabel className="mb-2">{t.ai.botToken}</SettingLabel>
                   <input
                     type="password"
                     value={activeAiTelegramSettings.botToken}
                     onChange={(e) => updateAiTelegramExchange(selectedExchange, { botToken: e.target.value })}
                     placeholder="123456:ABC-..."
-                    className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                    className={INPUT_FIELD_CLASS}
                   />
                 </div>
 
                 <div className="p-3 bg-bg-secondary border border-frame rounded">
-                  <label className="block text-primary-muted text-xs font-mono mb-2">{t.ai.chatId}</label>
+                  <SettingLabel className="mb-2">{t.ai.chatId}</SettingLabel>
                   <input
                     type="text"
                     value={activeAiTelegramSettings.chatId}
                     onChange={(e) => updateAiTelegramExchange(selectedExchange, { chatId: e.target.value })}
                     placeholder="-100..."
-                    className="w-full bg-bg-primary border border-frame rounded px-3 py-2 text-xs font-mono text-primary placeholder:text-primary-muted/40 focus:outline-none focus:border-primary"
+                    className={INPUT_FIELD_CLASS}
                   />
                 </div>
               </div>

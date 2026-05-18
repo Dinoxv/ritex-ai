@@ -32,7 +32,18 @@ function loadSettings(): DaemonSettings {
   try {
     const blob = getBotSettingsKey('daemon_settings');
     if (blob) {
-      return { ...DEFAULT_DAEMON_SETTINGS, ...(JSON.parse(blob) as Partial<DaemonSettings>) };
+      const parsed = JSON.parse(blob) as Partial<DaemonSettings> & { atrMult?: number };
+      const ritchiAtrMult = Number((parsed as any).ritchiAtrMult);
+      const atrMultAlias = Number((parsed as any).atrMult);
+      const resolvedAtrMult = Number.isFinite(ritchiAtrMult) && ritchiAtrMult > 0
+        ? ritchiAtrMult
+        : (Number.isFinite(atrMultAlias) && atrMultAlias > 0 ? atrMultAlias : undefined);
+
+      if (resolvedAtrMult !== undefined) {
+        (parsed as any).ritchiAtrMult = resolvedAtrMult;
+      }
+
+      return { ...DEFAULT_DAEMON_SETTINGS, ...(parsed as Partial<DaemonSettings>) };
     }
   } catch (err) {
     console.warn('[Daemon] Failed to parse daemon_settings:', err instanceof Error ? err.message : err);

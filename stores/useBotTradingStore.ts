@@ -8,8 +8,9 @@ import { useSymbolVolatilityStore } from './useSymbolVolatilityStore';
 import { useDexStore } from './useDexStore';
 import toast from 'react-hot-toast';
 import type { BotIndicatorType } from '@/models/Settings';
-import { calculateSieuXuHuong } from '@/lib/indicators';
+import { calculateATR, calculateSieuXuHuong } from '@/lib/indicators';
 import { INTERVAL_TO_MS } from '@/lib/time-utils';
+import { calcSlDistanceFromAtr, calcStopPrice } from '@/lib/services/sizing.service';
 import { getRawPositionSignedSize, getRawPositionSymbol } from '@/lib/utils/exchange-normalizers';
 import type { TimeInterval } from '@/types';
 
@@ -181,6 +182,57 @@ const normalizeBinanceSymbolInput = (symbol: string): string => {
   return raw;
 };
 
+const deriveSafetyStopPrice = async ({
+  service,
+  symbol,
+  timeframe,
+  side,
+  entryPrice,
+  indicatorAtrMult,
+  fallbackPercent,
+}: {
+  service: ExchangeTradingService;
+  symbol: string;
+  timeframe: TimeInterval;
+  side: BotPositionSide;
+  entryPrice: number;
+  indicatorAtrMult: number;
+  fallbackPercent: number;
+}): Promise<number> => {
+  const fallbackStop = side === 'long'
+    ? entryPrice * (1 - fallbackPercent / 100)
+    : entryPrice * (1 + fallbackPercent / 100);
+
+  if (!(indicatorAtrMult > 0)) {
+    return fallbackStop;
+  }
+
+  try {
+    const endTime = Date.now();
+    const intervalMs = INTERVAL_TO_MS[timeframe] ?? 60_000;
+    const startTime = endTime - (220 * intervalMs);
+    const candles = await service.getCandles({ coin: symbol, interval: timeframe, startTime, endTime });
+    if (!candles || candles.length < 50) {
+      return fallbackStop;
+    }
+
+    const atr50Values = calculateATR(candles as any, 50);
+    const atr50 = atr50Values.length > 0 ? atr50Values[atr50Values.length - 1] : 0;
+    if (!(atr50 > 0)) {
+      return fallbackStop;
+    }
+
+    const slDist = calcSlDistanceFromAtr(atr50, indicatorAtrMult);
+    if (!(slDist > 0)) {
+      return fallbackStop;
+    }
+
+    return calcStopPrice(entryPrice, side, slDist);
+  } catch {
+    return fallbackStop;
+  }
+};
+
 const runRitchiBacktestWithConfig = async ({
   service,
   symbols,
@@ -244,33 +296,90 @@ const runRitchiBacktestWithConfig = async ({
       config.tpMult,
     );
 
-    type SimPosition = { side: BotPositionSide; entryPrice: number; size: number };
+    type SimPosition = { side: BotPositionSide; entryPrice: number; size: number; stopPrice: number };
     type ClosedTrade = { pnl: number };
     let position: SimPosition | null = null;
     const closedTrades: ClosedTrade[] = [];
+    const atr50 = calculateATR(backtestCandles as any, 50);
+    const signalLookback = Math.max((config.pivLen ?? 5) + 2, 10);
+    const stableBars = 4;
+    const minAge = Math.max(0.2, Math.min(0.35, 20 / config.trendLen));
+    const REVERSAL_COOLDOWN_BARS = 3;
+    let lastReversalBar = -1000;
 
     for (let i = 1; i < candles.length; i += 1) {
       const candle = candles[i];
       const price = candle.close;
-      const buySignal = ritchi.buySignals[i];
-      const sellSignal = ritchi.sellSignals[i];
       if (!Number.isFinite(price) || price <= 0) {
         continue;
       }
 
-      if (!position) {
-        if (buySignal || sellSignal) {
-          const side: BotPositionSide = buySignal ? 'long' : 'short';
-          position = {
-            side,
-            entryPrice: price,
-            size: fixedNotional / price,
-          };
+      if (position) {
+        const stopHit = position.side === 'long'
+          ? candle.low <= position.stopPrice
+          : candle.high >= position.stopPrice;
+        if (stopHit) {
+          const exitPrice = position.stopPrice;
+          const pnlPerUnit = position.side === 'long'
+            ? exitPrice - position.entryPrice
+            : position.entryPrice - exitPrice;
+          closedTrades.push({ pnl: pnlPerUnit * position.size });
+          position = null;
+          lastReversalBar = i;
+          continue;
         }
+      }
+
+      const recentStart = Math.max(0, i - signalLookback + 1);
+      const recentBuy = ritchi.buySignals.slice(recentStart, i + 1).some(Boolean);
+      const recentSell = ritchi.sellSignals.slice(recentStart, i + 1).some(Boolean);
+      const directionValue = ritchi.direction[i];
+
+      let isFallback = false;
+      let useBuy = recentBuy;
+      let useSell = recentSell;
+
+      if (!useBuy && !useSell) {
+        const trendAge = ritchi.trendAge[i] ?? 0;
+        const stableStart = Math.max(0, i - stableBars + 1);
+        const window = ritchi.direction.slice(stableStart, i + 1);
+        const directionStable = window.length === stableBars
+          && directionValue !== undefined
+          && window.every((v) => v === directionValue);
+
+        if (trendAge >= minAge && directionStable) {
+          useBuy = directionValue === true;
+          useSell = directionValue === false;
+          isFallback = true;
+        }
+      }
+
+      if (!useBuy && !useSell) {
         continue;
       }
 
-      const isReversal = (position.side === 'long' && sellSignal) || (position.side === 'short' && buySignal);
+      if (isFallback && (i - lastReversalBar) < REVERSAL_COOLDOWN_BARS) {
+        continue;
+      }
+
+      const signalSide: BotPositionSide = useBuy ? 'long' : 'short';
+      const atrAtBar = atr50[i] ?? 0;
+      const slDist = config.atrMult > 0 && atrAtBar > 0
+        ? calcSlDistanceFromAtr(atrAtBar, config.atrMult)
+        : price * 0.02;
+
+      if (!position) {
+        const size = fixedNotional / price;
+        position = {
+          side: signalSide,
+          entryPrice: price,
+          size,
+          stopPrice: calcStopPrice(price, signalSide, slDist),
+        };
+        continue;
+      }
+
+      const isReversal = position.side !== signalSide;
       if (!isReversal) {
         continue;
       }
@@ -278,7 +387,15 @@ const runRitchiBacktestWithConfig = async ({
       const pnlPerUnit = position.side === 'long' ? price - position.entryPrice : position.entryPrice - price;
       const pnl = pnlPerUnit * position.size;
       closedTrades.push({ pnl });
-      position = null;
+      lastReversalBar = i;
+
+      const reverseSize = fixedNotional / price;
+      position = {
+        side: signalSide,
+        entryPrice: price,
+        size: reverseSize,
+        stopPrice: calcStopPrice(price, signalSide, slDist),
+      };
     }
 
     if (position) {
@@ -1149,10 +1266,18 @@ export const useBotTradingStore = create<BotTradingStore>()(
             numericSize = Number.parseFloat(size);
             // Place safety STOP_MARKET after market order succeeds (non-blocking)
             try {
-              const slPercent = botSettings.safetyStopLossPercent / 100;
-              const stopPrice = signalSide === 'long'
-                ? midPrice * (1 - slPercent)
-                : midPrice * (1 + slPercent);
+              const indicatorAtrMult = botSettings.indicator === 'ritchi'
+                ? settingsStore.settings.indicators.sieuXuHuong.atrMult
+                : 0;
+              const stopPrice = await deriveSafetyStopPrice({
+                service,
+                symbol,
+                timeframe: botSettings.timeframe,
+                side: signalSide,
+                entryPrice: midPrice,
+                indicatorAtrMult,
+                fallbackPercent: botSettings.safetyStopLossPercent,
+              });
               const formattedStop = service.formatPriceCached(stopPrice, metadata);
               const slResp = await service.placeStopLoss(
                 { coin: symbol, triggerPrice: formattedStop, size: service.formatSizeCached(numericSize, metadata), isBuy: signalSide === 'short' },
@@ -1322,10 +1447,18 @@ export const useBotTradingStore = create<BotTradingStore>()(
             openNumericSize = Number.parseFloat(size);
             // Place safety STOP_MARKET for the new position (non-blocking)
             try {
-              const slPercent = botSettings.safetyStopLossPercent / 100;
-              const stopPrice = signalSide === 'long'
-                ? openPrice * (1 - slPercent)
-                : openPrice * (1 + slPercent);
+              const indicatorAtrMult = botSettings.indicator === 'ritchi'
+                ? settingsStore.settings.indicators.sieuXuHuong.atrMult
+                : 0;
+              const stopPrice = await deriveSafetyStopPrice({
+                service,
+                symbol,
+                timeframe: botSettings.timeframe,
+                side: signalSide,
+                entryPrice: openPrice,
+                indicatorAtrMult,
+                fallbackPercent: botSettings.safetyStopLossPercent,
+              });
               const formattedStop = service.formatPriceCached(stopPrice, metadata);
               const slResp = await service.placeStopLoss(
                 { coin: symbol, triggerPrice: formattedStop, size: service.formatSizeCached(openNumericSize, metadata), isBuy: signalSide === 'short' },

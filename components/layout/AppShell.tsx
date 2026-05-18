@@ -65,8 +65,7 @@ export default function AppShell({ selectedSymbol, children }: AppShellProps) {
   const togglePanel = useSettingsStore((state) => state.togglePanel);
   const mobileActiveTab = useSettingsStore((state) => state.mobileActiveTab);
 
-  const candleKey = `${coin}-1m`;
-  const candles = useCandleStore((state) => state.candles[candleKey]) || [];
+  const candles = useCandleStore((state) => state.selectCandles(coin, '1m'));
   const buyCloud = useTradingStore((state) => state.buyCloud);
   const sellCloud = useTradingStore((state) => state.sellCloud);
   const smLong = useTradingStore((state) => state.smLong);

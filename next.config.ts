@@ -6,6 +6,9 @@ const distDir = process.env.NEXT_DIST_DIR?.trim() || '.next';
 const nextConfig: NextConfig = {
   deploymentId,
   distDir,
+  env: {
+    NEXT_PUBLIC_DEPLOYMENT_ID: deploymentId ?? '',
+  },
   images: {
     unoptimized: true,
     remotePatterns: [

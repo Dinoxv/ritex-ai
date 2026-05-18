@@ -1,25 +1,33 @@
-# Landing Page Assets
+# Landing Assets and Messaging - Toilabap.com
 
-Place your landing page media assets in this folder.
+## Muc tieu landing
 
-## Hero Section
-- **hero-background.mp4** or **hero-background.jpg** - Full-width background image/video for the hero section
-- Recommended size: 1920x1080 or larger
-- Video format: MP4 (H.264)
-- Image format: JPG or PNG
+Trang landing phai khien trader cam nhan ro hai diem:
+- Ban dang cham hon thi truong vi quy trinh thu cong.
+- Dong tien lon luon di truoc, can cong cu de theo kip.
 
-## Feature Demos
-Place your feature demonstration gifs/videos here:
+## Hero messaging
 
-1. **minicharts-demo.gif** - Symbol overview with minicharts
-2. **cursor-order-demo.gif** - Cursor-based order placement
-3. **keyboard-shortcuts-demo.gif** - Keyboard shortcuts in action
-4. **scanner-demo.gif** - Market scanner showing signals
-5. **timeframes-demo.gif** - Multi-timeframe switching
-6. **multi-monitor-demo.gif** - Multi-monitor chart layout
+- Headline: One codebase. Any exchange. Zero friction.
+- Subheadline: Tu hypothesis -> backtest -> live deploy trong mot workflow.
+- Flagship callout: Trend Matrix Strategy [Ritchi] (SMC + confluence).
 
-## Recommendations
-- Keep video files under 5MB when possible
-- Use MP4 with H.264 codec for videos
-- Use GIF or WebM for short demos
-- Optimize images before uploading
+## Logo va media standards
+
+- Uu tien logo dinh dang PNG trong landing/docs.
+- Khong dung logo SVG cho tai lieu thuong hieu.
+- Dung icon tham chieu: ../Ritchi-icon.png
+
+## Asset checklist
+
+- hero.png (hoac hero-background.mp4)
+- scanner.png
+- multitimeframe.png
+- multimonitor.png
+- symboloverview.png
+
+## Quality rules
+
+- Toi uu kich thuoc media truoc khi deploy.
+- Crop frame de thay ro signal, score, va risk labels.
+- Giu naming nhat quan de CDN cache de kiem soat.

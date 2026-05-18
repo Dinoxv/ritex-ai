@@ -1,6 +1,6 @@
 import { create } from 'zustand';
 import { persist } from 'zustand/middleware';
-import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, KalmanTrendSettings, SieuXuHuongSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings, AIStrategyConfig, BotTradingSettings } from '@/models/Settings';
+import { AppSettings, DEFAULT_SETTINGS, StochasticSettings, EmaSettings, MacdSettings, KalmanTrendSettings, SieuXuHuongSettings, TrendMatrixSettings, ScannerSettings, OrderSettings, ThemeSettings, ChartSettings, AIStrategyConfig, BotTradingSettings } from '@/models/Settings';
 
 type TabType = 'scanner' | 'indicators' | 'orders' | 'ui' | 'credentials' | 'ai';
 type MobileTabType = 'scanner' | 'symbols' | 'chart' | 'actions' | 'orders-positions';
@@ -22,6 +22,7 @@ interface SettingsStore {
   updateMacdSettings: (settings: Partial<MacdSettings>) => void;
   updateKalmanTrendSettings: (settings: Partial<KalmanTrendSettings>) => void;
   updateSieuXuHuongSettings: (settings: Partial<SieuXuHuongSettings>) => void;
+  updateTrendMatrixSettings: (settings: Partial<TrendMatrixSettings>) => void;
   updateScannerSettings: (settings: Partial<ScannerSettings>) => void;
   updateOrderSettings: (settings: Partial<OrderSettings>) => void;
   updateChartSettings: (settings: Partial<ChartSettings>) => void;
@@ -33,6 +34,32 @@ interface SettingsStore {
   unpinSymbol: (symbol: string) => void;
   resetSettings: () => void;
 }
+
+const clampNumber = (value: number, min: number, max: number, fallback: number): number => {
+  if (!Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.max(min, Math.min(max, value));
+};
+
+const sanitizeKalmanTrendUpdates = (updates: Partial<KalmanTrendSettings>): Partial<KalmanTrendSettings> => {
+  const sanitized: Partial<KalmanTrendSettings> = { ...updates };
+
+  if (typeof updates.processNoise === 'number') {
+    sanitized.processNoise = clampNumber(updates.processNoise, 0.0001, 0.01, DEFAULT_SETTINGS.indicators.kalmanTrend.processNoise);
+  }
+  if (typeof updates.measurementNoise === 'number') {
+    sanitized.measurementNoise = clampNumber(updates.measurementNoise, 0.01, 2.0, DEFAULT_SETTINGS.indicators.kalmanTrend.measurementNoise);
+  }
+  if (typeof updates.bandMultiplier === 'number') {
+    sanitized.bandMultiplier = clampNumber(updates.bandMultiplier, 0.5, 5.0, DEFAULT_SETTINGS.indicators.kalmanTrend.bandMultiplier);
+  }
+  if (typeof updates.volThreshold === 'number') {
+    sanitized.volThreshold = clampNumber(updates.volThreshold, 0.0, 2.0, DEFAULT_SETTINGS.indicators.kalmanTrend.volThreshold);
+  }
+
+  return sanitized;
+};
 
 const mergeSettings = (storedSettings: any): AppSettings => {
   if (!storedSettings || typeof storedSettings !== 'object') {
@@ -170,9 +197,30 @@ const mergeSettings = (storedSettings: any): AppSettings => {
           tpMult: storedSettings.indicators?.sieuXuHuong?.tpMult ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.tpMult,
           showSignals: storedSettings.indicators?.sieuXuHuong?.showSignals ?? DEFAULT_SETTINGS.indicators.sieuXuHuong.showSignals,
         },
+        trendMatrix: {
+          enabled: storedSettings.indicators?.trendMatrix?.enabled ?? DEFAULT_SETTINGS.indicators.trendMatrix.enabled,
+          msLen: storedSettings.indicators?.trendMatrix?.msLen ?? DEFAULT_SETTINGS.indicators.trendMatrix.msLen,
+          htfTF: storedSettings.indicators?.trendMatrix?.htfTF ?? DEFAULT_SETTINGS.indicators.trendMatrix.htfTF,
+          htfEmaLen: storedSettings.indicators?.trendMatrix?.htfEmaLen ?? DEFAULT_SETTINGS.indicators.trendMatrix.htfEmaLen,
+          atrLength: storedSettings.indicators?.trendMatrix?.atrLength ?? DEFAULT_SETTINGS.indicators.trendMatrix.atrLength,
+          atrMult: storedSettings.indicators?.trendMatrix?.atrMult ?? DEFAULT_SETTINGS.indicators.trendMatrix.atrMult,
+          targetStepMult: storedSettings.indicators?.trendMatrix?.targetStepMult ?? DEFAULT_SETTINGS.indicators.trendMatrix.targetStepMult,
+          riskPercent: storedSettings.indicators?.trendMatrix?.riskPercent ?? DEFAULT_SETTINGS.indicators.trendMatrix.riskPercent,
+          maxLossPercent: storedSettings.indicators?.trendMatrix?.maxLossPercent ?? DEFAULT_SETTINGS.indicators.trendMatrix.maxLossPercent,
+          partialTpPct: storedSettings.indicators?.trendMatrix?.partialTpPct ?? DEFAULT_SETTINGS.indicators.trendMatrix.partialTpPct,
+          bullColor: storedSettings.indicators?.trendMatrix?.bullColor ?? DEFAULT_SETTINGS.indicators.trendMatrix.bullColor,
+          bearColor: storedSettings.indicators?.trendMatrix?.bearColor ?? DEFAULT_SETTINGS.indicators.trendMatrix.bearColor,
+          showSig: storedSettings.indicators?.trendMatrix?.showSig ?? DEFAULT_SETTINGS.indicators.trendMatrix.showSig,
+          showTP: storedSettings.indicators?.trendMatrix?.showTP ?? DEFAULT_SETTINGS.indicators.trendMatrix.showTP,
+          showStop: storedSettings.indicators?.trendMatrix?.showStop ?? DEFAULT_SETTINGS.indicators.trendMatrix.showStop,
+          showHTF: storedSettings.indicators?.trendMatrix?.showHTF ?? DEFAULT_SETTINGS.indicators.trendMatrix.showHTF,
+          showPending: storedSettings.indicators?.trendMatrix?.showPending ?? DEFAULT_SETTINGS.indicators.trendMatrix.showPending,
+        },
       },
       scanner: {
         enabled: storedSettings.scanner?.enabled ?? DEFAULT_SETTINGS.scanner.enabled,
+        symbolSource: storedSettings.scanner?.symbolSource
+          ?? (storedSettings.scanner?.favouriteOnly === true ? 'favourite' : 'top'),
         scanInterval: storedSettings.scanner?.scanInterval ?? DEFAULT_SETTINGS.scanner.scanInterval,
         topMarkets: storedSettings.scanner?.topMarkets ?? DEFAULT_SETTINGS.scanner.topMarkets,
         playSound: storedSettings.scanner?.playSound ?? DEFAULT_SETTINGS.scanner.playSound,
@@ -325,6 +373,11 @@ const mergeSettings = (storedSettings: any): AppSettings => {
           atrMult: storedSettings.scanner?.ritchiTrendScanner?.atrMult ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.atrMult,
           tpMult: storedSettings.scanner?.ritchiTrendScanner?.tpMult ?? DEFAULT_SETTINGS.scanner.ritchiTrendScanner.tpMult,
         },
+        trendMatrixScanner: {
+          enabled: storedSettings.scanner?.trendMatrixScanner?.enabled ?? DEFAULT_SETTINGS.scanner.trendMatrixScanner.enabled,
+          timeframes: storedSettings.scanner?.trendMatrixScanner?.timeframes ?? DEFAULT_SETTINGS.scanner.trendMatrixScanner.timeframes,
+          signalLookback: storedSettings.scanner?.trendMatrixScanner?.signalLookback ?? DEFAULT_SETTINGS.scanner.trendMatrixScanner.signalLookback,
+        },
       },
       orders: {
         cloudPercentage: storedSettings.orders?.cloudPercentage ?? DEFAULT_SETTINGS.orders.cloudPercentage,
@@ -375,6 +428,12 @@ const mergeSettings = (storedSettings: any): AppSettings => {
         showBreakeven: storedSettings.chart?.showBreakeven ?? DEFAULT_SETTINGS.chart.showBreakeven,
         schmecklesMode: storedSettings.chart?.schmecklesMode ?? DEFAULT_SETTINGS.chart.schmecklesMode,
         invertedMode: storedSettings.chart?.invertedMode ?? DEFAULT_SETTINGS.chart.invertedMode,
+        tradingViewByExchange: {
+          binance: storedSettings.chart?.tradingViewByExchange?.binance
+            ?? DEFAULT_SETTINGS.chart.tradingViewByExchange.binance,
+          hyperliquid: storedSettings.chart?.tradingViewByExchange?.hyperliquid
+            ?? DEFAULT_SETTINGS.chart.tradingViewByExchange.hyperliquid,
+        },
       },
       ai: {
         enabled: storedSettings.ai?.enabled ?? DEFAULT_SETTINGS.ai.enabled,
@@ -507,7 +566,7 @@ export const useSettingsStore = create<SettingsStore>()(
               ...state.settings.indicators,
               kalmanTrend: {
                 ...state.settings.indicators.kalmanTrend,
-                ...updates,
+                ...sanitizeKalmanTrendUpdates(updates),
               },
             },
           },
@@ -520,6 +579,19 @@ export const useSettingsStore = create<SettingsStore>()(
               ...state.settings.indicators,
               sieuXuHuong: {
                 ...state.settings.indicators.sieuXuHuong,
+                ...updates,
+              },
+            },
+          },
+        })),
+      updateTrendMatrixSettings: (updates) =>
+        set((state) => ({
+          settings: {
+            ...state.settings,
+            indicators: {
+              ...state.settings.indicators,
+              trendMatrix: {
+                ...state.settings.indicators.trendMatrix,
                 ...updates,
               },
             },

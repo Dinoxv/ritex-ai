@@ -22,6 +22,7 @@ import MiniPriceChart from '@/components/scanner/MiniPriceChart';
 import SymbolItem from '@/components/sidepanel/SymbolItem';
 import ScannerResultItem from '@/components/scanner/ScannerResultItem';
 import AIStrategyPanel from '@/components/ai/AIStrategyPanel';
+import { DropdownMenu } from '@/components/ui/DropdownMenu';
 import {
   getInvertedColorClass,
   getInvertedAnimationClass,
@@ -179,10 +180,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
   const router = useRouter();
   const address = useAddressFromUrl();
   const [symbolsTab, setSymbolsTab] = useState<'all' | 'favourite'>('all');
-  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
   const [symbolSearchQuery, setSymbolSearchQuery] = useState('');
-  const dropdownRef = useRef<HTMLDivElement>(null);
-  const searchInputRef = useRef<HTMLInputElement>(null);
 
   const { results, status, scannerMetrics, runScan, startAutoScanWithDelay, stopAutoScan } = useScannerStore();
   const { settings, pinSymbol, unpinSymbol } = useSettingsStore();
@@ -282,7 +280,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
     return () => {
       unsubscribe();
     };
-  }, []);
+  }, [selectedExchange, subscribe, unsubscribe]);
 
   useEffect(() => {
     const symbols = allSymbolsString.split(',').filter(s => s.length > 0);
@@ -309,24 +307,6 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
       return () => clearInterval(intervalId);
     }
   }, [allSymbolsString, lastCandlePollTime]);
-
-  useEffect(() => {
-    function handleClickOutside(event: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
-        setIsDropdownOpen(false);
-        setSymbolSearchQuery('');
-      }
-    }
-
-    if (isDropdownOpen) {
-      document.addEventListener('mousedown', handleClickOutside);
-      searchInputRef.current?.focus();
-    }
-
-    return () => {
-      document.removeEventListener('mousedown', handleClickOutside);
-    };
-  }, [isDropdownOpen]);
 
   const formatTimeSince = (timestamp: number | null) => {
     if (!timestamp) return 'Never';
@@ -433,6 +413,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
         rsi: boolean;
         vol: boolean;
         kalman: boolean;
+        trendMatrix: boolean;
         channel: string | null;
         sr: 'support' | 'resistance' | null;
         srDistance: number | null;
@@ -469,6 +450,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
         if (result.channels) timeframes.push(...result.channels.map(c => c.timeframe));
         if (result.supportResistanceLevels) timeframes.push(...result.supportResistanceLevels.map(sr => sr.timeframe));
         if (result.kalmanTrends) timeframes.push(...result.kalmanTrends.map(k => k.timeframe));
+        if (result.trendMatrixSignals) timeframes.push(...result.trendMatrixSignals.map(tm => tm.timeframe));
 
         const uniqueTimeframes = [...new Set(timeframes)];
 
@@ -481,6 +463,7 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
               rsi: false,
               vol: false,
               kalman: false,
+              trendMatrix: false,
               channel: null,
               sr: null,
               srDistance: null,
@@ -533,6 +516,9 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
           }
           if (result.scanType === 'kalmanTrend' && result.kalmanTrends?.some(k => k.timeframe === tf)) {
             tfData.kalman = true;
+          }
+          if (result.scanType === 'trendMatrix' && result.trendMatrixSignals?.some(tm => tm.timeframe === tf)) {
+            tfData.trendMatrix = true;
           }
         });
       });
@@ -789,88 +775,93 @@ export default function Sidepanel({ selectedSymbol, onSymbolSelect, mobileView =
             <>
 
             {/* Add Symbols Dropdown */}
-            <div ref={dropdownRef} className="flex-shrink-0 mb-2 relative">
-            <button
-              onClick={() => {
-                setIsDropdownOpen(!isDropdownOpen);
-                if (isDropdownOpen) {
-                  setSymbolSearchQuery('');
-                }
-              }}
-              className="w-full terminal-border p-2 hover:bg-primary/5 active:bg-primary/10 active:scale-[0.99] cursor-pointer transition-all"
+            <DropdownMenu
+              title="Add Other Symbols"
+              minWidth="min-w-[22rem]"
+              className="flex-shrink-0 mb-2"
+              trigger={(open) => (
+                <button
+                  type="button"
+                  className="w-full terminal-border p-2 hover:bg-primary/5 active:bg-primary/10 active:scale-[0.99] cursor-pointer transition-all"
+                >
+                  <div className="flex items-center justify-between">
+                    <span className="text-primary-muted text-xs font-mono">ADD OTHER SYMBOLS</span>
+                    <span className="text-primary text-base">{open ? '▼' : '▶'}</span>
+                  </div>
+                </button>
+              )}
             >
-              <div className="flex items-center justify-between">
-                <span className="text-primary-muted text-xs font-mono">ADD OTHER SYMBOLS</span>
-                <span className="text-primary text-base">{isDropdownOpen ? '▼' : '▶'}</span>
-              </div>
-            </button>
+              {({ close }) => (
+                <div className="bg-bg-primary max-h-80 overflow-hidden scrollbar-thin scrollbar-thumb-primary-dark scrollbar-track-transparent">
+                  <div className="px-3 py-3 border-b border-gray-700 bg-[#0b1320]">
+                    <div className="flex items-center gap-2 rounded border border-gray-700 bg-[#101827] px-3 py-2 text-gray-300">
+                      <span className="text-gray-500">⌕</span>
+                      <input
+                        type="text"
+                        value={symbolSearchQuery}
+                        onChange={(e) => setSymbolSearchQuery(e.target.value)}
+                        placeholder="Search symbols..."
+                        autoFocus
+                        className="w-full bg-transparent text-sm text-gray-200 placeholder:text-gray-500 outline-none"
+                      />
+                    </div>
+                  </div>
 
-            {isDropdownOpen && (
-              <div className="mt-1 terminal-border bg-bg-primary max-h-80 overflow-hidden scrollbar-thin scrollbar-thumb-primary-dark scrollbar-track-transparent">
-                <div className="p-2 border-b border-frame">
-                  <input
-                    ref={searchInputRef}
-                    type="text"
-                    value={symbolSearchQuery}
-                    onChange={(e) => setSymbolSearchQuery(e.target.value)}
-                    placeholder="Search symbols..."
-                    className="w-full px-2 py-1 bg-bg-secondary terminal-border text-primary text-sm font-mono focus:outline-none focus:border-primary/50"
-                  />
+                  {filteredNonTop20Symbols.length === 0 ? (
+                    <div className="p-3 text-center text-primary-muted text-xs font-mono">
+                      {symbolSearchQuery.trim() ? 'No symbols found' : 'No additional symbols available'}
+                    </div>
+                  ) : (
+                    <div className="divide-y divide-frame max-h-64 overflow-y-auto">
+                      {filteredNonTop20Symbols.map((symbol) => {
+                        const isPinned = pinnedSymbols.includes(symbol);
+
+                        return (
+                          <div
+                            key={symbol}
+                            className="flex items-center hover:bg-primary/10 transition-all duration-150"
+                          >
+                            <button
+                              onClick={() => {
+                                if (onSymbolSelect) {
+                                  onSymbolSelect(symbol);
+                                } else {
+                                  router.push(`/${address}/${symbol}`);
+                                }
+                                setSymbolSearchQuery('');
+                                close();
+                              }}
+                              className="flex-1 text-left p-2 cursor-pointer active:scale-[0.98] transition-transform duration-100"
+                            >
+                              <div className="flex justify-between items-center gap-2">
+                                <span className="text-primary text-xs font-mono font-bold">
+                                  {symbol}/USD
+                                </span>
+                                <SymbolPrice symbol={symbol} />
+                              </div>
+                            </button>
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (isPinned) {
+                                  unpinSymbol(symbol);
+                                } else {
+                                  pinSymbol(symbol);
+                                }
+                              }}
+                              className="p-2 text-primary-muted hover:text-primary active:scale-90 cursor-pointer transition-all duration-150"
+                              title={isPinned ? 'Remove from favourite list' : 'Save to favourite list'}
+                            >
+                              {isPinned ? <PinOffIcon className="w-4 h-4" /> : <PinIcon className="w-4 h-4" />}
+                            </button>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
                 </div>
-
-                {filteredNonTop20Symbols.length === 0 ? (
-                  <div className="p-3 text-center text-primary-muted text-xs font-mono">
-                    {symbolSearchQuery.trim() ? 'No symbols found' : 'No additional symbols available'}
-                  </div>
-                ) : (
-                  <div className="divide-y divide-frame max-h-64 overflow-y-auto">
-                    {filteredNonTop20Symbols.map((symbol) => {
-                      const isPinned = pinnedSymbols.includes(symbol);
-
-                      return (
-                        <div
-                          key={symbol}
-                          className="flex items-center hover:bg-primary/10 transition-all duration-150"
-                        >
-                          <button
-                            onClick={() => {
-                              if (onSymbolSelect) {
-                                onSymbolSelect(symbol);
-                              } else {
-                                router.push(`/${address}/${symbol}`);
-                              }
-                            }}
-                            className="flex-1 text-left p-2 cursor-pointer active:scale-[0.98] transition-transform duration-100"
-                          >
-                            <div className="flex justify-between items-center gap-2">
-                              <span className="text-primary text-xs font-mono font-bold">
-                                {symbol}/USD
-                              </span>
-                              <SymbolPrice symbol={symbol} />
-                            </div>
-                          </button>
-                          <button
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              if (isPinned) {
-                                unpinSymbol(symbol);
-                              } else {
-                                pinSymbol(symbol);
-                              }
-                            }}
-                            className="p-2 text-primary-muted hover:text-primary active:scale-90 cursor-pointer transition-all duration-150"
-                            title={isPinned ? 'Remove from favourite list' : 'Save to favourite list'}
-                          >
-                            {isPinned ? <PinOffIcon className="w-4 h-4" /> : <PinIcon className="w-4 h-4" />}
-                          </button>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </div>
-            )}
-            </div>
+              )}
+            </DropdownMenu>
 
             <div ref={parentRef} className="flex-1 overflow-y-auto">
               {isLoadingTopSymbols && topSymbols.length === 0 ? (

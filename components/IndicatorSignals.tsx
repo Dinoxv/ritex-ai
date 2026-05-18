@@ -58,10 +58,10 @@ function IndicatorSignals({ coin }: IndicatorSignalsProps) {
   const subscribeToCandles = useCandleStore((state) => state.subscribeToCandles);
   const unsubscribeFromCandles = useCandleStore((state) => state.unsubscribeFromCandles);
 
-  const candles1m = useCandleStore((state) => state.candles[`${coin}-1m`]);
-  const candles5m = useCandleStore((state) => state.candles[`${coin}-5m`]);
-  const candles15m = useCandleStore((state) => state.candles[`${coin}-15m`]);
-  const candles1h = useCandleStore((state) => state.candles[`${coin}-1h`]);
+  const candles1m = useCandleStore((state) => state.selectCandles(coin, '1m'));
+  const candles5m = useCandleStore((state) => state.selectCandles(coin, '5m'));
+  const candles15m = useCandleStore((state) => state.selectCandles(coin, '15m'));
+  const candles1h = useCandleStore((state) => state.selectCandles(coin, '1h'));
 
   const tradesRecord = useTradesStore((state) => state.trades);
   const trades = useMemo(() => tradesRecord[coin] || [], [tradesRecord, coin]);

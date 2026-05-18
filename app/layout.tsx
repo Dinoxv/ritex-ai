@@ -8,6 +8,8 @@ import { RequireCredentials } from "@/components/auth/RequireCredentials";
 import { ConditionalServiceProvider } from "@/components/providers/ConditionalServiceProvider";
 import { Analytics } from "@vercel/analytics/next";
 import { Toaster } from "react-hot-toast";
+import DeploymentCheck from "@/components/DeploymentCheck";
+import ChunkLoadRecovery from "@/components/ChunkLoadRecovery";
 
 const enableVercelAnalytics =
   process.env.VERCEL === '1' || process.env.NEXT_PUBLIC_ENABLE_VERCEL_ANALYTICS === 'true';
@@ -136,6 +138,8 @@ export default function RootLayout({
         className={`${binancePlex.variable} subpixel-antialiased`}
         suppressHydrationWarning
       >
+        <ChunkLoadRecovery />
+        <DeploymentCheck />
         <CredentialsProvider>
           <ThemeApplier />
           <SettingsPanel />

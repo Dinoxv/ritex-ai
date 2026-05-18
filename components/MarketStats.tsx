@@ -18,8 +18,7 @@ function MarketStats({ coin, currentPrice }: MarketStatsProps) {
     change24h: number;
   } | null>(null);
 
-  const candleKey = `${coin}-1h`;
-  const candles = useCandleStore((state) => state.candles[candleKey]) || [];
+  const candles = useCandleStore((state) => state.selectCandles(coin, '1h'));
 
   const decimals = useMemo(() => {
     return useSymbolMetaStore.getState().getDecimals(coin);

@@ -13,7 +13,7 @@
 
 import { existsSync, mkdirSync, writeFileSync } from 'fs';
 import { join } from 'path';
-import { calculateSieuXuHuong } from '@/lib/indicators';
+import { calculateSieuXuHuong, calculateATR } from '@/lib/indicators';
 import { calcPositionSize, calcSlDistanceFromAtr, calcStopPrice } from '@/lib/services/sizing.service';
 import type { DaemonSettings } from '@/lib/bot-engine/types';
 import { DEFAULT_DAEMON_SETTINGS } from '@/lib/bot-engine/types';
@@ -27,13 +27,13 @@ const DAYS = 30;
 const TOTAL_BARS = DAYS * 1440;
 const EQUITY_INITIAL = 1000; // USDT simulated account
 const RISK_PERCENT = 1.0;    // % of equity per trade
-const ATR_MULT = 1.5;        // ATR multiplier for SL
+// ATR_MULT now sourced from settings.ritchiAtrMult (2.0) — matches daemon and Pine Script
 const LEVERAGE = 10;
 
 const settings: DaemonSettings = {
   ...DEFAULT_DAEMON_SETTINGS,
   riskPercent: RISK_PERCENT,
-  atrMultiplier: ATR_MULT,
+  // atrMultiplier kept at 1.5 (fallback only); primary SL uses ritchiAtrMult=2.0 × ATR(50)
   leverageByExchange: { binance: LEVERAGE, hyperliquid: LEVERAGE },
   paperMode: true,
 };
@@ -84,6 +84,7 @@ interface BacktestReport {
     days: number;
     initialEquity: number;
     riskPercent: number;
+    atrPeriod: number;
     atrMultiplier: number;
     leverage: number;
   };
@@ -137,20 +138,11 @@ async function fetchCandles(symbol: string, interval: string, totalBars: number)
   return all.sort((a, b) => a.time - b.time);
 }
 
-// ─── ATR calculation ──────────────────────────────────────────────────────────
+// ─── ATR extraction (uses same calculateATR as daemon — Wilder EMA smoothing) ──
 
-function calcAtr(candles: SimpleCandle[], period = 14): number {
-  if (candles.length < period + 1) return 0;
-  const recent = candles.slice(-(period + 1));
-  let sum = 0;
-  for (let i = 1; i < recent.length; i++) {
-    sum += Math.max(
-      recent[i].high - recent[i].low,
-      Math.abs(recent[i].high - recent[i - 1].close),
-      Math.abs(recent[i].low - recent[i - 1].close)
-    );
-  }
-  return sum / period;
+function getAtr50(candles: SimpleCandle[]): number {
+  const values = calculateATR(candles as any, 50);
+  return values.length > 0 ? values[values.length - 1] : 0;
 }
 
 // ─── Signal scan (same logic as daemon) ──────────────────────────────────────
@@ -215,8 +207,10 @@ function simulateSymbol(symbol: string, allCandles: SimpleCandle[]): SymbolResul
     stopPrice: number;
   } | null = null;
 
-  const WARMUP = 200;         // bars before first signal check
-  const LOOKBACK = 500;       // fixed rolling window to keep calculateSieuXuHuong O(1) per bar
+  const WARMUP = 200;               // bars before first signal check
+  const LOOKBACK = 500;             // fixed rolling window to keep calculateSieuXuHuong O(1) per bar
+  const REVERSAL_COOLDOWN_BARS = 3; // suppress fallback signals after reversal or SL hit
+  let lastReversalBar = -1000;      // bar index of last reversal/SL event
 
   for (let i = WARMUP; i < allCandles.length; i++) {
     const window = allCandles.slice(Math.max(0, i - LOOKBACK + 1), i + 1);
@@ -250,6 +244,7 @@ function simulateSymbol(symbol: string, allCandles: SimpleCandle[]): SymbolResul
         });
         equityCurve.push(equity);
         position = null;
+        lastReversalBar = i; // post-SL cooldown — suppress fallback re-entry
         continue;
       }
     }
@@ -259,12 +254,16 @@ function simulateSymbol(symbol: string, allCandles: SimpleCandle[]): SymbolResul
     if (!sig) continue;
     const signalSide: 'long' | 'short' = sig.signal === 'bullish' ? 'long' : 'short';
 
+    // Post-reversal / post-SL-hit fallback cooldown (mirrors daemon logic)
+    if (sig.isFallback && (i - lastReversalBar) < REVERSAL_COOLDOWN_BARS) continue;
+
     // No position → open
     if (!position) {
-      const atr = calcAtr(window, 14);
-      const slDist = ATR_MULT > 0 && atr > 0
-        ? calcSlDistanceFromAtr(atr, ATR_MULT)
-        : currentPrice * 0.015;
+      const atr50 = getAtr50(window);
+      const slMult = settings.ritchiAtrMult > 0 ? settings.ritchiAtrMult : settings.atrMultiplier;
+      const slDist = slMult > 0 && atr50 > 0
+        ? calcSlDistanceFromAtr(atr50, slMult)
+        : currentPrice * 0.02;
       const size = calcPositionSize({ equity, riskPercent: RISK_PERCENT, slDistance: slDist });
       const stopPrice = calcStopPrice(currentPrice, signalSide, slDist);
       position = {
@@ -301,12 +300,14 @@ function simulateSymbol(symbol: string, allCandles: SimpleCandle[]): SymbolResul
       stopPrice: position.stopPrice,
     });
     equityCurve.push(equity);
+    lastReversalBar = i; // post-reversal cooldown
 
     // Open in new direction
-    const atr = calcAtr(window, 14);
-    const slDist = ATR_MULT > 0 && atr > 0
-      ? calcSlDistanceFromAtr(atr, ATR_MULT)
-      : currentPrice * 0.015;
+    const atr50 = getAtr50(window);
+    const slMult = settings.ritchiAtrMult > 0 ? settings.ritchiAtrMult : settings.atrMultiplier;
+    const slDist = slMult > 0 && atr50 > 0
+      ? calcSlDistanceFromAtr(atr50, slMult)
+      : currentPrice * 0.02;
     const size = calcPositionSize({ equity, riskPercent: RISK_PERCENT, slDistance: slDist });
     const stopPrice = calcStopPrice(currentPrice, signalSide, slDist);
     position = {
@@ -444,7 +445,8 @@ async function main(): Promise<void> {
       days: DAYS,
       initialEquity: EQUITY_INITIAL,
       riskPercent: RISK_PERCENT,
-      atrMultiplier: ATR_MULT,
+      atrPeriod: 50,
+      atrMultiplier: settings.ritchiAtrMult,
       leverage: LEVERAGE,
     },
     symbols: symbolResults,

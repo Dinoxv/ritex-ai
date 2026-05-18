@@ -26,6 +26,7 @@ module.exports = {
       NODE_ENV: 'production',
       NEXT_DEPLOYMENT_ID: process.env.NEXT_DEPLOYMENT_ID || '',
       BINANCE_WHITELIST_IP: '103.200.20.162',
+      NEXT_DIST_DIR: '.next',
     },
   }],
 };

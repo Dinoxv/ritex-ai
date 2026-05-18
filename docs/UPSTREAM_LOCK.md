@@ -1,21 +1,18 @@
-# Upstream Lock Note
+# Upstream Lock - Branch Governance
 
-Repo upstream for chart/realtime sync: `upstream-hyperscalper/master` from `https://github.com/jestersimpps/hyperscalper.git`.
+## Muc tieu
 
-## Locked divergence
+Dong bo nguon voi upstream nhung khong lam vo tan bo wiring da exchange cua Toilabap runtime.
 
-Only one intentional divergence should remain when syncing these files from upstream:
+## Lock rules
 
-- `stores/useCandleStore.ts`
-  - Keep `ExchangeTradingService` for `service` and `setService`.
-  - Do not revert this to `HyperliquidService`.
+- Khong tu y doi service contracts da exchange.
+- Files lien quan abstraction layer bat buoc manual review.
+- Moi divergence phai co ly do va tai lieu kem theo.
 
-## Why
+## Sync checklist
 
-This repo routes the candle store through multi-exchange providers (`ServiceProvider` and `MinimalServiceProvider`).
-Those providers pass an `ExchangeTradingService`, so forcing the upstream `HyperliquidService` type breaks the local wiring.
-
-## Sync rule
-
-When re-syncing from upstream, `components/ScalpingChart.tsx` should match upstream exactly.
-`stores/useCandleStore.ts` should also match upstream except for the `ExchangeTradingService` typing noted above.
+1. So sanh cac files service/store cot loi.
+2. Chay typecheck va lint.
+3. Smoke test scanner + timeframe switching.
+4. Xac nhan deployment guardrails con nguyen ven.

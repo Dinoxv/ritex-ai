@@ -11,7 +11,8 @@ import type {
   DivergenceValue,
   SupportResistanceValue,
   KalmanTrendValue,
-  RitchiTrendValue
+  RitchiTrendValue,
+  TrendMatrixValue
 } from '@/models/Scanner';
 import type {
   StochasticScannerConfig,
@@ -25,6 +26,7 @@ import type {
   SupportResistanceScannerConfig,
   KalmanTrendScannerConfig,
   RitchiTrendScannerConfig,
+  TrendMatrixScannerConfig,
   ScannerSettings
 } from '@/models/Settings';
 import type { TransformedCandle } from './types';
@@ -42,6 +44,7 @@ import {
   calculateATR,
   calculateKalmanTrend,
   calculateSieuXuHuong,
+  calculateTrendMatrix,
   type DivergenceOptions
 } from '@/lib/indicators';
 import { aggregate1mTo5m } from '@/lib/candle-aggregator';
@@ -111,6 +114,30 @@ export interface RitchiTrendScanParams {
   config: RitchiTrendScannerConfig;
 }
 
+export interface TrendMatrixScanParams {
+  symbol: string;
+  timeframes: TimeInterval[];
+  config: TrendMatrixScannerConfig;
+  indicatorConfig: {
+    msLen: number;
+    htfTF: '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+    htfEmaLen: number;
+    atrLength: number;
+    atrMult: number;
+    targetStepMult: number;
+    riskPercent: number;
+    maxLossPercent: number;
+    partialTpPct: number;
+    bullColor: string;
+    bearColor: string;
+    showSig: boolean;
+    showTP: boolean;
+    showStop: boolean;
+    showHTF: boolean;
+    showPending: boolean;
+  };
+}
+
 interface CandleFetchProgress {
   stage: 'fetching-candles';
   completed: number;
@@ -137,8 +164,7 @@ export class ScannerService {
   }
 
   private getCandleFetchBatchSize(): number {
-    const selectedExchange = useDexStore.getState().selectedExchange;
-    return selectedExchange === 'binance' ? 20 : 10;
+    return this.hyperliquidService.getExchangeKey().startsWith('binance') ? 20 : 10;
   }
 
   private async sleep(ms: number): Promise<void> {
@@ -270,6 +296,14 @@ export class ScannerService {
         requiredCandles,
         150,
         settings.ritchiTrendScanner.timeframes
+      );
+    }
+
+    if (settings.trendMatrixScanner?.enabled) {
+      requiredCandles = this.updateRequiredCandlesForTimeframes(
+        requiredCandles,
+        220,
+        settings.trendMatrixScanner.timeframes
       );
     }
 
@@ -665,38 +699,39 @@ export class ScannerService {
         const recentHistogram = macdResult.histogram.slice(-config.recentReversalLookback);
         let foundReversal = false;
         let signalType: 'bullish' | 'bearish' | null = null;
+        let signalIndex = -1;
 
         for (let i = 1; i < recentHistogram.length; i++) {
-          const prev = recentHistogram[i - 1];
-          const curr = recentHistogram[i];
-          const prevMacd = macdResult.macd[macdResult.macd.length - config.recentReversalLookback + i - 1];
-          const currMacd = macdResult.macd[macdResult.macd.length - config.recentReversalLookback + i];
-          const prevSignal = macdResult.signal[macdResult.signal.length - config.recentReversalLookback + i - 1];
-          const currSignal = macdResult.signal[macdResult.signal.length - config.recentReversalLookback + i];
+          const absoluteIndex = macdResult.macd.length - config.recentReversalLookback + i;
+          const prevMacd = macdResult.macd[absoluteIndex - 1];
+          const currMacd = macdResult.macd[absoluteIndex];
+          const prevSignal = macdResult.signal[absoluteIndex - 1];
+          const currSignal = macdResult.signal[absoluteIndex];
 
           if (prevMacd <= prevSignal && currMacd > currSignal) {
             foundReversal = true;
             signalType = 'bullish';
+            signalIndex = absoluteIndex;
             break;
           }
 
           if (prevMacd >= prevSignal && currMacd < currSignal) {
             foundReversal = true;
             signalType = 'bearish';
+            signalIndex = absoluteIndex;
             break;
           }
         }
 
-        if (foundReversal && signalType) {
-          const lastIndex = macdResult.histogram.length - 1;
-          const lastCandle = candles[candles.length - 1];
+        if (foundReversal && signalType && signalIndex >= 0) {
+          const signalCandle = candles[signalIndex];
           const macdValue: MacdReversalValue = {
             timeframe,
             direction: signalType,
-            time: lastCandle.time,
-            price: lastCandle.close,
-            macdValue: macdResult.macd[lastIndex],
-            signalValue: macdResult.signal[lastIndex],
+            time: signalCandle.time,
+            price: signalCandle.close,
+            macdValue: macdResult.macd[signalIndex],
+            signalValue: macdResult.signal[signalIndex],
           };
 
           const description = `MACD ${signalType} crossover on ${timeframe}`;
@@ -746,33 +781,37 @@ export class ScannerService {
         const recentRsi = rsi.slice(-config.recentReversalLookback);
         let foundReversal = false;
         let signalType: 'bullish' | 'bearish' | null = null;
+        let signalIndex = -1;
 
         for (let i = 1; i < recentRsi.length; i++) {
           const prev = recentRsi[i - 1];
           const curr = recentRsi[i];
+          const absoluteIndex = rsi.length - config.recentReversalLookback + i;
 
           if (prev <= config.oversoldLevel && curr > config.oversoldLevel) {
             foundReversal = true;
             signalType = 'bullish';
+            signalIndex = absoluteIndex;
             break;
           }
 
           if (prev >= config.overboughtLevel && curr < config.overboughtLevel) {
             foundReversal = true;
             signalType = 'bearish';
+            signalIndex = absoluteIndex;
             break;
           }
         }
 
-        if (foundReversal && signalType) {
-          const lastCandle = candles[candles.length - 1];
+        if (foundReversal && signalType && signalIndex >= 0) {
+          const signalCandle = candles[signalIndex];
           const zone = signalType === 'bullish' ? 'oversold' : 'overbought';
           const rsiValue: RsiReversalValue = {
             timeframe,
             direction: signalType,
-            time: lastCandle.time,
-            price: lastCandle.close,
-            rsiValue: rsi[rsi.length - 1],
+            time: signalCandle.time,
+            price: signalCandle.close,
+            rsiValue: rsi[signalIndex],
             zone,
           };
 
@@ -1437,6 +1476,125 @@ export class ScannerService {
   ): Promise<ScanResult[]> {
     return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
       this.scanRitchiTrend({ ...scanParams, symbol })
+    );
+  }
+
+  private isBullishTrendMatrixColor(color: string | undefined, bullColor: string): boolean {
+    if (!color) return false;
+    const normalizedColor = color.toLowerCase();
+    const normalizedBull = bullColor.toLowerCase();
+    const compactBull = normalizedBull.replace('#', '').replace(/[^a-f0-9]/g, '');
+    return (
+      normalizedColor.includes(normalizedBull)
+      || (compactBull.length >= 6 && normalizedColor.includes(compactBull.slice(0, 6)))
+      || normalizedColor.includes('52,230,126')
+      || normalizedColor.includes('34e67e')
+    );
+  }
+
+  async scanTrendMatrix(params: TrendMatrixScanParams): Promise<ScanResult | null> {
+    const { symbol, timeframes, config, indicatorConfig } = params;
+
+    const candleStore = useCandleStore.getState();
+    const closePrices = candleStore.getClosePrices(symbol, '1m', 100) || [];
+    const lookback = Math.max(1, config.signalLookback || 10);
+
+    for (const timeframe of timeframes) {
+      try {
+        const lookbackCandles = 240;
+        let candles = this.getCandlesFromStore(symbol, timeframe, lookbackCandles);
+
+        if (!candles || candles.length < 80) {
+          candles = await this.fetchCandlesDirect(symbol, timeframe, lookbackCandles);
+        }
+
+        if (!candles || candles.length < 80) {
+          continue;
+        }
+
+        const trendMatrix = calculateTrendMatrix(candles as any, {
+          msLen: indicatorConfig.msLen,
+          htfTF: indicatorConfig.htfTF,
+          htfEmaLen: indicatorConfig.htfEmaLen,
+          atrLength: indicatorConfig.atrLength,
+          atrMult: indicatorConfig.atrMult,
+          targetStepMult: indicatorConfig.targetStepMult,
+          riskPercent: indicatorConfig.riskPercent,
+          maxLossPercent: indicatorConfig.maxLossPercent,
+          partialTpPct: indicatorConfig.partialTpPct,
+          bullColor: indicatorConfig.bullColor,
+          bearColor: indicatorConfig.bearColor,
+          showSig: indicatorConfig.showSig,
+          showTP: indicatorConfig.showTP,
+          showStop: indicatorConfig.showStop,
+          showHTF: indicatorConfig.showHTF,
+          showPending: indicatorConfig.showPending,
+        });
+
+        const recentSignals = trendMatrix.buySellLabels.slice(-lookback);
+        if (recentSignals.length === 0) {
+          continue;
+        }
+
+        const latestSignal = recentSignals[recentSignals.length - 1];
+        const recentTp = trendMatrix.tpLines.slice(-12);
+        const recentSl = trendMatrix.slLines.slice(-6);
+
+        let signalType: 'bullish' | 'bearish';
+        if (this.isBullishTrendMatrixColor(latestSignal.color, indicatorConfig.bullColor)) {
+          signalType = 'bullish';
+        } else {
+          const aboveCount = recentTp.filter(tp => tp.value > latestSignal.value).length;
+          const belowCount = recentTp.filter(tp => tp.value < latestSignal.value).length;
+          signalType = aboveCount >= belowCount ? 'bullish' : 'bearish';
+        }
+
+        const tpCandidates = signalType === 'bullish'
+          ? recentTp.filter(tp => tp.value > latestSignal.value)
+          : recentTp.filter(tp => tp.value < latestSignal.value);
+
+        const takeProfit = tpCandidates.length > 0
+          ? tpCandidates[tpCandidates.length - 1].value
+          : latestSignal.value;
+        const stopLoss = recentSl.length > 0 ? recentSl[recentSl.length - 1].value : latestSignal.value;
+
+        const matchedCandle = candles.find(c => Math.floor(c.time / 1000) === latestSignal.time);
+
+        const trendMatrixValue: TrendMatrixValue = {
+          direction: signalType,
+          timeframe,
+          time: matchedCandle?.time ?? Date.now(),
+          buySignal: signalType === 'bullish',
+          sellSignal: signalType === 'bearish',
+          price: latestSignal.value,
+          stopLoss,
+          takeProfit,
+        };
+
+        return {
+          symbol,
+          trendMatrixSignals: [trendMatrixValue],
+          matchedAt: Date.now(),
+          signalType,
+          description: `Trend Matrix ${signalType === 'bullish' ? 'BUY' : 'SELL'} signal on ${timeframe}`,
+          scanType: 'trendMatrix',
+          closePrices,
+        };
+      } catch (error) {
+        console.error(`Error scanning Trend Matrix for ${symbol} on ${timeframe}:`, error);
+        continue;
+      }
+    }
+
+    return null;
+  }
+
+  async scanMultipleSymbolsForTrendMatrix(
+    symbols: string[],
+    params: Omit<TrendMatrixScanParams, 'symbol'>
+  ): Promise<ScanResult[]> {
+    return this.runScanForSymbols(symbols, params, (symbol, scanParams) =>
+      this.scanTrendMatrix({ ...scanParams, symbol })
     );
   }
 

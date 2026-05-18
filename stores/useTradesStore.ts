@@ -3,7 +3,7 @@ import type { Trade } from '@/types';
 import type { ExchangeWebSocketService } from '@/lib/websocket/exchange-websocket.interface';
 import { useWebSocketStatusStore } from '@/stores/useWebSocketStatusStore';
 import { formatTrade } from '@/lib/format-utils';
-import { useDexStore } from './useDexStore';
+import { useCandleStore } from './useCandleStore';
 
 interface TradesStore {
   trades: Record<string, Trade[]>;
@@ -35,7 +35,9 @@ export const useTradesStore = create<TradesStore>((set, get) => ({
 
     const initWebSocket = async () => {
       const { useWebSocketService } = await import('@/lib/websocket/websocket-singleton');
-      const exchange = useDexStore.getState().selectedExchange;
+      const currentService = useCandleStore.getState().service;
+      const exchangeKey = currentService?.getExchangeKey() || '';
+      const exchange: 'hyperliquid' | 'binance' = exchangeKey.startsWith('binance') ? 'binance' : 'hyperliquid';
       const { service, trackSubscription } = useWebSocketService(exchange);
 
       const cleanup = trackSubscription();

@@ -1,150 +1,94 @@
-# RITEX AI - HyperScalper
+# Toilabap.com x Hyperscalper
 
-Nền tảng giao dịch và scanner tín hiệu cho Hyperliquid và Binance USD-M Futures, tối ưu cho tốc độ và quan sát thị trường thời gian thực.
+![Toilabap x Ritchi icon](public/Ritchi-icon.png)
 
-## Điểm nổi bật
+Toilabap.com la nen tang algo trading toan dien, va Hyperscalper la lop terminal realtime de scan, xac nhan, va thuc thi quyet dinh nhanh hon thi truong.
 
-- Multi-exchange: Hyperliquid + Binance USD-M Futures
-- Scanner đa chiến lược với 10 bộ quét:
-  - Stochastic
-  - Volume Spike
-  - EMA Alignment
-  - MACD Reversal
-  - RSI Reversal
-  - Channel
-  - Divergence
-  - Support/Resistance
-  - Kalman Trend
-  - Ritchi Trend
-- Scanner có tiến độ realtime:
-  - preparing
-  - fetching-candles
-  - scanning
-  - finalizing
-- Metrics hiệu năng scanner:
-  - tổng số lần chạy
-  - trung bình thời gian chạy
-  - thời gian chạy gần nhất
-  - số lần fail
-  - top scanner chậm nhất
-- Cảnh báo hiệu năng theo ngưỡng cấu hình:
-  - Medium warning (màu vàng)
-  - High warning (màu đỏ)
-- Retry + exponential backoff cho fetch candles
-- Batch size động theo exchange để cân bằng tốc độ và ổn định
+Core philosophy:
 
-## Cập nhật mới nhất
+Write strategy logic once. Run on any exchange, any asset class, without changing your core trading logic.
 
-### P0 - Stability & Correctness
+## Slogan he thong (chinh thuc)
 
-- Fix race condition khi scanner fetch candles đồng thời
-- Bỏ hardcoded yêu cầu candles và tính động theo scanner/timeframe đang bật
-- Validate lại dữ liệu sau khi aggregate 1m -> 5m trước khi scan
+- One codebase. Any exchange. Zero friction.
+- Tu prompt den lenh live trong 90 giay.
+- Ca Map hanh dong truoc. Ban vao lenh dung luc.
 
-### P1 - Maintainability & Throughput
+## Van de thi truong ma chung ta giai
 
-- Refactor logic scan nhiều symbol về generic runner
-- Thêm giới hạn concurrency khi scan để tránh bắn quá nhiều promise cùng lúc
-- Thêm clamp validation cho input số trong Scanner Settings
+Truyen thong:
+- 2-4 gio chi de lay va normalize du lieu moi lan test y tuong.
+- Backtest va live la hai he thong code khac nhau.
+- Tu y tuong den deploy thuong cham hon nhịp doi chieu cua thi truong.
 
-### P2 - Operational Visibility
+Voi Toilabap x Hyperscalper:
+- Exchange abstraction: mot interface cho Stocks, Crypto, Forex, Futures.
+- Scanner + charting event-driven: test va verify setup ngay tren runtime.
+- Trend Matrix Strategy [Ritchi] la blueprint production-grade co san.
 
-- Structured logger cho ScannerService và ScannerStore
-- Progress tracking theo stage trong scanner status
-- Dynamic batch size khi fetch candles theo exchange
+## Flagship strategy: Trend Matrix [Ritchi] v3.1.1
 
-### P3 - Performance Alerting
+4 lop confluence cot loi:
+- Market structure shift (CHoCH / BOS).
+- Liquidity behavior (sweep, pending zones, FVG context).
+- Volatility-aware risk (ATR trailing stop).
+- Partial take-profit nhieu muc de toi uu phan phoi loi nhuan.
 
-- Retry/backoff khi fetch candle bị lỗi tạm thời
-- Scanner runtime metrics theo từng scan type
-- UI progress bar + metrics trong Sidepanel
-- Cảnh báo màu vàng/đỏ theo ngưỡng thời gian chạy
-- Ngưỡng cảnh báo đưa vào Settings, chỉnh realtime:
-  - Medium Duration Warning (seconds)
-  - High Duration Warning (seconds)
+Outcome mong muon:
+- Bat dung khoanh khac doi chieu.
+- Vao lenh cung chieu dong tien lon.
+- Giu ky luat rui ro o cap production.
 
-## Cấu hình Scanner Warning Threshold
+## Kien truc stack
 
-Trong Settings -> Scanner:
+```text
+YOUR STRATEGY LOGIC
+	-> TOILABAP FRAMEWORK LAYER (Backtest, Paper, Live)
+	-> EXCHANGE ABSTRACTION (Alpaca, Binance, OANDA, ...)
+	-> ASSET CLASSES (Stocks, Crypto, Forex, Futures)
+```
 
-- Medium Duration Warning (seconds)
-- High Duration Warning (seconds)
+Trong Hyperscalper:
+- Frontend runtime: Next.js + React + lightweight-charts.
+- State/runtime: scanner, candles, bot lifecycle qua stores.
+- Deployment guardrails: PM2 + deployment ID + static-load recovery.
 
-Quy tắc hiển thị:
+## Quickstart
 
-- Avg duration > High -> đỏ
-- Avg duration > Medium và <= High -> vàng
-- Còn lại -> màu mặc định
-
-## Bảo mật trước khi push
-
-Đã áp dụng hardening cho ignore rule để tránh lộ dữ liệu local:
-
-- Ignore env local
-- Ignore credential/secrets/token files local
-- Ignore file backup
-
-Khuyến nghị trước khi public source:
-
-1. Không commit key/secret thật vào code, config, hoặc docs
-2. Dùng file ví dụ dạng .example cho biến môi trường
-3. Giữ remote URL sạch, không nhúng token
-4. Rà lại lịch sử commit nếu từng lộ key
-
-## Cài đặt
-
-Yêu cầu:
-
-- Node.js 18+
-- npm 9+
-
-Chạy local:
+1. Cai dependencies
 
 ```bash
 npm install
+```
+
+2. Chay local
+
+```bash
 npm run dev
 ```
 
-Build production:
+3. Build production
 
 ```bash
 npm run build
-npm start
 ```
 
-## Deploy với PM2
-
-```bash
-pm2 start ecosystem.config.js
-```
-
-Hoặc restart frontend:
-
-```bash
-pm2 restart hyperscalper-frontend
-```
-
-Deploy an toàn hơn cho rollout production:
+4. Deploy voi PM2
 
 ```bash
 npm run deploy:pm2
 ```
 
-Script này sẽ tạo `NEXT_DEPLOYMENT_ID` mới cho mỗi lần deploy, build lại app, rồi restart PM2 với đúng deployment ID đó để client bundle và runtime cùng một phiên rollout.
+## Tai lieu
 
-## Cấu trúc chính
+- AI trading flow: AI_TRADING_LOGIC.md
+- Trend Matrix scanner: RITCHI_TREND_SCANNER.md
+- Bot trading phase 1: docs/BotTrading-Binance-Phase1.md
+- Realtime volume trigger: docs/REALTIME_VOLUME_TRIGGER_ENGINE.md
+- Loading freeze runbook: docs/LOADING_FREEZE_RUNBOOK.md
+- Rebrand and messaging: REBRAND_PLAYBOOK.md
 
-- app: Next.js App Router
-- components: UI và chart/scanner panels
-- lib/services: exchange services và scanner service
-- stores: Zustand stores cho scanner, settings, candles, positions, orders
-- models: type contracts
+## Brand message chot
 
-## Ghi chú quan trọng
-
-- Binance integration trong dự án này tập trung vào USD-M Futures.
-- Scanner chỉ scan tốt khi symbols có dữ liệu candle đầy đủ; hệ thống đã tự fetch bổ sung trước khi quét.
-
-## License
-
-Internal / Proprietary.
+Toilabap.com khong ban mot dashboard.
+Toilabap.com ban toc do tu duy va kha nang theo dau Tien Lon trong thi truong van dong lien tuc.

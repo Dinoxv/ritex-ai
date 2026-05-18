@@ -69,12 +69,33 @@ export interface SieuXuHuongSettings {
   showSignals: boolean;
 }
 
+export interface TrendMatrixSettings {
+  enabled: boolean;
+  msLen: number;
+  htfTF: '1m' | '5m' | '15m' | '1h' | '4h' | '1d';
+  htfEmaLen: number;
+  atrLength: number;
+  atrMult: number;
+  targetStepMult: number;
+  riskPercent: number;
+  maxLossPercent: number;
+  partialTpPct: number;
+  bullColor: string;
+  bearColor: string;
+  showSig: boolean;
+  showTP: boolean;
+  showStop: boolean;
+  showHTF: boolean;
+  showPending: boolean;
+}
+
 export interface IndicatorSettings {
   stochastic: StochasticSettings;
   ema: EmaSettings;
   macd: MacdSettings;
   kalmanTrend: KalmanTrendSettings;
   sieuXuHuong: SieuXuHuongSettings;
+  trendMatrix: TrendMatrixSettings;
 }
 
 export interface StochasticScannerConfig {
@@ -167,8 +188,15 @@ export interface RitchiTrendScannerConfig {
   tpMult: number;
 }
 
+export interface TrendMatrixScannerConfig {
+  enabled: boolean;
+  timeframes: ('1m' | '5m')[];
+  signalLookback: number;
+}
+
 export interface ScannerSettings {
   enabled: boolean;
+  symbolSource: 'top' | 'favourite';
   scanInterval: number;
   topMarkets: number;
   playSound: boolean;
@@ -220,6 +248,7 @@ export interface ScannerSettings {
   supportResistanceScanner: SupportResistanceScannerConfig;
   kalmanTrendScanner: KalmanTrendScannerConfig;
   ritchiTrendScanner: RitchiTrendScannerConfig;
+  trendMatrixScanner: TrendMatrixScannerConfig;
 }
 
 export interface OrderSettings {
@@ -259,6 +288,10 @@ export interface ChartSettings {
   showBreakeven: boolean;
   schmecklesMode: boolean;
   invertedMode: boolean;
+  tradingViewByExchange: {
+    binance: boolean;
+    hyperliquid: boolean;
+  };
 }
 
 export interface AIStrategyConfig {
@@ -413,9 +446,29 @@ export const DEFAULT_SETTINGS: AppSettings = {
       tpMult: 3.0,
       showSignals: true,
     },
+    trendMatrix: {
+      enabled: false,
+      msLen: 10,
+      htfTF: '5m',
+      htfEmaLen: 50,
+      atrLength: 14,
+      atrMult: 4,
+      targetStepMult: 2,
+      riskPercent: 1,
+      maxLossPercent: 3,
+      partialTpPct: 25,
+      bullColor: '#34e67e',
+      bearColor: '#ff52f1',
+      showSig: true,
+      showTP: true,
+      showStop: true,
+      showHTF: true,
+      showPending: true,
+    },
   },
   scanner: {
     enabled: false,
+    symbolSource: 'top',
     scanInterval: 1,
     topMarkets: 50,
     playSound: true,
@@ -537,6 +590,11 @@ export const DEFAULT_SETTINGS: AppSettings = {
       atrMult: 2.0,
       tpMult: 3.0,
     },
+    trendMatrixScanner: {
+      enabled: false,
+      timeframes: ['1m', '5m'],
+      signalLookback: 10,
+    },
   },
   orders: {
     cloudPercentage: 5,
@@ -571,6 +629,10 @@ export const DEFAULT_SETTINGS: AppSettings = {
     showBreakeven: true,
     schmecklesMode: false,
     invertedMode: false,
+    tradingViewByExchange: {
+      binance: true,
+      hyperliquid: true,
+    },
   },
   ai: {
     enabled: false,

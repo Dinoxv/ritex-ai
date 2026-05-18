@@ -124,10 +124,9 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
           volatilityStore.updateFromGlobalPoll(metaData);
           topSymbolsStore.updateFromGlobalPoll(metaData);
 
-          // Merge HIP-3 DEX prices into sidebar (allMids WS doesn't include them)
-          if (selectedDex) {
-            useSidebarPricesStore.getState().mergeExternalPrices(metaData);
-          }
+          // Always seed sidebar prices from REST mark prices (provides initial prices before WS connects,
+          // and acts as fallback for Binance where WS may take a few seconds to deliver)
+          useSidebarPricesStore.getState().mergeExternalPrices(metaData);
         }
       }
 
@@ -162,10 +161,13 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
       const candleStore = useCandleStore.getState();
       const topSymbolsStore = useTopSymbolsStore.getState();
       const settings = useSettingsStore.getState().settings;
-      const selectedExchange = useDexStore.getState().selectedExchange;
+      // Derive exchange from the service to avoid selectedExchange race condition on first load
+      const serviceKey = get().service?.getExchangeKey() || '';
+      const isBinanceService = serviceKey.startsWith('binance');
+      const selectedExchange = isBinanceService ? 'binance' : (useDexStore.getState().selectedExchange);
       const runtimeTopMarkets = settings?.scanner?.runtimeByExchange?.[selectedExchange]?.topMarkets;
       const topCount = runtimeTopMarkets ?? settings?.scanner?.topMarkets ?? 50;
-      const effectiveTopCount = selectedExchange === 'binance' ? Math.min(topCount, 12) : topCount;
+      const effectiveTopCount = isBinanceService ? Math.min(topCount, 12) : topCount;
       const topSymbols = topSymbolsStore.symbols.slice(0, effectiveTopCount);
 
       if (topSymbols.length === 0) {
@@ -175,7 +177,7 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
 
       console.log(`[GlobalPolling] fetchCandleData: fetching for ${topSymbols.length} symbols`);
 
-      const staggerDelay = selectedExchange === 'binance' ? 450 : 200;
+      const staggerDelay = isBinanceService ? 450 : 200;
       let index = 0;
 
       for (const symbol of topSymbols) {
@@ -227,7 +229,10 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
 
   startGlobalPolling: () => {
     const { fastPollingInterval, slowPollingInterval, candlePollingInterval, fetchFastData, fetchSlowData, fetchCandleData } = get();
-    const selectedExchange = useDexStore.getState().selectedExchange;
+    // Derive exchange from the service directly to avoid selectedExchange race condition
+    // (selectedExchange defaults to 'hyperliquid' until RequireCredentials fires)
+    const serviceKey = get().service?.getExchangeKey() || '';
+    const isBinance = serviceKey.startsWith('binance');
 
     if (fastPollingInterval || slowPollingInterval || candlePollingInterval) {
       console.log('[GlobalPolling] startGlobalPolling: already running, skipping');
@@ -239,9 +244,9 @@ export const useGlobalPollingStore = create<GlobalPollingStore>((set, get) => ({
     fetchSlowData();
     fetchCandleData();
 
-    const fastIntervalMs = selectedExchange === 'binance' ? 12_000 : 5_000;
-    const slowIntervalMs = selectedExchange === 'binance' ? 90_000 : 60_000;
-    const candleIntervalMs = selectedExchange === 'binance' ? 180_000 : 60_000;
+    const fastIntervalMs = isBinance ? 12_000 : 5_000;
+    const slowIntervalMs = isBinance ? 90_000 : 60_000;
+    const candleIntervalMs = isBinance ? 180_000 : 60_000;
 
     const fastIntervalId = setInterval(() => {
       fetchFastData();

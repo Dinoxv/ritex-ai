@@ -1,3 +1,10 @@
+import { calculateTrendMatrix } from './trend-matrix';
+export {
+  calculateTrendMatrix,
+  type TrendMatrixOptions,
+  type TrendMatrixOverlayPoint,
+  type TrendMatrixResult,
+} from './trend-matrix';
 import type { CandleData as FullCandleData } from '@/types';
 import { createMemoizedFunction, createCandleBasedMemoization } from './memoization';
 
@@ -2011,6 +2018,15 @@ export interface KalmanTrendResult {
   kalmanFilter: number[];
 }
 
+export interface KalmanTrendMarker {
+  time: number;
+  position: 'aboveBar' | 'belowBar';
+  color: string;
+  shape: 'arrowUp' | 'arrowDown';
+  text: string;
+  id: string;
+}
+
 export function calculateKalmanTrend(
   candles: FullCandleData[],
   processNoise: number = 0.0005,
@@ -2126,6 +2142,46 @@ export function calculateKalmanTrend(
   }
 
   return { trendLine, direction, delta, volumeBar, buySignals, sellSignals, kalmanFilter };
+}
+
+export function createKalmanTrendMarkers(
+  candles: FullCandleData[],
+  kalmanTrend: KalmanTrendResult | null,
+  showSignals: boolean
+): KalmanTrendMarker[] {
+  if (!kalmanTrend || !showSignals) {
+    return [];
+  }
+
+  const markers: KalmanTrendMarker[] = [];
+
+  for (let i = 0; i < candles.length; i++) {
+    const time = (candles[i].time / 1000) as number;
+
+    if (kalmanTrend.buySignals[i]) {
+      markers.push({
+        time,
+        position: 'belowBar',
+        color: '#00c878',
+        shape: 'arrowUp',
+        text: `BUY Δ${kalmanTrend.delta[i].toFixed(2)}`,
+        id: `kalman-buy-${i}`,
+      });
+    }
+
+    if (kalmanTrend.sellSignals[i]) {
+      markers.push({
+        time,
+        position: 'aboveBar',
+        color: '#ff5050',
+        shape: 'arrowDown',
+        text: `SELL Δ${kalmanTrend.delta[i].toFixed(2)}`,
+        id: `kalman-sell-${i}`,
+      });
+    }
+  }
+
+  return markers;
 }
 
 

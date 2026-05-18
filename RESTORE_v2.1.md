@@ -1,100 +1,42 @@
-# Restore Point: v2.1-binance-fixes
+# Restore v2.1 - Runtime Recovery Procedure
 
-**Date:** 2026-04-21 18:30 GMT+7  
-**Commit:** 23b9dcb  
-**Tag:** v2.1-binance-fixes  
-**PM2 Status:** Online (PID: 1315743, restart #84)
+## Muc tieu
 
-## What's Included
+Khoi phuc nhanh mot ban on dinh ma khong pha vo deployment guardrails.
 
-### ✅ Binance Perp Improvements
-- **Trades**: Increased limit from 100 → **500** (max API)
-- **Metadata Cache**: Reduced from 60s → **30s** (fresher data)
-- **History Symbols**: Increased from 30 → **100** symbols
-- **Ghost Orders**: Fixed filter to remove size=0, price=0, inactive orders
+## Pre-check bat buoc
 
-### ✅ Position Mode Detection
-- Auto-detect Hedge vs One-way mode via `/fapi/v1/positionSide/dual`
-- Automatically set correct `positionSide` parameter
-- Remove `reduceOnly` in Hedge mode (not supported)
-- Retry on position-side mismatch with mode refresh
+1. Xac nhan commit/tag dich can restore.
+2. Backup env, PM2 ecosystem, va runtime config.
+3. Kiem tra process map va port map hien tai.
 
-### ✅ Trigger Order Improvements
-- Added `workingType: MARK_PRICE` for reliable trigger execution
-- Use `closePosition: true` for SL/TP orders (primary)
-- Fallback to quantity+reduceOnly if closePosition fails
-- Console warning log when fallback activates
-
-### ✅ Files Modified
-- `/root/hyperscalper/lib/services/binance.service.ts` (main changes)
-- UI components: time display (UTC → GMT+7), chart improvements
-- Stores: scanner, user fills optimizations
-
-## How to Restore
-
-### Method 1: Git Tag (Recommended)
-```bash
-cd /root/hyperscalper
-git checkout v2.1-binance-fixes
-npm run build
-pm2 restart hyperscalper-frontend
-```
-
-### Method 2: Git Commit Hash
-```bash
-cd /root/hyperscalper
-git checkout 23b9dcb
-npm run build
-pm2 restart hyperscalper-frontend
-```
-
-### Method 3: Branch Reset (if on master)
-```bash
-cd /root/hyperscalper
-git reset --hard v2.1-binance-fixes
-npm run build
-pm2 restart hyperscalper-frontend
-```
-
-## Verify After Restore
-
-1. **Check PM2 Status:**
-   ```bash
-   pm2 status hyperscalper-frontend
-   pm2 logs hyperscalper-frontend --lines 20
-   ```
-
-2. **Test Binance Perp:**
-   - Open RAVE or any token page
-   - Verify no ghost orders (size=0, price=$0.00)
-   - Check that trades show up to 500 entries
-   - Test placing orders (market, limit, stop-loss)
-
-3. **Check Browser:**
-   - Hard refresh: `Ctrl + Shift + R`
-   - Clear cache if needed
-   - Verify time shows GMT+7
-
-## Rollback to Previous Version
-
-If you need to go back **before** this restore point:
+## Quy trinh restore
 
 ```bash
 cd /root/hyperscalper
-git log --oneline -10  # Find desired commit
-git checkout <commit-hash>
+git fetch --all --tags
+git checkout <stable-tag-or-commit>
+npm install
 npm run build
-pm2 restart hyperscalper-frontend
+pm2 restart hyperscalper-frontend --update-env
 ```
 
-## Notes
+## Post-restore validation
 
-- This restore point includes all Binance API compatibility fixes
-- Ghost orders are filtered at service level (not UI)
-- Position mode detection is cached for 60 seconds
-- All changes are production-tested and PM2-verified
+- Route chinh render binh thuong.
+- Timeframe switch khong crash.
+- Trend Matrix overlays load dung du lieu.
+- Scanner cycle co output + metrics.
+- NEXT_DEPLOYMENT_ID hien dien trong runtime.
 
----
+## Neu con loading freeze
 
-**Created by:** AI Agent  
-**Session:** 2026-04-21 fixes for Binance Perp ghost orders & data improvements
+- Kiem tra mismatch giua build artifact va cache.
+- Thuc hien hard reload cache-bust.
+- Chay theo runbook: docs/LOADING_FREEZE_RUNBOOK.md
+
+## Roll-forward strategy
+
+- Tao nhanh branch hotfix tu moc vua restore.
+- Chi cherry-pick thay doi can thiet.
+- Deploy qua luong deploy:pm2 de giu tinh dong bo.

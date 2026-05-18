@@ -74,7 +74,7 @@ function TradeVolumeTimeline({ coin, trades }: TradeVolumeTimelineProps) {
       if (!chartContainerRef.current || !mounted) return;
 
       try {
-        const { createChart } = await import('lightweight-charts');
+        const { createChart, BaselineSeries } = await import('lightweight-charts');
 
         if (!mounted || !chartContainerRef.current) return;
 
@@ -109,7 +109,7 @@ function TradeVolumeTimeline({ coin, trades }: TradeVolumeTimelineProps) {
         });
 
         // Use baseline series for color change at zero
-        const baselineSeries = chart.addBaselineSeries({
+        const baselineSeries = chart.addSeries(BaselineSeries, {
           baseValue: { type: 'price', price: 0 },
           topLineColor: colors.statusBullish,
           topFillColor1: colors.statusBullish + '40',

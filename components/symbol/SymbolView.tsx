@@ -3,6 +3,8 @@
 import { useState, useEffect, useRef, useCallback, useMemo, memo } from 'react';
 import ScalpingChart from '@/components/ScalpingChart';
 import MultiTimeframeChart from '@/components/MultiTimeframeChart';
+import TradingViewExchangeChart from '@/components/charting/TradingViewExchangeChart';
+import LightweightChart from '@/components/charting/LightweightChart';
 import TerminalHeader from '@/components/layout/TerminalHeader';
 import { useTradesStore } from '@/stores/useTradesStore';
 import { usePositionStore } from '@/stores/usePositionStore';
@@ -20,6 +22,7 @@ import { calculateAverageCandleHeight } from '@/lib/trading-utils';
 import { getCandleTimeWindow } from '@/lib/time-utils';
 import { DEFAULT_CANDLE_COUNT } from '@/lib/constants';
 import type { TimeInterval } from '@/types';
+import { useTradingViewDatafeed } from '@/lib/hooks/use-tradingview-datafeed';
 
 interface SymbolViewProps {
   coin: string;
@@ -28,6 +31,7 @@ interface SymbolViewProps {
 function SymbolView({ coin }: SymbolViewProps) {
   const [currentPrice, setCurrentPrice] = useState(0);
   const [newTradeKeys, setNewTradeKeys] = useState<Set<string>>(new Set());
+  const [tvLibraryUnavailable, setTvLibraryUnavailable] = useState(false);
   const chartRef = useRef<any>(null);
   const crosshairStateRef = useRef({ active: false, type: null as any });
 
@@ -41,6 +45,7 @@ function SymbolView({ coin }: SymbolViewProps) {
   const playTradeSound = useSettingsStore((state) => state.settings.theme.playTradeSound);
   const settingsOrders = useSettingsStore((state) => state.settings.orders);
   const selectedExchange = useDexStore((state) => state.selectedExchange);
+  const selectedDex = useDexStore((state) => state.selectedDex);
   const orderSettings = useMemo(() => {
     const byExchange = settingsOrders.byExchange?.[selectedExchange];
     return byExchange ?? {
@@ -51,6 +56,7 @@ function SymbolView({ coin }: SymbolViewProps) {
     };
   }, [settingsOrders, selectedExchange]);
   const invertedMode = useSettingsStore((state) => state.settings.chart.invertedMode);
+  const tradingViewEnabledByExchange = useSettingsStore((state) => state.settings.chart.tradingViewByExchange);
 
   const position = usePositionStore((state) => state.positions[coin]);
 
@@ -60,8 +66,7 @@ function SymbolView({ coin }: SymbolViewProps) {
   const subscribeToOrders = useOrderStore((state) => state.subscribeToOrders);
   const unsubscribeFromOrders = useOrderStore((state) => state.unsubscribeFromOrders);
 
-  const candleKey = `${coin}-1m`;
-  const candles = useCandleStore((state) => state.candles[candleKey]) || [];
+  const candles = useCandleStore((state) => state.selectCandles(coin, '1m'));
   const fetchCandles = useCandleStore((state) => state.fetchCandles);
   const subscribeToCandles = useCandleStore((state) => state.subscribeToCandles);
   const unsubscribeFromCandles = useCandleStore((state) => state.unsubscribeFromCandles);
@@ -79,6 +84,20 @@ function SymbolView({ coin }: SymbolViewProps) {
     console.log('Crosshair state updated:', { active: crosshairActive, type: crosshairType });
   }, [crosshairActive, crosshairType]);
   const candleService = useCandleStore((state) => state.service);
+  const tvDatafeed = useTradingViewDatafeed(candleService, selectedExchange, selectedDex);
+  const tradingViewEnabledForExchange = selectedExchange === 'binance'
+    ? (tradingViewEnabledByExchange?.binance ?? true)
+    : selectedExchange === 'hyperliquid'
+      ? (tradingViewEnabledByExchange?.hyperliquid ?? true)
+      : false;
+  const shouldUseTradingViewChart = !isMultiChartView
+    && !tvLibraryUnavailable
+    && tradingViewEnabledForExchange
+    && (selectedExchange === 'binance' || selectedExchange === 'hyperliquid');
+
+  useEffect(() => {
+    setTvLibraryUnavailable(false);
+  }, [coin, selectedExchange, selectedDex]);
 
   const getDecimals = useSymbolMetaStore((state) => state.getDecimals);
   const decimals = useMemo(() => getDecimals(coin), [getDecimals, coin]);
@@ -105,7 +124,7 @@ function SymbolView({ coin }: SymbolViewProps) {
       unsubscribeFromOrders(coin);
       setActiveSymbol(null);
     };
-  }, [coin, setActiveSymbol]);
+  }, [coin, selectedExchange, subscribeToTrades, unsubscribeFromTrades, subscribeToOrders, unsubscribeFromOrders, setActiveSymbol]);
 
   useEffect(() => {
     console.log(`[SymbolView] Candle effect triggered for ${coin}`, { candleService: !!candleService });
@@ -126,7 +145,7 @@ function SymbolView({ coin }: SymbolViewProps) {
         unsubscribeFromCandles(coin, interval);
       });
     };
-  }, [coin, candleService]);
+  }, [coin, selectedExchange, candleService, fetchCandles, subscribeToCandles, unsubscribeFromCandles]);
 
   useEffect(() => {
     if (trades.length === 0) return;
@@ -180,6 +199,17 @@ function SymbolView({ coin }: SymbolViewProps) {
       };
     }
   }, [trades, playTradeSound]);
+
+  useEffect(() => {
+    if (candles.length === 0) {
+      return;
+    }
+
+    const latest = candles[candles.length - 1];
+    if (latest?.close != null) {
+      setCurrentPrice(latest.close);
+    }
+  }, [candles]);
 
   const handleBuyCloud = useCallback(async () => {
     const actualSide = invertedMode ? 'bearish' : 'bullish';
@@ -473,8 +503,7 @@ function SymbolView({ coin }: SymbolViewProps) {
   const handleAutoZoom = useCallback(() => {
     try {
       if (chartRef.current && chartRef.current.timeScale) {
-        const candleKey = `${coin}-1m`;
-        const candles = useCandleStore.getState().candles[candleKey] || [];
+        const candles = useCandleStore.getState().selectCandles(coin, '1m');
 
         if (candles.length >= 2) {
           const fromTime = candles[0].time / 1000;
@@ -498,8 +527,7 @@ function SymbolView({ coin }: SymbolViewProps) {
   const handleZoomTo50 = useCallback(() => {
     try {
       if (chartRef.current && chartRef.current.timeScale) {
-        const candleKey = `${coin}-1m`;
-        const candles = useCandleStore.getState().candles[candleKey] || [];
+        const candles = useCandleStore.getState().selectCandles(coin, '1m');
         if (candles.length >= 2) {
           const endIndex = candles.length - 1;
           const startIndex = Math.max(0, endIndex - 49);
@@ -554,15 +582,23 @@ function SymbolView({ coin }: SymbolViewProps) {
           <div className="flex-1 min-h-0">
             <MultiTimeframeChart coin={coin} />
           </div>
+        ) : shouldUseTradingViewChart ? (
+          <div className="terminal-border flex flex-1 min-h-0 overflow-hidden">
+            <LightweightChart
+              coin={coin}
+              exchange={selectedExchange}
+              className="h-full w-full"
+            />
+          </div>
         ) : (
           <div className="terminal-border p-1.5 flex flex-col flex-1 min-h-0">
             <div className="text-[10px] text-primary-muted mb-0.5 uppercase tracking-wider">█ SCALPING CHART</div>
             <div className={`flex-1 min-h-0 ${crosshairActive ? 'cursor-crosshair' : ''}`}>
-              <ScalpingChart
-                coin={coin}
-                interval="1m"
-                onPriceUpdate={setCurrentPrice}
-                onChartReady={(chart) => { chartRef.current = chart; }}
+                <ScalpingChart
+                  coin={coin}
+                  interval="1m"
+                  onPriceUpdate={setCurrentPrice}
+                  onChartReady={(chart) => { chartRef.current = chart; }}
 onChartClick={async (data) => {
                   const { active, type } = crosshairStateRef.current;
                   console.log('Chart clicked at price:', data.price, 'Crosshair active:', active, 'Type:', type);
@@ -644,7 +680,7 @@ onChartClick={async (data) => {
                 }}
                 position={position}
                 orders={orders}
-              />
+                />
             </div>
           </div>
         )}

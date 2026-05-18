@@ -43,11 +43,11 @@ export default function ChartPopupView({ coin, address }: ChartPopupViewProps) {
   const position = usePositionStore((state) => state.positions[coin]);
   const orders = useOrderStore((state) => state.orders[coin]) || [];
 
-  const mainChartData = useCandleStore((state) => state.candles[`${coin}-${selectedTimeframe}`] ?? EMPTY_CANDLES);
-  const candles1m = useCandleStore((state) => state.candles[`${coin}-1m`] ?? EMPTY_CANDLES);
-  const candles5m = useCandleStore((state) => state.candles[`${coin}-5m`] ?? EMPTY_CANDLES);
-  const candles15m = useCandleStore((state) => state.candles[`${coin}-15m`] ?? EMPTY_CANDLES);
-  const candles1h = useCandleStore((state) => state.candles[`${coin}-1h`] ?? EMPTY_CANDLES);
+  const mainChartData = useCandleStore((state) => state.selectCandles(coin, selectedTimeframe) ?? EMPTY_CANDLES);
+  const candles1m = useCandleStore((state) => state.selectCandles(coin, '1m') ?? EMPTY_CANDLES);
+  const candles5m = useCandleStore((state) => state.selectCandles(coin, '5m') ?? EMPTY_CANDLES);
+  const candles15m = useCandleStore((state) => state.selectCandles(coin, '15m') ?? EMPTY_CANDLES);
+  const candles1h = useCandleStore((state) => state.selectCandles(coin, '1h') ?? EMPTY_CANDLES);
 
   useEffect(() => {
     if (!candleService) {

@@ -5,8 +5,9 @@ set -euo pipefail
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 cd "$ROOT_DIR"
 
-deployment_id="${NEXT_DEPLOYMENT_ID:-$(date -u +%Y%m%d%H%M%S)}"
+deployment_id="$(date -u +%Y%m%d%H%M%S)"
 export NEXT_DEPLOYMENT_ID="$deployment_id"
+export NEXT_PUBLIC_DEPLOYMENT_ID="$deployment_id"
 
 echo "Using NEXT_DEPLOYMENT_ID=$NEXT_DEPLOYMENT_ID"
 
@@ -29,6 +30,9 @@ rm -rf .next_old
 [ -d .next ] && mv .next .next_old
 mv .next_new .next
 
+# IMPORTANT: never keep NEXT_DIST_DIR in runtime env (causes .next_new crash-loop)
+unset NEXT_DIST_DIR
+
 if pm2 describe hyperscalper-frontend >/dev/null 2>&1; then
   pm2 restart ecosystem.config.js --only hyperscalper-frontend --update-env
 else
@@ -36,5 +40,4 @@ else
 fi
 
 # Dọn backup sau khi restart thành công
-rm -rf .next_old
 rm -rf .next_old

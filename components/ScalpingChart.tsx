@@ -1,6 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState, useMemo, useCallback } from 'react';
+import {
+  CandlestickSeries,
+  HistogramSeries,
+  LineSeries,
+  BarSeries,
+  AreaSeries,
+  BaselineSeries,
+  createSeriesMarkers,
+} from 'lightweight-charts';
 import type { CandleData, TimeInterval } from '@/types';
 import type { Position } from '@/models/Position';
 import type { Order } from '@/models/Order';
@@ -29,6 +38,7 @@ import {
   detectRsiReversals,
   calculateTrendlines,
   calculatePivotLines,
+  createKalmanTrendMarkers,
   type StochasticData,
   type DivergencePoint,
   type ReversalMarker,
@@ -250,9 +260,10 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   const firstCandleTimeRef = useRef<number | null>(null);
   const candlesLengthRef = useRef<number>(0);
 
-  const candleKey = `${coin}-${interval}`;
-  const storeCandles = useCandleStore((state) => state.candles[candleKey]) || [];
-  const storeLoading = useCandleStore((state) => state.loading[candleKey]) || false;
+  const selectCandles = useCandleStore((state) => state.selectCandles);
+  const selectLoading = useCandleStore((state) => state.selectLoading);
+  const storeCandles = selectCandles(coin, interval);
+  const storeLoading = selectLoading(coin, interval);
   const candleService = useCandleStore((state) => state.service);
   const getDecimals = useSymbolMetaStore((state) => state.getDecimals);
   const decimals = getDecimals(coin);
@@ -281,8 +292,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     .filter(([_, config]) => config.enabled && !simplifiedView && macdSettings.showMultiTimeframe)
     .map(([tf]) => tf as TimeInterval);
 
-  const storeMacdCandles = useCandleStore((state) => state.candles);
-  const allMacdCandles = isExternalData && macdCandleData ? macdCandleData : storeMacdCandles;
+  const allMacdCandles = isExternalData && macdCandleData ? macdCandleData : undefined;
 
   useEffect(() => {
     let mounted = true;
@@ -294,7 +304,15 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
       if (!chartContainerRef.current || !mounted) return;
 
       try {
-        const { createChart } = await import('lightweight-charts');
+        const {
+          createChart,
+          CandlestickSeries,
+          HistogramSeries,
+          LineSeries,
+          BarSeries,
+          AreaSeries,
+          BaselineSeries,
+        } = await import('lightweight-charts');
 
         if (!mounted || !chartContainerRef.current) return;
 
@@ -332,7 +350,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           },
         });
 
-        const candleSeries = chart.addCandlestickSeries({
+        const candleSeries = chart.addSeries(CandlestickSeries, {
           upColor: colors.statusBullish,
           downColor: colors.statusBearish,
           borderVisible: false,
@@ -345,7 +363,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           },
         });
 
-        const volumeSeries = chart.addHistogramSeries({
+        const volumeSeries = chart.addSeries(HistogramSeries, {
           color: colors.statusBullish,
           priceFormat: {
             type: 'volume',
@@ -360,21 +378,21 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           },
         });
 
-        const ema1Series = chart.addLineSeries({
+        const ema1Series = chart.addSeries(LineSeries, {
           color: colors.accentBlue,
           lineWidth: 2,
           lastValueVisible: false,
           priceLineVisible: false,
         });
 
-        const ema2Series = chart.addLineSeries({
+        const ema2Series = chart.addSeries(LineSeries, {
           color: colors.accentRose,
           lineWidth: 2,
           lastValueVisible: false,
           priceLineVisible: false,
         });
 
-        const ema3Series = chart.addLineSeries({
+        const ema3Series = chart.addSeries(LineSeries, {
           color: colors.statusBullish,
           lineWidth: 2,
           lastValueVisible: false,
@@ -382,7 +400,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         });
 
         // Kalman Trend series
-        const kalmanTrendSeries = chart.addLineSeries({
+        const kalmanTrendSeries = chart.addSeries(LineSeries, {
           color: '#1a6cca',
           lineWidth: 3,
           lastValueVisible: false,
@@ -391,7 +409,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         kalmanTrendSeriesRef.current = kalmanTrendSeries;
 
         // Siêu Xu Hướng series
-        const sieuXuHuongSeries = chart.addLineSeries({
+        const sieuXuHuongSeries = chart.addSeries(LineSeries, {
           color: '#ff9800',
           lineWidth: 2,
           lastValueVisible: false,
@@ -411,7 +429,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
 
         if (!hideStochastic) {
           if (simplifiedView) {
-            const kSeries = chart.addLineSeries({
+            const kSeries = chart.addSeries(LineSeries, {
               color: colors.statusBullish,
               lineWidth: 1,
               priceScaleId: 'stoch',
@@ -420,7 +438,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
               lineStyle: 2,
             });
 
-            const dSeries = chart.addLineSeries({
+            const dSeries = chart.addSeries(LineSeries, {
               color: colors.accentRose,
               lineWidth: 1,
               priceScaleId: 'stoch',
@@ -447,7 +465,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
             Object.entries(stochasticSettings.variants).forEach(([variantName, settings]) => {
               if (!settings.enabled) return;
 
-              const dSeries = chart.addLineSeries({
+              const dSeries = chart.addSeries(LineSeries, {
                 color: variantColors[variantName],
                 lineWidth: 1,
                 priceScaleId: 'stoch',
@@ -478,7 +496,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         macdSeriesRefsRef.current = {};
 
         enabledMacdTimeframes.forEach((timeframe) => {
-          const lineSeries = chart.addLineSeries({
+          const lineSeries = chart.addSeries(LineSeries, {
             color: macdTimeframeColors[timeframe].line,
             lineWidth: 2,
             priceScaleId: 'macd',
@@ -486,7 +504,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
             priceLineVisible: false,
           });
 
-          const signalSeries = chart.addLineSeries({
+          const signalSeries = chart.addSeries(LineSeries, {
             color: macdTimeframeColors[timeframe].signal,
             lineWidth: 1,
             lineStyle: 2,
@@ -495,7 +513,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
             priceLineVisible: false,
           });
 
-          const histogramSeries = chart.addHistogramSeries({
+          const histogramSeries = chart.addSeries(HistogramSeries, {
             priceScaleId: 'macd',
             lastValueVisible: false,
             priceLineVisible: false,
@@ -665,7 +683,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
       // Recreate stochastic series when toggled back on
       if (Object.keys(stochSeriesRefsRef.current).length === 0) {
         if (simplifiedView) {
-          const kSeries = chart.addLineSeries({
+          const kSeries = chart.addSeries(LineSeries, {
             color: colors.statusBullish,
             lineWidth: 1,
             priceScaleId: 'stoch',
@@ -674,7 +692,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
             lineStyle: 2,
           });
 
-          const dSeries = chart.addLineSeries({
+          const dSeries = chart.addSeries(LineSeries, {
             color: colors.accentRose,
             lineWidth: 1,
             priceScaleId: 'stoch',
@@ -834,7 +852,15 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
 
   useEffect(() => {
     lastCandleTimeRef.current = null;
+    firstCandleTimeRef.current = null;
+    candlesLengthRef.current = 0;
   }, [interval]);
+
+  useEffect(() => {
+    lastCandleTimeRef.current = null;
+    firstCandleTimeRef.current = null;
+    candlesLengthRef.current = 0;
+  }, [coin]);
 
   // Infinite scroll: load older candles when user scrolls to left edge
   // Also auto-fills viewport on initial load and when chart is small
@@ -1026,7 +1052,9 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
 
   const detectDivergencesDebounced = useDebouncedCallback(() => {
     if (!simplifiedView && stochasticSettings.showMultiVariant && stochasticSettings.showDivergence && displayCandles.length >= 50) {
-      const stochCandles = interval === '1m' ? candles : (isExternalData ? allMacdCandles['1m'] : useCandleStore.getState().candles[`${coin}-1m`]);
+      const stochCandles = interval === '1m'
+        ? candles
+        : (isExternalData ? allMacdCandles?.['1m'] : useCandleStore.getState().selectCandles(coin, '1m'));
       if (!stochCandles || stochCandles.length === 0) return;
       const displayStochCandles = invertCandles(stochCandles, chartSettings?.invertedMode ?? false);
 
@@ -1067,7 +1095,19 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
   }, [displayCandles, simplifiedView, stochasticSettings.showMultiVariant, stochasticSettings.showDivergence, stochasticSettings.variants, interval, candles, isExternalData, allMacdCandles, coin, chartSettings]);
 
   useEffect(() => {
-    if (!chartReady || !candleSeriesRef.current || displayCandles.length === 0) return;
+    if (!chartReady || !candleSeriesRef.current || displayCandles.length === 0) {
+      // Reset tracking refs when candles become empty (e.g. service/exchange switch).
+      // Without this, when new exchange candles arrive with the same array length and
+      // same last-candle timestamp (same minute boundary), isNewCandle and isLengthChanged
+      // both evaluate to false, so setData is never called and the chart stays frozen
+      // with old exchange prices.
+      if (displayCandles.length === 0) {
+        lastCandleTimeRef.current = null;
+        firstCandleTimeRef.current = null;
+        candlesLengthRef.current = 0;
+      }
+      return;
+    }
 
     candlesBufferRef.current = displayCandles;
 
@@ -1158,10 +1198,18 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           const dnColor = '#ca1aad';
 
           const trendData = kalmanTrend.trendLine.map((value, i) => {
+            const pointTime = (displayCandles[i].time / 1000) as any;
             const isChange = i > 0 && kalmanTrend.direction[i] !== kalmanTrend.direction[i - 1];
+
+            if (isChange) {
+              return {
+                time: pointTime,
+              };
+            }
+
             return {
-              time: (displayCandles[i].time / 1000) as any,
-              value: isChange ? undefined as any : value,
+              time: pointTime,
+              value,
               color: kalmanTrend.direction[i] ? upColor : dnColor,
             };
           });
@@ -1198,31 +1246,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
         }
 
         // Build markers including Kalman signals
-        const kalmanMarkers: any[] = [];
-        if (kalmanTrend && kalmanTrendSettings?.enabled && kalmanTrendSettings?.showSignals) {
-          for (let i = 0; i < displayCandles.length; i++) {
-            if (kalmanTrend.buySignals[i]) {
-              kalmanMarkers.push({
-                time: (displayCandles[i].time / 1000) as any,
-                position: 'belowBar',
-                color: '#00c878',
-                shape: 'arrowUp',
-                text: 'BUY Δ' + kalmanTrend.delta[i].toFixed(2),
-                id: `kalman-buy-${i}`,
-              });
-            }
-            if (kalmanTrend.sellSignals[i]) {
-              kalmanMarkers.push({
-                time: (displayCandles[i].time / 1000) as any,
-                position: 'aboveBar',
-                color: '#ff5050',
-                shape: 'arrowDown',
-                text: 'SELL Δ' + kalmanTrend.delta[i].toFixed(2),
-                id: `kalman-sell-${i}`,
-              });
-            }
-          }
-        }
+        const kalmanMarkers = createKalmanTrendMarkers(displayCandles, kalmanTrend, kalmanTrendSettings?.showSignals ?? false);
 
         // Ritchi Trend signal markers
         const ritchiMarkers: any[] = [];
@@ -1255,7 +1279,9 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
           ? [...pivotMarkers, ...divergenceMarkers, ...crossoverMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers, ...ritchiMarkers]
           : [...pivotMarkers, ...divergenceMarkers, ...macdReversalMarkers, ...rsiReversalMarkers, ...kalmanMarkers, ...ritchiMarkers];
 
-        candleSeriesRef.current?.setMarkers(allMarkers.sort((a, b) => a.time - b.time));
+        if (candleSeriesRef.current) {
+          createSeriesMarkers(candleSeriesRef.current, allMarkers.sort((a, b) => a.time - b.time));
+        }
       });
     } else {
       candleSeriesRef.current.update(candleData[candleData.length - 1]);
@@ -1335,7 +1361,9 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     const colors = getThemeColors();
 
     enabledMacdTimeframes.forEach((timeframe) => {
-      const macdCandles = isExternalData ? allMacdCandles[timeframe] : allMacdCandles[`${coin}-${timeframe}` as TimeInterval];
+      const macdCandles = isExternalData
+        ? allMacdCandles?.[timeframe]
+        : useCandleStore.getState().selectCandles(coin, timeframe);
       if (!macdCandles || macdCandles.length === 0) return;
 
       const config = macdSettings.timeframes?.[timeframe as keyof typeof macdSettings.timeframes];
@@ -1393,7 +1421,9 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
     // Multi-variant stochastic for normal view
     if (!stochasticSettings.showMultiVariant) return;
 
-    const stochCandles = interval === '1m' ? candles : (isExternalData ? allMacdCandles['1m'] : useCandleStore.getState().candles[`${coin}-1m`]);
+    const stochCandles = interval === '1m'
+      ? candles
+      : (isExternalData ? allMacdCandles?.['1m'] : useCandleStore.getState().selectCandles(coin, '1m'));
     if (!stochCandles || stochCandles.length === 0) return;
 
     const displayStochCandles = invertCandles(stochCandles, chartSettings?.invertedMode ?? false);
@@ -1427,7 +1457,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
       const stochMarkers = chartSettings?.showPivotMarkers
         ? createStochasticPivotMarkers(stochData, displayStochCandles.slice(offset))
         : [];
-      stochSeriesRefsRef.current[variantName].d.setMarkers(stochMarkers);
+      createSeriesMarkers(stochSeriesRefsRef.current[variantName].d, stochMarkers);
     }
   }, [chartReady, displayCandles, interval, allMacdCandles, stochasticSettings, chartSettings, coin, isExternalData, simplifiedView, simpleStochastic]);
 
@@ -1582,7 +1612,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
 
     trendlines.supportLine.forEach((line) => {
       if (line.points.length >= 2) {
-        const supportSeries = chartRef.current!.addLineSeries({
+        const supportSeries = chartRef.current!.addSeries(LineSeries, {
           color: colors.statusBullish,
           lineWidth: 2,
           lineStyle: line.lineStyle,
@@ -1596,7 +1626,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
 
     trendlines.resistanceLine.forEach((line) => {
       if (line.points.length >= 2) {
-        const resistanceSeries = chartRef.current!.addLineSeries({
+        const resistanceSeries = chartRef.current!.addSeries(LineSeries, {
           color: colors.statusBearish,
           lineWidth: 2,
           lineStyle: line.lineStyle,
@@ -1704,7 +1734,7 @@ export default function ScalpingChart({ coin, interval, onPriceUpdate, onChartRe
       }
 
       // Create baseline series with entry as baseline and breakeven as data
-      const breakevenBandSeries = chartRef.current.addBaselineSeries({
+      const breakevenBandSeries = chartRef.current.addSeries(BaselineSeries, {
         baseValue: { type: 'price', price: displayEntryPrice },
         topFillColor1: 'rgba(255, 255, 0, 0.15)',
         topFillColor2: 'rgba(255, 255, 0, 0.05)',

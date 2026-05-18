@@ -8,7 +8,7 @@ import { STANDARD_CANDLES } from '@/lib/constants';
 
 function BTCChart() {
   const [currentPrice, setCurrentPrice] = useState(0);
-  const candles = useCandleStore((state) => state.candles['BTC-1m']) || [];
+  const candles = useCandleStore((state) => state.selectCandles('BTC', '1m'));
   const candleService = useCandleStore((state) => state.service);
 
   useEffect(() => {

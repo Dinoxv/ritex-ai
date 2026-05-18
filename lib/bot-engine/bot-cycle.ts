@@ -5,7 +5,7 @@
  * No React / Zustand / browser dependencies – pure Node.js.
  */
 
-import { calculateSieuXuHuong } from '@/lib/indicators';
+import { calculateSieuXuHuong, calculateATR } from '@/lib/indicators';
 import {
   getAllPositions,
   upsertPosition,
@@ -232,6 +232,32 @@ export async function runBotCycle(
   // Post-reversal cooldown tracking (in-memory, reset on daemon restart)
   const lastReversalAt: Record<string, number> = {};
 
+  // Sync exchange positions: detect externally-closed positions (SL hit while bot was offline)
+  if (!settings.paperMode && Object.keys(positions).length > 0) {
+    try {
+      const exchangePositions = await client.getOpenPositions();
+      const exchangeSymbols = new Set(exchangePositions.map((p) => p.symbol));
+      for (const [sym, pos] of Object.entries(positions)) {
+        if (!exchangeSymbols.has(sym)) {
+          // Position no longer on exchange — safety SL was triggered
+          delete positions[sym];
+          deletePosition(sym);
+          // Apply cooldown so fallback signal cannot immediately re-enter
+          lastReversalAt[sym] = Date.now();
+          log(sym, indicator, 'close-sl-hit',
+            `Safety SL hit externally — position cleaned up, fallback cooldown applied`, {
+            side: pos.side,
+            price: pos.entryPrice,
+            size: pos.size,
+          });
+          await alerts.sendPositionClose(sym, pos.side, pos.entryPrice, pos.size, 0, 'sl-hit');
+        }
+      }
+    } catch (syncErr) {
+      console.warn('[BotCycle] Exchange position sync failed (non-fatal):', syncErr instanceof Error ? syncErr.message : syncErr);
+    }
+  }
+
   for (const symbol of trackedSymbols) {
     try {
       await processSymbol(
@@ -299,7 +325,7 @@ async function processSymbol(
     return;
   }
 
-  // 3. Post-reversal fallback cooldown
+  // 3. Post-reversal / post-SL-hit fallback cooldown
   const REVERSAL_COOLDOWN_BARS = 3;
   const intervalMs = settings.timeframe === '5m' ? 5 * 60 * 1000 : 60 * 1000;
   const cooldownMs = intervalMs * REVERSAL_COOLDOWN_BARS;
@@ -368,10 +394,13 @@ async function openPosition(
 
   const meta = await client.getSymbolMeta(symbol);
 
-  // ATR-based SL distance (Fix #6)
-  const atr = client.calcAtr(candles, 14);
-  const slDist = settings.atrMultiplier > 0 && atr > 0
-    ? calcSlDistanceFromAtr(atr, settings.atrMultiplier)
+  // Safety SL distance: use ATR(50) × ritchiAtrMult to match the Siêu Xu Hướng indicator
+  // (Pine Script uses ATR(50) × atrMult=2.0; old code used ATR(14) × 1.5 — 37% narrower)
+  const atr50Values = calculateATR(candles as any, 50);
+  const atr50 = atr50Values.length > 0 ? atr50Values[atr50Values.length - 1] : 0;
+  const slMult = settings.ritchiAtrMult > 0 ? settings.ritchiAtrMult : settings.atrMultiplier;
+  const slDist = slMult > 0 && atr50 > 0
+    ? calcSlDistanceFromAtr(atr50, slMult)
     : midPrice * (settings.safetyStopLossPercent / 100);
 
   // Risk-based sizing (Fix #7) or fallback to fixed margin
