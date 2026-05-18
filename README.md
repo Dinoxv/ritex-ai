@@ -10,6 +10,16 @@ Nen tang giao dich thuat toan toan dien cho trader, quant va team dev muon di tu
 
 Toilabap.com x Hyperscalper la nen tang algo trading, AI trading va smart money concept trading, ho tro backtest, paper trading va live trading tren Stocks, Crypto, Forex, Futures voi mot codebase duy nhat.
 
+## Advanced SEO Pack
+
+Meta description (147 ky tu):
+Toilabap x Hyperscalper la nen tang algo trading giup trader va developer backtest, paper trade va live deploy chien luoc tren Stocks, Crypto, Forex.
+
+Headline SEO A/B test:
+- A: Toilabap x Hyperscalper - Nen Tang Algo Trading cho Backtest va Live Deploy Da San
+- B: Build Once, Trade Everywhere - AI Algo Trading Platform cho Stocks, Crypto, Forex
+- C: Smart Money Concept Trading Platform - CHoCH, Liquidity Sweep, FVG, Confluence Score
+
 ## SEO Keywords (Song Ngu Viet-Anh)
 
 ### 1) Developer Intent (Y dinh ky thuat / xay dung he thong)
