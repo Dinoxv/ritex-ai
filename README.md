@@ -4,32 +4,32 @@
 
 # Toilabap.com x Hyperscalper
 
-Nen tang giao dich thuat toan toan dien cho trader, quant va team dev muon di tu y tuong den backtest va live deploy nhanh, ro rang, co ky luat.
+Nền tảng giao dịch thuật toán toàn diện cho trader, quant và team dev muốn đi từ ý tưởng đến backtest và live deploy nhanh, rõ ràng, có kỷ luật.
 
 ## SEO Introduction
 
-Toilabap.com x Hyperscalper la nen tang algo trading, AI trading va smart money concept trading, ho tro backtest, paper trading va live trading tren Stocks, Crypto, Forex, Futures voi mot codebase duy nhat.
+Toilabap.com x Hyperscalper là nền tảng algo trading, AI trading và smart money concept trading, hỗ trợ backtest, paper trading và live trading trên Stocks, Crypto, Forex, Futures với một codebase duy nhất.
 
 ## Advanced SEO Pack
 
-Meta description (147 ky tu):
-Toilabap x Hyperscalper la nen tang algo trading giup trader va developer backtest, paper trade va live deploy chien luoc tren Stocks, Crypto, Forex.
+Meta description (147 ký tự):
+Toilabap x Hyperscalper là nền tảng algo trading giúp trader và developer backtest, paper trade và live deploy chiến lược trên Stocks, Crypto, Forex.
 
 Headline SEO A/B test:
-- A: Toilabap x Hyperscalper - Nen Tang Algo Trading cho Backtest va Live Deploy Da San
+- A: Toilabap x Hyperscalper - Nền Tảng Algo Trading cho Backtest và Live Deploy Đa Sàn
 - B: Build Once, Trade Everywhere - AI Algo Trading Platform cho Stocks, Crypto, Forex
 - C: Smart Money Concept Trading Platform - CHoCH, Liquidity Sweep, FVG, Confluence Score
 
-## SEO Keywords (Song Ngu Viet-Anh)
+## SEO Keywords (Song Ngữ Việt-Anh)
 
-### 1) Developer Intent (Y dinh ky thuat / xay dung he thong)
+### 1) Developer Intent (Ý định kỹ thuật / xây dựng hệ thống)
 
 **VN keywords:**
-- nen tang giao dich thuat toan ma nguon mo
+- nền tảng giao dịch thuật toán mã nguồn mở
 - framework algo trading cho developer
-- backtest va live deploy tu mot codebase
-- he thong giao dich da san cross-exchange
-- terminal giao dich realtime Next.js TypeScript
+- backtest và live deploy từ một codebase
+- hệ thống giao dịch đa sàn cross-exchange
+- terminal giao dịch realtime Next.js TypeScript
 - bot trading PM2 deployment
 
 **EN keywords:**
@@ -40,16 +40,16 @@ Headline SEO A/B test:
 - Next.js TypeScript trading terminal
 - PM2 trading bot deployment
 
-### 2) Trader Intent (Y dinh giao dich / tim edge)
+### 2) Trader Intent (Ý định giao dịch / tìm edge)
 
 **VN keywords:**
-- chien luoc smart money concept
+- chiến lược smart money concept
 - CHoCH liquidity sweep FVG strategy
 - trend matrix strategy ritchi
-- bot giao dich crypto forex stocks
-- tu dong hoa chien luoc giao dich
-- quan ly rui ro ATR trailing stop
-- he thong confluence scoring giao dich
+- bot giao dịch crypto forex stocks
+- tự động hóa chiến lược giao dịch
+- quản lý rủi ro ATR trailing stop
+- hệ thống confluence scoring giao dịch
 
 **EN keywords:**
 - smart money concept trading strategy
@@ -60,14 +60,14 @@ Headline SEO A/B test:
 - ATR trailing stop risk management
 - confluence scoring trading system
 
-### 3) Business Intent (Y dinh doanh nghiep / san pham)
+### 3) Business Intent (Ý định doanh nghiệp / sản phẩm)
 
 **VN keywords:**
-- nen tang giao dich cho team va startup fintech
-- giai phap ha tang giao dich dinh luong
-- giam thoi gian tu y tuong den lenh live
-- phan mem giao dich cho cong dong trader
-- san pham giao dich AI cho thi truong Viet Nam
+- nền tảng giao dịch cho team và startup fintech
+- giải pháp hạ tầng giao dịch định lượng
+- giảm thời gian từ ý tưởng đến lệnh live
+- phần mềm giao dịch cho cộng đồng trader
+- sản phẩm giao dịch AI cho thị trường Việt Nam
 
 **EN keywords:**
 - algorithmic trading infrastructure for teams
@@ -80,7 +80,7 @@ Headline SEO A/B test:
 
 - "how to build an algorithmic trading platform with backtest and live deploy"
 - "best open source smart money concept trading bot"
-- "nen tang algo trading cho crypto forex stocks tai Viet Nam"
+- "nền tang algo trading cho crypto forex stocks tại Việt Nam"
 - "Next.js TypeScript real-time trading dashboard architecture"
 - "confluence score CHoCH liquidity sweep FVG strategy"
 
@@ -90,7 +90,7 @@ Headline SEO A/B test:
 
 ```text
 TOILABAP.COM LA GI?
--> Nen tang Giao Dich Thong Minh theo dau Dong Tien Lon.
+-> Nền tảng Giao Dịch Thong Minh theo dau Dong Tien Lon.
 -> Kien truc: Strategy -> Confluence Filter -> Backtest -> Live Deploy.
 -> "Write once, run on any exchange" - Stocks, Crypto, Forex, Futures.
 -> Flagship: Trend Matrix Strategy [Ritchi] - SMC built-in, san sang deploy.
